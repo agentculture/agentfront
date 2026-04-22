@@ -15,6 +15,10 @@ Stack (mirrors `../culture` conventions for the AgentCulture OSS org):
 - CI: `tests.yml` (PR), `publish.yml` (TestPyPI on PR, PyPI on push to main — Trusted Publishing / OIDC), `security-checks.yml` (scheduled weekly).
 - Version bump required when `afi/`, `pyproject.toml`, or `tests/` changes — enforced by the `version-check` job in `tests.yml`. Use the repo-local `version-bump` skill (`.claude/skills/version-bump/`) or run `python3 .claude/skills/version-bump/scripts/bump.py {major,minor,patch}` directly; pipe a JSON changelog object via stdin so `CHANGELOG.md` gets a populated entry.
 
+## Context
+
+This repo belongs to the **AgentCulture** OSS org. Before making design decisions, read [`docs/agentculture.md`](./docs/agentculture.md) (what the org is, that agents are first-class members, and afi-cli's foundational role) and [`docs/agent-first.md`](./docs/agent-first.md) (the paradigm — learnability on CLI, minimalism on MCP, discoverability on HTTP). Every feature proposal is expected to pass an Agent First review.
+
 ## Intended Purpose
 
 **afi-cli** = *Agent First Interface CLI*. A scaffolding tool that generates **all three interface surfaces** an AI agent may need to consume a tool, from a single source of truth:

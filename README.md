@@ -8,7 +8,7 @@ From a single source of truth, afi-cli generates three interface surfaces, each 
 - **MCP server** — a deliberately minimal menu, tuned for low surface area over maximal API coverage.
 - **HTTP site** — markdown pages plus a sitemap, navigable by any agent with a fetch tool.
 
-Part of the [AgentCulture](https://github.com/agentculture) OSS org.
+Part of the [AgentCulture](https://github.com/agentculture) OSS org — see [`docs/agentculture.md`](./docs/agentculture.md) for the org, its paradigm, and how afi-cli is foundational to it. The design brief is in [`docs/agent-first.md`](./docs/agent-first.md).
 
 ## Install
 
