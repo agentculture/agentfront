@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/). This project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-04-22
+
+### Added
+
+- `afi explain <path>` — global markdown catalog lookup; resolves any noun/verb path to structured markdown. `--json` mode emits `{path, markdown}`.
+- `afi cli cite [path]` — emit the agent-first Python CLI reference tree into `<path>/.afi/reference/python-cli/` with literal `{{tokens}}`; adds `.afi/` to `.gitignore` if missing; writes `AGENT.md` and `MANIFEST.json`. Safe for brownfield use (only touches `.afi/` plus one gitignore line).
+- `afi cli verify [path]` — five-bundle agent-first rubric auditor: structure, learnability, json, errors, explain. Supports `--json` and `--strict`.
+- Exit-code policy: `0` success / `1` user error / `2` environment error; `3+` reserved.
+- Self-verify acceptance gate: `afi cli verify` on the afi-cli repo passes every bundle; `tests/test_self_verify.py` blocks regressions.
+- `docs/rubric.md` — canonical five-bundle checklist.
+
+### Changed
+
+- `afi learn` now emits a structured self-teaching prompt (purpose, command map, exit codes, `--json`, `explain`); `--json` mode emits a typed payload.
+- `afi/cli/__init__.py` refactored: `_AfiArgumentParser` routes argparse errors through our structured format (so unknown verbs carry a `hint:` line); error handling centralised in `_dispatch`.
+- Coverage threshold raised from 50% to 70% (current coverage ~82%).
+
 ## [0.1.2] - 2026-04-22
 
 ### Added
@@ -15,7 +32,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 
 - README.md and CLAUDE.md: link the two new docs so humans and future Claude sessions read the org context before making design decisions.
-- **Policy:** every PR now bumps the version, even docs-only or trivial ones. CLAUDE.md updated, and `.github/workflows/tests.yml` version-check gate no longer skips when only docs/config change. PyPI history and `CHANGELOG.md` now track each merged PR 1:1.
+- __Policy:__ every PR now bumps the version, even docs-only or trivial ones. CLAUDE.md updated, and `.github/workflows/tests.yml` version-check gate no longer skips when only docs/config change. PyPI history and `CHANGELOG.md` now track each merged PR 1:1.
 
 ## [0.1.1] - 2026-04-22
 
