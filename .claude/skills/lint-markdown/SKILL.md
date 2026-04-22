@@ -7,7 +7,7 @@ description: Use after editing any .md file in this repo, before committing, or 
 
 One step: run the repo script.
 
-```
+```bash
 scripts/lint-md.sh
 ```
 
@@ -15,7 +15,7 @@ No flags. It handles file selection (all tracked `.md` files), auto-fix, and con
 
 To scope to specific files, pass them as arguments:
 
-```
+```bash
 scripts/lint-md.sh path/to/file.md path/to/other.md
 ```
 
