@@ -8,6 +8,36 @@ From a single source of truth, afi-cli generates three interface surfaces, each 
 - **MCP server** — a deliberately minimal menu, tuned for low surface area over maximal API coverage.
 - **HTTP site** — markdown pages plus a sitemap, navigable by any agent with a fetch tool.
 
-## Status
+Part of the [AgentCulture](https://github.com/agentculture) OSS org.
 
-Greenfield. Stack and entry points are not yet chosen; see [`CLAUDE.md`](./CLAUDE.md) for the design north star and repo setup (markdown lint hook, lint skill, etc.).
+## Install
+
+```bash
+uv tool install afi-cli
+```
+
+Then `afi --version` should work on your PATH. `uv tool install` is the supported path — not `pip install`.
+
+## Usage
+
+```bash
+afi learn    # self-description for an agent reader
+afi --help   # subcommand listing
+```
+
+Feature commands (scaffold generators for CLI / MCP / HTTP) are not implemented yet — the `learn` stub is a placeholder that demonstrates the agent-learnability principle.
+
+## Develop
+
+```bash
+uv sync                          # install + dev deps
+uv run pytest -n auto -v         # tests
+uv run afi learn                 # run the CLI from source
+uv run pre-commit install        # enable lint hooks
+```
+
+See [`CLAUDE.md`](./CLAUDE.md) for design intent and full command reference.
+
+## License
+
+MIT. © 2026 Ori Nachum / AgentCulture.

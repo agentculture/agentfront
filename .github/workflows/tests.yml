@@ -1,0 +1,83 @@
+name: Tests
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4
+
+      - run: uv python install 3.12
+
+      - run: uv sync
+
+      - run: uv run pytest -n auto --cov=afi --cov-report=xml:coverage.xml --cov-report=term -v
+
+  version-check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - run: git fetch origin main
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      - name: Check if code changed
+        id: changes
+        run: |
+          CODE_CHANGED=$(git diff --name-only origin/main...HEAD -- 'afi/' 'pyproject.toml' 'tests/' | head -1)
+          if [ -z "$CODE_CHANGED" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Only docs/config changed — skipping version check"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check version bump
+        if: steps.changes.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          MAIN_VERSION=$(git show origin/main:pyproject.toml 2>/dev/null | python3 -c "import sys,tomllib; print(tomllib.loads(sys.stdin.read())['project']['version'])" 2>/dev/null || echo "")
+
+          if [ -z "$MAIN_VERSION" ]; then
+            echo "No pyproject.toml on main yet — skipping version check (initial scaffold)."
+            exit 0
+          fi
+
+          if [ "$PR_VERSION" = "$MAIN_VERSION" ]; then
+            MARKER="<!-- version-check -->"
+            BODY="⚠️ **Version not bumped** — \`pyproject.toml\` still has \`$PR_VERSION\` (same as main). Bump before merging to avoid a failed PyPI publish.
+
+          $MARKER"
+
+            EXISTING=$(gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
+              --jq '.[] | select(.body | contains("<!-- version-check -->")) | .id' | head -1)
+
+            if [ -n "$EXISTING" ]; then
+              gh api repos/${{ github.repository }}/issues/comments/$EXISTING \
+                -X PATCH -f body="$BODY" > /dev/null
+            else
+              gh pr comment ${{ github.event.pull_request.number }} --body "$BODY" || true
+            fi
+
+            echo "::error::Version $PR_VERSION matches main. Bump before merging."
+            exit 1
+          else
+            echo "Version bumped: $MAIN_VERSION -> $PR_VERSION"
+          fi
