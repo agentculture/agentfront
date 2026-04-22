@@ -1,0 +1,15 @@
+# markdownlint-cli2 config for afi-cli.
+# markdownlint-cli2 stops walking at the git root, so the user's global
+# ~/.markdownlint-cli2.yaml isn't picked up from inside the repo.
+# Keep this file aligned with the global preset.
+
+config:
+  default: true
+  # MD013: Line length — disabled. Prose lines wrap at the reader.
+  MD013: false
+  # MD060: Table pipe spacing — disabled (stylistic preference).
+  MD060: false
+
+ignores:
+  - "node_modules/**"
+  - ".local/**"

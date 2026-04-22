@@ -30,6 +30,12 @@ This project lives under `/home/spark/git/`, whose workspace-level `CLAUDE.md` e
 
 Do not add these tools preemptively — wire them in when there is code to lint.
 
+## Markdown Linting
+
+- **Auto-fix (recommended):** `scripts/lint-md.sh` — runs `markdownlint-cli2 --fix` across all tracked `.md` files (or pass paths to scope). The `lint-markdown` skill under `.claude/skills/` wraps this one-liner.
+- **Pre-commit hook:** `.pre-commit-config.yaml` runs `markdownlint-cli2` in check-only mode. Activate with `pre-commit install` after installing [pre-commit](https://pre-commit.com/).
+- **Config:** `.markdownlint-cli2.yaml` at the repo root (MD013/MD060 disabled). Lives in-repo because `markdownlint-cli2` stops walking at the git root and does not pick up `~/.markdownlint-cli2.yaml` from inside the repo.
+
 ## Permissions
 
 `.claude/settings.local.json` pre-allows `Bash(python3 *)`. Extend this file (not the global settings) when adding project-local tool permissions.
