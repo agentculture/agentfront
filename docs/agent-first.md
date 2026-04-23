@@ -1,4 +1,7 @@
-# Agent First
+---
+title: Agent First
+nav_order: 2
+---
 
 **Agent First** is AgentCulture's guiding paradigm: when you design software, *the primary consumer is an AI agent, not a human*. Every other decision — CLI shape, docs layout, protocol menu, error messages — flows from that reversal.
 

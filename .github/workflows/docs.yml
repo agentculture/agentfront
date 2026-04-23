@@ -65,12 +65,29 @@ jobs:
         id: secrets
         env:
           CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          if [ -n "$CF_API_TOKEN" ]; then
+          # wrangler needs BOTH the API token and the account ID. Gating
+          # on only one leaves a failure window where adding just one
+          # secret would turn CI red. List exactly which secrets are
+          # missing so a reviewer doesn't have to open the deploy logs
+          # to find out.
+          missing=""
+          if [ -z "$CF_API_TOKEN" ]; then
+            missing="CLOUDFLARE_API_TOKEN"
+          fi
+          if [ -z "$CF_ACCOUNT_ID" ]; then
+            if [ -n "$missing" ]; then
+              missing="$missing, CLOUDFLARE_ACCOUNT_ID"
+            else
+              missing="CLOUDFLARE_ACCOUNT_ID"
+            fi
+          fi
+          if [ -z "$missing" ]; then
             echo "present=true" >> "$GITHUB_OUTPUT"
           else
             echo "present=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Cloudflare secrets not yet configured; skipping deploy. See agentculture/cloudflare for wiring."
+            echo "::notice::Cloudflare secrets not yet configured (missing: $missing); skipping deploy. See agentculture/cloudflare for wiring."
           fi
       - name: Deploy to Cloudflare Pages
         id: deploy
@@ -96,8 +113,12 @@ jobs:
         run: |
           set -e
           MARKER='<!-- afi-docs-preview -->'
-          ALIAS_URL="https://${BRANCH}.afi.pages.dev"
-          BODY="$MARKER"$'\n'"📘 **docs preview** for this PR:"$'\n\n'"- **Latest deploy:** $DEPLOY_URL  _(immutable — this specific commit)_"$'\n'"- **Branch alias:** $ALIAS_URL  _(always latest — updates on each push)_"
+          # Jekyll builds with `baseurl: /afi`, so every asset, link, and
+          # canonical tag lives under /afi. Root of either preview URL
+          # returns a 404 — point reviewers at /afi/ directly.
+          DEPLOY_ENTRY="${DEPLOY_URL%/}/afi/"
+          ALIAS_URL="https://${BRANCH}.afi.pages.dev/afi/"
+          BODY="$MARKER"$'\n'"📘 **docs preview** for this PR:"$'\n\n'"- **Latest deploy:** $DEPLOY_ENTRY  _(immutable — this specific commit)_"$'\n'"- **Branch alias:** $ALIAS_URL  _(always latest — updates on each push)_"
           EXISTING=$(gh api --paginate "repos/$REPO/issues/$PR_NUMBER/comments" \
             | jq -rs "add | [.[] | select(.body | contains(\"$MARKER\")) | .id] | first // empty")
           if [ -n "$EXISTING" ]; then

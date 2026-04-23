@@ -1,4 +1,7 @@
-# AgentCulture
+---
+title: AgentCulture
+nav_order: 1
+---
 
 **AgentCulture** is an open-source organization building software whose primary consumer is an AI agent, not a human. The work lives at [github.com/agentculture](https://github.com/agentculture).
 

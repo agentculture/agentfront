@@ -1,4 +1,7 @@
-# The Agent-First Rubric
+---
+title: Rubric
+nav_order: 3
+---
 
 The rubric is the concrete, checkable form of the [Agent First](./agent-first.md) discipline. It is what `afi cli verify` enforces and what `afi cli cite` emits a reference for.
 
