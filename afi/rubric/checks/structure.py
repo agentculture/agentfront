@@ -127,11 +127,18 @@ if len(_params) > 1:
     )
     sys.exit(2)
 
-if len(_params) == 1 and _params[0].default is inspect.Parameter.empty:
-    sys.stderr.write(
-        "no_default: argv parameter must default to None so main() can be called with no args\n"
-    )
-    sys.exit(2)
+if len(_params) == 1:
+    _p = _params[0]
+    if _p.name != "argv":
+        sys.stderr.write(
+            f"bad_param_name: single parameter must be named 'argv', got {{_p.name!r}}\n"
+        )
+        sys.exit(2)
+    if _p.default is not None:
+        sys.stderr.write(
+            f"bad_default: argv must default to None, got default={{_p.default!r}}\n"
+        )
+        sys.exit(2)
 
 # Functional invariant: main(["--help"]) must terminate with an int exit code
 # (either returned or via SystemExit). argparse's --help path SystemExits(0),
@@ -171,9 +178,15 @@ sys.exit(0)
 def _resolve_entry_target(ctx: VerifyContext) -> tuple[str, str] | None:
     """Return ``(module, func)`` for ``ctx.tool_name``'s script entry, or ``None``.
 
-    The entry is chosen by matching the script name to ``ctx.tool_name``; if
-    no match, the first declared script is used (consistent with the rest of
-    afi's targeting heuristics).
+    Resolution rule (tightened after PR #6 review):
+
+    * If ``ctx.tool_name`` **is** a key in ``[project.scripts]``, validate
+      that entry. If the value is malformed (not a ``module:func`` string),
+      return ``None`` — do **not** silently fall back to a different entry,
+      since that would let the check validate the wrong function and hide
+      real drift.
+    * Only when ``ctx.tool_name`` is not present at all do we fall back to
+      the first declared script (single-binary projects).
     """
     p = ctx.target_path / "pyproject.toml"
     if not p.is_file():
@@ -185,8 +198,9 @@ def _resolve_entry_target(ctx: VerifyContext) -> tuple[str, str] | None:
     scripts = data.get("project", {}).get("scripts", {})
     if not isinstance(scripts, dict) or not scripts:
         return None
-    target = scripts.get(ctx.tool_name)
-    if not isinstance(target, str) or ":" not in target:
+    if ctx.tool_name in scripts:
+        target = scripts[ctx.tool_name]
+    else:
         target = next(iter(scripts.values()))
     if not isinstance(target, str) or ":" not in target:
         return None

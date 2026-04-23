@@ -1,4 +1,4 @@
-"""End-to-end tests for the ``afi cli {cite,verify}`` surface.
+"""End-to-end tests for the ``afi cli {cite,verify,overview}`` surface.
 
 These drive afi as a subprocess (via ``python -m afi``) to exercise the full
 argparse + dispatch + cite + rubric code path end-to-end — not via

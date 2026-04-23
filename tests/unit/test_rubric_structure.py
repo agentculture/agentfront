@@ -130,14 +130,47 @@ def test_main_entry_contract_errors_when_probe_reports_bad_signature(
         structure.subprocess,
         "run",
         lambda *a, **kw: SimpleNamespace(
-            returncode=2, stdout="", stderr="no_default: argv parameter must default to None\n"
+            returncode=2,
+            stdout="",
+            stderr="bad_default: argv must default to None, got default=[]\n",
         ),
     )
     result = structure._check_main_entry_contract(_ctx(tmp_path))
     assert not result.passed
     assert result.severity == "error"
-    assert "no_default" in result.evidence
+    assert "bad_default" in result.evidence
     assert "main(argv" in result.remediation
+
+
+def test_resolve_entry_target_returns_none_when_matching_script_malformed(
+    tmp_path: Path,
+) -> None:
+    """If ctx.tool_name has an entry but value lacks ``module:func`` shape,
+    return None rather than silently falling back to a different script.
+
+    This prevents the probe from validating a *different* entry point than
+    the tool actually uses — regression caught in PR #6 review (Qodo Q4).
+    """
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "demo"\nversion = "0.0.1"\n'
+        "\n[project.scripts]\n"
+        'other = "other.cli:main"\n'
+        'demo = "not-a-valid-entry-shape"\n'
+    )
+    assert structure._resolve_entry_target(_ctx(tmp_path)) is None
+
+
+def test_resolve_entry_target_falls_back_when_tool_name_absent(
+    tmp_path: Path,
+) -> None:
+    """When ctx.tool_name is not in scripts at all, the first script is used."""
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "demo"\nversion = "0.0.1"\n'
+        "\n[project.scripts]\n"
+        'other = "other.cli:main"\n'
+    )
+    # ctx.tool_name="demo" is not in scripts → falls back to "other" entry.
+    assert structure._resolve_entry_target(_ctx(tmp_path)) == ("other.cli", "main")
 
 
 def test_main_entry_contract_warns_when_probe_cannot_run(

@@ -30,17 +30,25 @@ and trust the structural bundle.
 from __future__ import annotations
 
 import json
+import secrets
+import tempfile
+from pathlib import Path
 
 from afi.rubric._types import CheckResult, VerifyContext
 
 BUNDLE = "overview"
 
-# A path unlikely to collide with a real project on any sane filesystem.
-# Overview must fall back to its zero-target template (exit 0) rather than
-# hard-failing the way ``verify`` does on a missing target.
-# S108: BOGUS_PATH is never written to; it exists only to exercise the
-# graceful-fallback code path (missing target).
-BOGUS_PATH = "/tmp/afi-overview-bogus-path-zzz-does-not-exist"  # noqa: S108
+
+def _fresh_missing_path() -> str:
+    """Return a random, guaranteed-non-existent path for the graceful-fallback probe.
+
+    The path is never created — the whole point is that the target tool's
+    ``overview`` verb must fall back gracefully when handed a missing target.
+    The random suffix avoids a predictable ``/tmp/`` location that a malicious
+    actor could pre-seed with crafted content (overview is a file-reading verb
+    in target mode). Overridable in tests via monkey-patch.
+    """
+    return str(Path(tempfile.gettempdir()) / f"afi-overview-missing-{secrets.token_hex(8)}")
 
 
 def _check_overview_global_exists(ctx: VerifyContext) -> CheckResult:
@@ -137,7 +145,8 @@ def _check_overview_json_shape(ctx: VerifyContext) -> CheckResult:
 
 
 def _check_overview_graceful_on_bad_path(ctx: VerifyContext) -> CheckResult:
-    out = ctx.runner.run(["overview", BOGUS_PATH], timeout=10.0)
+    bogus = _fresh_missing_path()
+    out = ctx.runner.run(["overview", bogus], timeout=10.0)
     if out.returncode == 0:
         return CheckResult(
             BUNDLE,

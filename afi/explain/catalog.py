@@ -171,12 +171,13 @@ always the latest reference. The `.gitignore` line is check-before-modify.
 _CLI_VERIFY = """\
 # afi cli verify [path] [--json] [--strict]
 
-Audit a CLI at `path` against the five-bundle agent-first rubric.
+Audit a CLI at `path` against the six-bundle agent-first rubric.
 
 ## Bundles
 
 1. **structure** — `pyproject.toml` with `[project.scripts]`, `tests/`
-   dir, `<tool> --help` exits 0.
+   dir, `<tool> --help` exits 0, target `main(argv: list[str] | None =
+   None) -> int` signature conforms.
 2. **learnability** — `<tool> learn` exits 0, stdout ≥ 200 chars, mentions
    purpose, commands, exit codes, `--json`, `explain`.
 3. **json** — `<tool> learn --json` is parseable; stderr clean on success;
@@ -185,6 +186,10 @@ Audit a CLI at `path` against the five-bundle agent-first rubric.
    traceback; exit-code policy documented in `learn`.
 5. **explain** — `<tool> explain` and `<tool> explain <tool>` succeed;
    bogus path fails with remediation.
+6. **overview** — `<tool> overview` and `<tool> cli overview` succeed;
+   `overview --json` carries the stable keys `subject` + `sections`;
+   missing target paths fall back gracefully (exit 0 with a warning),
+   since descriptive verbs must not hard-fail the way `verify` does.
 
 ## Strategy
 
@@ -265,13 +270,18 @@ Stable keys — culture's embed helper can machine-read the output.
 
 ## Rubric role
 
-Rubric bundle 6 (`overview_cmd`) asserts that every agent-first CLI
-exposes:
+Rubric bundle 6 (`overview_cmd`) asserts:
 
-- a top-level `overview` verb that works and accepts `--json`;
-- an `overview` verb under every noun that has action-verbs;
-- a stable JSON shape (`subject`, `sections` required);
-- **read-only** behaviour (the target tree's file mtimes must not change).
+- a top-level `overview` verb exists and works (non-empty stdout);
+- every noun with action-verbs also exposes an `overview` verb (checked
+  against the `cli` noun today; generalises as nouns are added);
+- `overview --json` carries the stable keys `subject` and `sections`;
+- missing target paths fall back gracefully (exit 0 with a warning) —
+  descriptive verbs must not hard-fail the way `verify` does.
+
+The **read-only** invariant is a *design* contract — the verb has no
+mutating flags (`--out`, `--write`, etc.) — rather than a runtime
+filesystem probe, keeping the rubric fast and black-box.
 """
 
 

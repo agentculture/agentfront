@@ -206,7 +206,7 @@ def register(sub: argparse._SubParsersAction) -> None:
 
     verify = cli_sub.add_parser(
         "verify",
-        help="Audit a CLI at <path> against the five-bundle agent-first rubric.",
+        help="Audit a CLI at <path> against the six-bundle agent-first rubric.",
     )
     verify.add_argument("path", nargs="?", default=".", help="Target project path (default: .).")
     verify.add_argument("--json", action="store_true", help="Emit structured JSON.")

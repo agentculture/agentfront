@@ -1,4 +1,4 @@
-"""Agent-first rubric — five bundles of checks.
+"""Agent-first rubric — six bundles of checks.
 
 Public API:
 
