@@ -5,7 +5,7 @@ baseurl: "/afi"
 lang: en
 
 theme: just-the-docs
-color_scheme: dark
+color_scheme: dark-terminal
 
 search_enabled: true
 search:

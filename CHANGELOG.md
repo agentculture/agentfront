@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/). This project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2026-04-23
+
+### Added
+
+- docs/_sass/color_schemes/dark-terminal.scss, docs/_sass/custom/custom.scss — port the canonical culture design system (byte-identical to the copies in agex-cli and culture). Dark background (#0B0F12), bright-green accent (#41D67A), off-white text; custom hero, btn-cta, and docs-grid components.
+- docs/_includes/head_custom.html — inline dark-bg preload so the page does not flash white on load, plus rel=related links back to Culture, agex, and AgentIRC.
+
+### Changed
+
+- docs/_config.yml: color_scheme dark -> dark-terminal so the new SCSS activates.
+- docs/index.md: restructured the landing page to use the shared hero + btn-cta + docs-grid components. Visual parity with culture.dev/agex; copy is unchanged.
+
 ## [0.4.0] - 2026-04-23
 
 ### Added
