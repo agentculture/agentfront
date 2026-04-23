@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/). This project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-04-23
+
+
+### Added
+
+- afi cli overview [path] — read-only markdown snapshot of a target CLI (entry point, command surface, agent-first triple presence, rubric posture). Falls back to afi's own scaffolded template when path is omitted or the target has no detectable CLI surface.
+- afi overview [path] — top-level rollup across interface surfaces; currently reports cli only (mcp and site follow in v0.4 / v0.5). Delegates to the cli inspector and notes unimplemented surfaces.
+- Rubric bundle 6 (overview_cmd) — asserts target CLIs expose a top-level `overview` verb, an `overview` verb under the `cli` noun, a stable `--json` shape with `subject` and `sections` keys, and graceful fallback on missing target paths.
+- Structure-bundle `main_entry_contract` check — probes the target's [project.scripts] entry via a uv subprocess to confirm the function matches `main(argv: list[str] | None = None) -> int` and does not `sys.exit` on normal paths (argparse --help SystemExit(0) is tolerated).
+- Universal verb triple documented in the explain catalog: `learn` / `explain` / `overview` are mandated on every agent-first CLI; afi now self-verifies against the full triple.
+
 ## [0.2.0] - 2026-04-22
 
 ### Added

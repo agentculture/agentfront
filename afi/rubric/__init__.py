@@ -1,4 +1,4 @@
-"""Agent-first rubric — five bundles of checks.
+"""Agent-first rubric — six bundles of checks.
 
 Public API:
 
@@ -17,6 +17,7 @@ from afi.rubric.checks import errors as _errors_checks
 from afi.rubric.checks import explain_cmd as _explain_checks
 from afi.rubric.checks import json_output as _json_checks
 from afi.rubric.checks import learnability as _learn_checks
+from afi.rubric.checks import overview_cmd as _overview_checks
 from afi.rubric.checks import structure as _structure_checks
 
 
@@ -28,6 +29,7 @@ def default_rubric() -> list:
         _json_checks,
         _errors_checks,
         _explain_checks,
+        _overview_checks,
     ]
 
 

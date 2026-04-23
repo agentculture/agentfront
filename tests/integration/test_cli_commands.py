@@ -1,4 +1,4 @@
-"""End-to-end tests for the ``afi cli {cite,verify}`` surface.
+"""End-to-end tests for the ``afi cli {cite,verify,overview}`` surface.
 
 These drive afi as a subprocess (via ``python -m afi``) to exercise the full
 argparse + dispatch + cite + rubric code path end-to-end — not via
@@ -96,6 +96,7 @@ def test_verify_json_mode_emits_structured_report() -> None:
         "json",
         "errors",
         "explain",
+        "overview",
     }
 
 
@@ -108,9 +109,62 @@ def test_bogus_verb_exits_with_hint() -> None:
     assert "Traceback" not in result.stderr
 
 
-@pytest.mark.parametrize("path", ["afi", "learn", "explain", "cli", "cli cite", "cli verify"])
+@pytest.mark.parametrize(
+    "path",
+    [
+        "afi",
+        "learn",
+        "explain",
+        "overview",
+        "cli",
+        "cli cite",
+        "cli verify",
+        "cli overview",
+    ],
+)
 def test_every_registered_path_has_explain_entry(path: str) -> None:
     tokens = path.split()
     result = _run_afi("explain", *tokens)
     assert result.returncode == 0, result.stderr
     assert result.stdout.startswith("#")
+
+
+# --- overview verb (new in v0.3) -----------------------------------------
+
+
+def test_cli_overview_zero_target_renders_template() -> None:
+    result = _run_afi("cli", "overview")
+    assert result.returncode == 0, result.stderr
+    assert "afi default template" in result.stdout
+    # Tokens are literal in the scaffolded template — overview must surface them.
+    assert "{{slug}}" in result.stdout
+
+
+def test_cli_overview_on_self_shows_six_bundles_context() -> None:
+    result = _run_afi("cli", "overview", str(REPO_ROOT), cwd=REPO_ROOT)
+    assert result.returncode == 0, result.stderr
+    assert "Project root" in result.stdout
+    assert "Command surface" in result.stdout
+    assert "Agent-first triple" in result.stdout
+
+
+def test_cli_overview_json_mode_has_stable_keys() -> None:
+    result = _run_afi("cli", "overview", "--json", str(REPO_ROOT), cwd=REPO_ROOT)
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert set(payload.keys()) == {"subject", "path", "sections", "warnings", "notes"}
+    assert payload["subject"] == "cli"
+
+
+def test_top_level_overview_stub_works() -> None:
+    result = _run_afi("overview")
+    assert result.returncode == 0, result.stderr
+    assert "overview: all" in result.stdout
+
+
+def test_overview_is_graceful_on_missing_path(tmp_path: Path) -> None:
+    # Read-only verb: falls back, does NOT hard-fail.
+    missing = tmp_path / "does-not-exist"
+    result = _run_afi("cli", "overview", str(missing))
+    assert result.returncode == 0, result.stderr
+    assert "afi default template" in result.stdout

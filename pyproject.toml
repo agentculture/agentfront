@@ -1,6 +1,6 @@
 [project]
 name = "afi-cli"
-version = "0.2.0"
+version = "0.3.0"
 description = "Agent First Interface — scaffold CLI, MCP, and HTTP interfaces for agent-first tools."
 readme = "README.md"
 license = "MIT"

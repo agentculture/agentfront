@@ -1,4 +1,4 @@
-"""Acceptance gate: afi-cli must pass its own five-bundle rubric.
+"""Acceptance gate: afi-cli must pass its own six-bundle rubric.
 
 This is what makes afi a first citizen of the rubric it publishes. If any
 rubric check regresses — `learn` drops below 200 chars, `explain` loses an
@@ -36,7 +36,7 @@ def test_self_verify_passes_every_bundle() -> None:
     )
 
 
-def test_self_verify_covers_all_five_bundles() -> None:
+def test_self_verify_covers_all_six_bundles() -> None:
     ctx = VerifyContext(
         target_path=REPO_ROOT,
         tool_name="afi",
@@ -46,4 +46,4 @@ def test_self_verify_covers_all_five_bundles() -> None:
     results = run_rubric(ctx)
 
     bundles = {r.bundle for r in results}
-    assert bundles == {"structure", "learnability", "json", "errors", "explain"}
+    assert bundles == {"structure", "learnability", "json", "errors", "explain", "overview"}

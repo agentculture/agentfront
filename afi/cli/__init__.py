@@ -73,6 +73,7 @@ def _build_parser() -> argparse.ArgumentParser:
     from afi.cli._commands import cli as _cli_group
     from afi.cli._commands import explain as _explain_cmd
     from afi.cli._commands import learn as _learn_cmd
+    from afi.cli._commands import overview as _overview_cmd
 
     parser = _AfiArgumentParser(
         prog="afi",
@@ -91,6 +92,7 @@ def _build_parser() -> argparse.ArgumentParser:
     # Globals (top-level, not nested under a noun).
     _learn_cmd.register(sub)
     _explain_cmd.register(sub)
+    _overview_cmd.register(sub)
 
     # Noun groups.
     _cli_group.register(sub)
