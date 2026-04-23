@@ -8,12 +8,13 @@ import tomllib
 from afi.rubric._types import CheckResult, VerifyContext
 
 BUNDLE = "structure"
+_PYPROJECT = "pyproject.toml"
 
 _MAIN_PROBE_TIMEOUT = 30.0
 
 
 def _check_pyproject_exists(ctx: VerifyContext) -> CheckResult:
-    p = ctx.target_path / "pyproject.toml"
+    p = ctx.target_path / _PYPROJECT
     if p.is_file():
         return CheckResult(BUNDLE, "pyproject_exists", True, "info", f"found {p}")
     return CheckResult(
@@ -27,7 +28,7 @@ def _check_pyproject_exists(ctx: VerifyContext) -> CheckResult:
 
 
 def _check_project_scripts(ctx: VerifyContext) -> CheckResult:
-    p = ctx.target_path / "pyproject.toml"
+    p = ctx.target_path / _PYPROJECT
     if not p.is_file():
         return CheckResult(
             BUNDLE,
@@ -188,7 +189,7 @@ def _resolve_entry_target(ctx: VerifyContext) -> tuple[str, str] | None:
     * Only when ``ctx.tool_name`` is not present at all do we fall back to
       the first declared script (single-binary projects).
     """
-    p = ctx.target_path / "pyproject.toml"
+    p = ctx.target_path / _PYPROJECT
     if not p.is_file():
         return None
     try:

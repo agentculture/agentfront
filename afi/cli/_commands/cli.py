@@ -21,6 +21,8 @@ from afi.rubric import run_rubric
 from afi.rubric._runner import SubprocessRunner
 from afi.rubric._types import CheckResult, VerifyContext
 
+_JSON_HELP = "Emit structured JSON."
+
 
 def _resolve_tool_name(target_path: Path) -> str:
     pp = target_path / "pyproject.toml"
@@ -201,7 +203,7 @@ def register(sub: argparse._SubParsersAction) -> None:
         default=None,
         help="Override output directory (default: <path>/.afi/reference/<lang>-cli/).",
     )
-    cite.add_argument("--json", action="store_true", help="Emit structured JSON.")
+    cite.add_argument("--json", action="store_true", help=_JSON_HELP)
     cite.set_defaults(func=cmd_cite)
 
     verify = cli_sub.add_parser(
@@ -209,7 +211,7 @@ def register(sub: argparse._SubParsersAction) -> None:
         help="Audit a CLI at <path> against the six-bundle agent-first rubric.",
     )
     verify.add_argument("path", nargs="?", default=".", help="Target project path (default: .).")
-    verify.add_argument("--json", action="store_true", help="Emit structured JSON.")
+    verify.add_argument("--json", action="store_true", help=_JSON_HELP)
     verify.add_argument(
         "--strict",
         action="store_true",
@@ -230,7 +232,7 @@ def register(sub: argparse._SubParsersAction) -> None:
             "describe afi's default scaffolded template."
         ),
     )
-    overview.add_argument("--json", action="store_true", help="Emit structured JSON.")
+    overview.add_argument("--json", action="store_true", help=_JSON_HELP)
     overview.set_defaults(func=cmd_cli_overview)
 
     def _no_verb(_args: argparse.Namespace) -> int:

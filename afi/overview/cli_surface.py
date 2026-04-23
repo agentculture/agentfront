@@ -255,7 +255,7 @@ def _scan_verbs(source: Path) -> list[str]:
 
 def _emit_agent_first_triple_section(report: OverviewReport, info: _TargetInfo) -> None:
     commands_dir = info.package_root / "_commands"
-    present: dict[str, bool] = {verb: False for verb in _TRIPLE}
+    present: dict[str, bool] = dict.fromkeys(_TRIPLE, False)
     if commands_dir.is_dir():
         for verb in _TRIPLE:
             present[verb] = (commands_dir / f"{verb}.py").is_file()
@@ -322,56 +322,77 @@ def _zero_target_report(
     if warning:
         report.warnings.append(warning)
 
+    manifest = _load_template_manifest(report)
+    if manifest is None:
+        return report
+
+    files = manifest.get("files", []) if isinstance(manifest, dict) else []
+    tokens = manifest.get("tokens", {}) if isinstance(manifest, dict) else {}
+
+    report.sections.append(_build_template_intro_section(manifest, files))
+    tokens_section = _build_tokens_section(tokens)
+    if tokens_section is not None:
+        report.sections.append(tokens_section)
+    inventory_section = _build_inventory_section(files)
+    if inventory_section is not None:
+        report.sections.append(inventory_section)
+    report.sections.append(_build_template_triple_section(files))
+
+    report.notes.append(
+        "scaffold into a real project: `afi cli cite <path>` (see `afi explain cli cite`)."
+    )
+    report.notes.append("then audit: `afi cli verify <path>` (see `afi explain cli verify`).")
+    return report
+
+
+def _load_template_manifest(report: OverviewReport) -> dict | None:
+    """Load MANIFEST.json; append a warning to ``report`` and return None on failure."""
     manifest_path = _TEMPLATE_ROOT / "MANIFEST.json"
     if not manifest_path.is_file():
         report.warnings.append(
             f"afi's bundled template is missing at {manifest_path}; "
             "this is a packaging bug, please file an issue."
         )
-        return report
-
+        return None
     try:
-        manifest = json.loads(manifest_path.read_text())
+        return json.loads(manifest_path.read_text())
     except (OSError, json.JSONDecodeError) as err:
         report.warnings.append(f"could not read afi's bundled manifest: {err}")
-        return report
+        return None
 
-    files = manifest.get("files", []) if isinstance(manifest, dict) else []
-    tokens = manifest.get("tokens", {}) if isinstance(manifest, dict) else {}
 
-    # Intro section.
-    report.sections.append(
-        OverviewSection(
-            heading="afi default template",
-            body_md=(
-                "No target CLI to inspect; showing the reference tree afi would "
-                "scaffold when you run `afi cli cite <path>`.\n\n"
-                f"- **Language:** `{manifest.get('lang', 'unknown')}`\n"
-                f"- **Source:** `{_TEMPLATE_ROOT}`\n"
-                f"- **File count:** {len(files)}"
-            ),
-            findings=[
-                {"key": "lang", "value": manifest.get("lang")},
-                {"key": "template_root", "value": str(_TEMPLATE_ROOT)},
-                {"key": "file_count", "value": len(files)},
-            ],
-        )
+def _build_template_intro_section(manifest: dict, files: list) -> OverviewSection:
+    return OverviewSection(
+        heading="afi default template",
+        body_md=(
+            "No target CLI to inspect; showing the reference tree afi would "
+            "scaffold when you run `afi cli cite <path>`.\n\n"
+            f"- **Language:** `{manifest.get('lang', 'unknown')}`\n"
+            f"- **Source:** `{_TEMPLATE_ROOT}`\n"
+            f"- **File count:** {len(files)}"
+        ),
+        findings=[
+            {"key": "lang", "value": manifest.get("lang")},
+            {"key": "template_root", "value": str(_TEMPLATE_ROOT)},
+            {"key": "file_count", "value": len(files)},
+        ],
     )
 
-    # Tokens section — tell the agent what substitution they'll do.
-    if tokens:
-        lines = ["Agents consuming the scaffolded tree substitute these tokens:", ""]
-        for tok, desc in tokens.items():
-            lines.append(f"- `{{{{{tok}}}}}` — {desc}")
-        report.sections.append(
-            OverviewSection(
-                heading="Tokens",
-                body_md="\n".join(lines),
-                findings=[{"token": t, "description": d} for t, d in tokens.items()],
-            )
-        )
 
-    # File inventory grouped by role.
+def _build_tokens_section(tokens: dict) -> OverviewSection | None:
+    if not tokens:
+        return None
+    lines = ["Agents consuming the scaffolded tree substitute these tokens:", ""]
+    for tok, desc in tokens.items():
+        lines.append(f"- `{{{{{tok}}}}}` — {desc}")
+    return OverviewSection(
+        heading="Tokens",
+        body_md="\n".join(lines),
+        findings=[{"token": t, "description": d} for t, d in tokens.items()],
+    )
+
+
+def _build_inventory_section(files: list) -> OverviewSection | None:
     by_role: dict[str, list[dict]] = {}
     for f in files:
         if not isinstance(f, dict):
@@ -386,24 +407,20 @@ def _zero_target_report(
         for f in by_role[role]:
             body_lines.append(f"- `{f.get('path', '?')}` — {f.get('summary', '')}")
         body_lines.append("")
-    if body_lines:
-        report.sections.append(
-            OverviewSection(
-                heading="File inventory",
-                body_md="\n".join(body_lines).rstrip(),
-                findings=[
-                    {
-                        "path": f.get("path"),
-                        "role": f.get("role"),
-                        "summary": f.get("summary"),
-                    }
-                    for f in files
-                    if isinstance(f, dict)
-                ],
-            )
-        )
+    if not body_lines:
+        return None
+    return OverviewSection(
+        heading="File inventory",
+        body_md="\n".join(body_lines).rstrip(),
+        findings=[
+            {"path": f.get("path"), "role": f.get("role"), "summary": f.get("summary")}
+            for f in files
+            if isinstance(f, dict)
+        ],
+    )
 
-    # Agent-first triple — the template's intent.
+
+def _build_template_triple_section(files: list) -> OverviewSection:
     commands = [
         f.get("path", "")
         for f in files
@@ -421,16 +438,8 @@ def _zero_target_report(
             "The template does not yet scaffold: " + ", ".join(missing) + ". "
             "afi is tracked to add them as it grows."
         )
-    report.sections.append(
-        OverviewSection(
-            heading="Agent-first triple (template)",
-            body_md="\n".join(body_lines),
-            findings=[{"verb": v, "present": triple_present[v]} for v in _TRIPLE],
-        )
+    return OverviewSection(
+        heading="Agent-first triple (template)",
+        body_md="\n".join(body_lines),
+        findings=[{"verb": v, "present": triple_present[v]} for v in _TRIPLE],
     )
-
-    report.notes.append(
-        "scaffold into a real project: `afi cli cite <path>` (see `afi explain cli cite`)."
-    )
-    report.notes.append("then audit: `afi cli verify <path>` (see `afi explain cli verify`).")
-    return report
