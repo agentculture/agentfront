@@ -57,47 +57,60 @@ def test_cite_json_mode_emits_parseable_payload(tmp_path: Path) -> None:
     assert len(payload["next_steps"]) == 3
 
 
-def test_cite_then_verify_round_trip(tmp_path: Path) -> None:
+def test_cite_then_doctor_round_trip(tmp_path: Path) -> None:
     """Citing into an empty dir makes the reference available, but the
-    target project itself isn't a CLI — verify should fail on structure
+    target project itself isn't a CLI — doctor should fail on structure
     (no pyproject.toml). This guards against the reference being a hidden
     scaffolder: cite DOES NOT produce a working CLI; it produces a
     reference for an agent to apply.
     """
     _run_afi("cli", "cite", str(tmp_path), cwd=tmp_path)
 
-    # The empty target is not a CLI project — verify should bail at structure.
-    result = _run_afi("cli", "verify", str(tmp_path), cwd=tmp_path)
+    # The empty target is not a CLI project — doctor should bail at structure.
+    result = _run_afi("cli", "doctor", str(tmp_path), cwd=tmp_path)
 
     assert result.returncode != 0
     assert "pyproject.toml" in (result.stderr + result.stdout).lower()
 
 
-def test_verify_self_passes() -> None:
-    """`afi cli verify .` on the afi-cli repo passes every bundle."""
-    result = _run_afi("cli", "verify", str(REPO_ROOT), cwd=REPO_ROOT)
+def test_doctor_self_passes() -> None:
+    """`afi cli doctor .` on the afi-cli repo passes every bundle."""
+    result = _run_afi("cli", "doctor", str(REPO_ROOT), cwd=REPO_ROOT)
 
     assert (
         result.returncode == 0
-    ), f"self-verify failed:\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+    ), f"self-doctor failed:\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
 
 
-def test_verify_json_mode_emits_structured_report() -> None:
-    result = _run_afi("cli", "verify", ".", "--json", cwd=REPO_ROOT)
+def test_doctor_json_mode_emits_structured_report() -> None:
+    result = _run_afi("cli", "doctor", ".", "--json", cwd=REPO_ROOT)
 
     assert result.returncode == 0, result.stderr
     payload = json.loads(result.stdout)
     assert payload["tool"] == "afi"
+    assert payload["healthy"] is True
     assert payload["summary"]["errors"] == 0
     assert payload["summary"]["total"] > 0
-    assert set(payload["summary"]["bundles"].keys()) == {
+    bundles = {c["bundle"] for c in payload["checks"]}
+    assert bundles == {
         "structure",
         "learnability",
         "json",
         "errors",
         "explain",
         "overview",
+        "doctor",
     }
+
+
+def test_verify_alias_still_works_with_deprecation_diagnostic() -> None:
+    """`afi cli verify` is a deprecated alias for `cli doctor`. It must keep
+    working for one minor cycle (removed in v0.6.0) and emit a deprecation
+    diagnostic to stderr so callers know to migrate.
+    """
+    result = _run_afi("cli", "verify", str(REPO_ROOT), cwd=REPO_ROOT)
+    assert result.returncode == 0, f"verify alias broke:\nstderr:\n{result.stderr}"
+    assert "deprecated" in result.stderr.lower()
 
 
 def test_bogus_verb_exits_with_hint() -> None:
@@ -116,9 +129,11 @@ def test_bogus_verb_exits_with_hint() -> None:
         "learn",
         "explain",
         "overview",
+        "doctor",
         "cli",
         "cli cite",
-        "cli verify",
+        "cli doctor",
+        "cli verify",  # deprecated alias — entry still present for one cycle.
         "cli overview",
     ],
 )
@@ -140,12 +155,12 @@ def test_cli_overview_zero_target_renders_template() -> None:
     assert "{{slug}}" in result.stdout
 
 
-def test_cli_overview_on_self_shows_six_bundles_context() -> None:
+def test_cli_overview_on_self_shows_universals_context() -> None:
     result = _run_afi("cli", "overview", str(REPO_ROOT), cwd=REPO_ROOT)
     assert result.returncode == 0, result.stderr
     assert "Project root" in result.stdout
     assert "Command surface" in result.stdout
-    assert "Agent-first triple" in result.stdout
+    assert "Agent-first universals" in result.stdout
 
 
 def test_cli_overview_json_mode_has_stable_keys() -> None:

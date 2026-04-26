@@ -32,6 +32,7 @@ def _write_minimal_cli_project(root: Path, *, with_triple: bool = True) -> None:
         (pkg / "learn.py").write_text('def register(sub):\n    sub.add_parser("learn")\n')
         (pkg / "explain.py").write_text('def register(sub):\n    sub.add_parser("explain")\n')
         (pkg / "overview.py").write_text('def register(sub):\n    sub.add_parser("overview")\n')
+        (pkg / "doctor.py").write_text('def register(sub):\n    sub.add_parser("doctor")\n')
 
 
 def test_zero_target_describes_afi_template() -> None:
@@ -66,23 +67,28 @@ def test_target_mode_enumerates_command_surface(tmp_path: Path) -> None:
     headings = [s.heading for s in report.sections]
     assert "Project root" in headings
     assert "Command surface" in headings
-    assert "Agent-first triple" in headings
+    assert "Agent-first universals" in headings
     assert "Rubric posture" in headings
     # The command surface finds the noun and its verbs.
     surface = next(s for s in report.sections if s.heading == "Command surface")
     names = {f.get("command") for f in surface.findings}
     assert {"cli", "learn", "explain", "overview"}.issubset(names)
     # Triple is all-present.
-    triple = next(s for s in report.sections if s.heading == "Agent-first triple")
+    triple = next(s for s in report.sections if s.heading == "Agent-first universals")
     assert all(f["present"] for f in triple.findings)
 
 
 def test_target_mode_flags_missing_triple(tmp_path: Path) -> None:
     _write_minimal_cli_project(tmp_path, with_triple=False)
     report = inspect(tmp_path)
-    triple = next(s for s in report.sections if s.heading == "Agent-first triple")
+    triple = next(s for s in report.sections if s.heading == "Agent-first universals")
     present = {f["verb"]: f["present"] for f in triple.findings}
-    assert not present["learn"] and not present["explain"] and not present["overview"]
+    assert (
+        not present["learn"]
+        and not present["explain"]
+        and not present["overview"]
+        and not present["doctor"]
+    )
 
 
 def test_malformed_pyproject_falls_back(tmp_path: Path) -> None:

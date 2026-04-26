@@ -21,7 +21,25 @@ def test_check_result_to_dict_shape() -> None:
         "severity": "info",
         "evidence": "e",
         "remediation": "r",
+        "auto_fixable": False,
+        "fix_id": "",
     }
+
+
+def test_check_result_carries_auto_fix_metadata() -> None:
+    r = CheckResult(
+        "b",
+        "c",
+        False,
+        "error",
+        "e",
+        "r",
+        auto_fixable=True,
+        fix_id="my_fix",
+    )
+    payload = r.to_dict()
+    assert payload["auto_fixable"] is True
+    assert payload["fix_id"] == "my_fix"
 
 
 def test_verify_context_defaults(tmp_path: Path) -> None:

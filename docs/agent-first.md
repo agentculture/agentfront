@@ -45,6 +45,10 @@ An MCP server can expose dozens of tools. It should expose the fewest. Each tool
 
 An agent's fetch tool doesn't navigate like a human with a browser. It follows links, parses markdown, and obeys sitemaps. So: every HTTP surface AgentCulture ships is **markdown-first with a sitemap**. No SPA, no SDK, no login wall. If an agent can GET the root URL and a sitemap, it can build a complete map of the docs and pull exactly the pages it needs — no bespoke client required.
 
+### Diagnosability — `doctor` on every surface
+
+Learnability tells the agent *what is here*; diagnosability tells it *what is wrong, and how to fix it*. Every agent-first tool exposes a `doctor` verb (CLI), tool (MCP), or endpoint (HTTP) that surveys its own install and surfaces inconsistencies with actionable remediation. The pillar joins learnability / minimalism / discoverability as a baseline contract: when the tool is broken, an agent must be able to diagnose it without reading source, and the failure mode must always carry a `remediation` string. `--fix` is offered when remediation is safe to auto-apply; otherwise the verb explains the fix in prose an agent can act on.
+
 ## Why `afi-cli` is foundational
 
 Every AgentCulture tool eventually wants all three surfaces. Without a shared scaffolder, each project would:
@@ -83,19 +87,21 @@ If the answer to any of those is "no," the feature either changes shape or doesn
 
 ## The rubric
 
-The discipline above is made mechanical by the [**rubric**](./rubric.md) — five bundles of concrete checks that `afi cli verify` runs against any CLI. Each bundle corresponds to one of the principles above:
+The discipline above is made mechanical by the [**rubric**](./rubric.md) — seven bundles of concrete checks that `afi cli doctor` runs against any CLI. Each bundle corresponds to one of the principles above:
 
 1. **structure** — argparse discipline and project layout.
 2. **learnability** — a `learn` affordance that satisfies the CLI principle.
 3. **json** — machine-readable output, so agents parse structure not prose.
 4. **errors** — propagation with remediation, no tracebacks.
 5. **explain** — global addressable markdown docs, per the HTTP principle applied to the CLI surface.
+6. **overview** — descriptive snapshot of the surface; *what is present*.
+7. **doctor** — diagnosability with actionable remediation; *what is wrong, and how to fix it*.
 
-See [`rubric.md`](./rubric.md) for the exact checks and severities. afi-cli itself is required to pass — the `tests/test_self_verify.py` acceptance gate blocks any regression.
+See [`rubric.md`](./rubric.md) for the exact checks and severities. afi-cli itself is required to pass — the `tests/test_self_doctor.py` acceptance gate blocks any regression.
 
 ## See also
 
 - [agentculture.md](./agentculture.md) — the org, membership model, and project list.
-- [rubric.md](./rubric.md) — the five-bundle rubric, concrete check list.
+- [rubric.md](./rubric.md) — the seven-bundle rubric, concrete check list.
 - [../CLAUDE.md](../CLAUDE.md) — afi-cli stack choices and common commands.
 - [../README.md](../README.md) — install and quick-start.

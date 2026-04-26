@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/). This project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-04-26
+
+### Added
+
+- afi doctor [path] — global verb. With no path, runs the in-process self-diagnosis (version consistency, CHANGELOG entry, surface coherence between argparse / learn / explain, reference-tree integrity, rubric module loadability). With a path, forwards to the target audit. Supports --json, --fix, --dry-run, --strict.
+- afi cli doctor [path] — replaces afi cli verify as the rubric audit verb. Adds --fix (apply auto-fixable remediations) and --dry-run (preview them). Same exit-code policy as verify.
+- Rubric bundle 7 (doctor) — asserts the target CLI exposes a doctor verb with the agent-first contract: non-empty report on stdout, --json carries healthy (bool) + checks (list), each check has id/passed/severity/message, failed checks supply remediation. Mirrors the bundle-6 (overview) pattern.
+- afi.doctor package — public surface (run_self_diagnosis, Diagnosis, is_healthy) plus the fix registry skeleton (register_fix / apply_fix / FixOutcome). v0.5 ships the registry with no initial handlers; remediations are explain-how-to-fix until follow-ups populate the table.
+- CheckResult: auto_fixable (bool) and fix_id (str) fields, surfaced in to_dict().
+
+### Changed
+
+- Universal verb tier expanded from learn/explain/overview to learn/explain/overview/doctor; afi.overview.cli_surface enumerates the four under heading Agent-first universals (was Agent-first triple).
+- afi learn output now lists overview, doctor, cli doctor, cli overview alongside the existing verbs (closes a long-standing drift introduced when overview shipped in v0.3).
+- afi explain catalog gains doctor and cli doctor entries; cli verify now resolves to the cli doctor body during the deprecation window.
+- docs/agent-first.md adds diagnosability as the fourth pillar; docs/rubric.md adds Bundle 6 (overview) and Bundle 7 (doctor) sections and bumps the preamble from five to seven bundles.
+- afi/cite/references/python-cli/AGENT.md updated to list all seven rubric bundles and point at afi cli doctor.
+- tests/test_self_verify.py renamed to tests/test_self_doctor.py; expected bundle set is now seven; new in-process self-diagnosis assertion.
+
 ## [0.4.1] - 2026-04-23
 
 ### Added

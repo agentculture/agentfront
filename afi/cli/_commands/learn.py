@@ -22,7 +22,7 @@ Purpose
 -------
 Generate and verify agent-first interfaces for CLIs (and, later, MCP
 servers and HTTP sites). afi itself demonstrates the patterns it checks:
-learn, explain, --json output, structured errors.
+learn, explain, overview, doctor, --json output, structured errors.
 
 Commands
 --------
@@ -30,12 +30,26 @@ Commands
   afi explain <path>...  Print markdown docs for any noun/verb path; the
                          primary way for an agent to introspect afi's
                          grammar. Supports --json.
+  afi overview [path]    Read-only rollup across interface surfaces. (v0.3)
+  afi doctor [path]      Diagnose afi's own install (no path) or audit a
+                         target CLI against the rubric (with path). With
+                         --fix, applies auto-fixable remediations. (v0.5)
   afi cli cite [path]    Emit the Python agent-first CLI reference tree
                          into <path>/.afi/reference/python-cli/ for the
                          agent to apply. (v0.2)
-  afi cli verify [path]  Audit a CLI against the five-bundle rubric
-                         (structure, learnability, --json, errors,
-                         explain). (v0.2)
+  afi cli doctor [path]  Audit the CLI at <path> against the seven-bundle
+                         rubric; --fix applies auto-fixable remediations.
+                         (v0.5; replaces `cli verify`.)
+  afi cli overview [path] Read-only descriptive snapshot of a CLI. (v0.3)
+
+Universal verb tier (agent-first)
+---------------------------------
+Every agent-first CLI exposes the four universal verbs:
+
+  - learn     — what is this tool?
+  - explain   — what does this command do?
+  - overview  — what is *present* in the subject?
+  - doctor    — what is wrong, and how do I fix it?
 
 Machine-readable output
 -----------------------
@@ -53,8 +67,9 @@ Exit-code policy
 More detail
 -----------
   afi explain afi
+  afi explain doctor
   afi explain cli cite
-  afi explain cli verify
+  afi explain cli doctor
 
 Homepage: https://github.com/agentculture/afi-cli
 """
@@ -68,8 +83,24 @@ def _as_json_payload() -> dict[str, object]:
         "commands": [
             {"path": ["learn"], "summary": "Self-teaching prompt."},
             {"path": ["explain"], "summary": "Markdown docs by noun/verb path."},
+            {"path": ["overview"], "summary": "Rollup across interface surfaces."},
+            {
+                "path": ["doctor"],
+                "summary": (
+                    "Self-diagnose afi's install or audit a target CLI; "
+                    "--fix applies auto-fixable remediations."
+                ),
+            },
             {"path": ["cli", "cite"], "summary": "Emit CLI reference drop."},
-            {"path": ["cli", "verify"], "summary": "Audit a CLI against the rubric."},
+            {
+                "path": ["cli", "doctor"],
+                "summary": "Audit a CLI against the rubric (replaces `cli verify`).",
+            },
+            {
+                "path": ["cli", "verify"],
+                "summary": "Deprecated alias for `cli doctor` (removed in v0.6.0).",
+            },
+            {"path": ["cli", "overview"], "summary": "Read-only snapshot of a target CLI."},
         ],
         "exit_codes": {
             "0": "success",
@@ -77,7 +108,7 @@ def _as_json_payload() -> dict[str, object]:
             "2": "environment/setup error",
         },
         "json_support": True,
-        "explain_pointer": "afi explain <path> (e.g. 'afi explain cli cite')",
+        "explain_pointer": "afi explain <path> (e.g. 'afi explain cli doctor')",
     }
 
 

@@ -14,24 +14,28 @@ _ROOT = """\
 
 afi is the AgentCulture Agent First Interface scaffolder. It emits reference
 drops for agent-first CLIs (and, later, MCP servers and HTTP sites) and
-audits any tool against the six-bundle agent-first rubric.
+audits any tool against the seven-bundle agent-first rubric.
 
 ## Verbs
 
 - `afi learn` — structured self-teaching prompt.
 - `afi explain <path>` — markdown docs for any noun/verb.
 - `afi overview [path]` — descriptive rollup across all interface surfaces.
+- `afi doctor [path]` — self-diagnose afi or audit a target CLI; `--fix`
+  applies auto-fixable remediations.
 - `afi cli cite [path]` — drop the CLI reference pattern into a project.
-- `afi cli verify [path]` — audit a CLI against the rubric.
+- `afi cli doctor [path]` — audit a CLI against the rubric (replaces
+  `cli verify` in v0.5).
 - `afi cli overview [path]` — read-only snapshot of a target CLI.
 
-## Universal verb triple (agent-first)
+## Universal verb tier (agent-first)
 
-Every agent-first CLI exposes `learn` / `explain` / `overview`:
+Every agent-first CLI exposes the four universal verbs:
 
 - `learn` — what is this tool?
 - `explain <path>` — what does this command do?
 - `overview [path]` — what is *present* in the subject the command addresses?
+- `doctor [path]` — what is *wrong*, and how do I fix it?
 
 ## Principles
 
@@ -52,8 +56,9 @@ sibling project `agex-cli`.
 - `afi explain learn`
 - `afi explain explain`
 - `afi explain overview`
+- `afi explain doctor`
 - `afi explain cli cite`
-- `afi explain cli verify`
+- `afi explain cli doctor`
 - `afi explain cli overview`
 """
 
@@ -112,16 +117,19 @@ _CLI = """\
 # afi cli
 
 The `cli` noun groups verbs that act on *a CLI project* (the target
-project). From v0.3 there are three verbs:
+project). From v0.5 there are three active verbs plus one deprecated alias:
 
 - `afi cli cite [path]` — drop the Python agent-first reference tree into
   `<path>/.afi/reference/python-cli/` for an agent to integrate.
-- `afi cli verify [path]` — run the six-bundle agent-first rubric against
-  the CLI at `<path>`.
+- `afi cli doctor [path]` — run the seven-bundle agent-first rubric against
+  the CLI at `<path>` and surface remediations; `--fix` applies any
+  auto-fixable ones, `--dry-run` previews them.
 - `afi cli overview [path]` — read-only descriptive snapshot of the CLI at
   `<path>` (or afi's own scaffolded template when no path is given).
+- `afi cli verify [path]` — *deprecated* alias for `afi cli doctor`; will be
+  removed in v0.6.0.
 
-See `afi explain cli cite`, `afi explain cli verify`, and
+See `afi explain cli cite`, `afi explain cli doctor`, and
 `afi explain cli overview` for details.
 """
 
@@ -168,10 +176,12 @@ always the latest reference. The `.gitignore` line is check-before-modify.
 - `2` environment error (reference tree missing in install)
 """
 
-_CLI_VERIFY = """\
-# afi cli verify [path] [--json] [--strict]
+_CLI_DOCTOR = """\
+# afi cli doctor [path] [--json] [--fix] [--dry-run] [--strict]
 
-Audit a CLI at `path` against the six-bundle agent-first rubric.
+Audit a CLI at `path` against the seven-bundle agent-first rubric and
+surface inconsistencies with actionable remediation. Replaces
+`afi cli verify` in v0.5; the old name is a deprecated alias.
 
 ## Bundles
 
@@ -188,8 +198,21 @@ Audit a CLI at `path` against the six-bundle agent-first rubric.
    bogus path fails with remediation.
 6. **overview** — `<tool> overview` and `<tool> cli overview` succeed;
    `overview --json` carries the stable keys `subject` + `sections`;
-   missing target paths fall back gracefully (exit 0 with a warning),
-   since descriptive verbs must not hard-fail the way `verify` does.
+   missing target paths fall back gracefully.
+7. **doctor** — `<tool> doctor` produces a non-empty report;
+   `<tool> doctor --json` carries `healthy` (bool) + `checks` (list);
+   each check entry has `id`, `passed`, `severity`, `message`; failed
+   checks supply a non-empty `remediation`.
+
+## --fix and --dry-run
+
+Failed checks may declare `auto_fixable: true` and a `fix_id`. With
+`--fix`, doctor invokes the registered handler for each fixable check
+and re-runs the rubric to report the post-fix verdict. With `--dry-run`
+it lists the planned fixes without mutating. The fix registry lives in
+`afi.doctor.fixes`; v0.5 ships the registry skeleton with no initial
+handlers (every remediation is "explain how to fix" until follow-up PRs
+populate the table).
 
 ## Strategy
 
@@ -201,15 +224,76 @@ probes for every behavioral check. `<tool>` is resolved from
 ## Arguments
 
 - `path` (optional, default `.`) — target project directory.
-- `--json` — emit the full report as JSON (`results` + `summary`).
+- `--json` — emit `{tool, subject, healthy, checks, summary}`.
+- `--fix` — apply auto-fixable remediations in place.
+- `--dry-run` — preview which fixes would run, without mutating.
 - `--strict` — treat warnings as failures.
 
 ## Exit codes
 
 - `0` if no `error`-severity check failed (strict: no failure at all).
 - `1` if the rubric failed.
-- `2` if verify itself couldn't set up (can't find the tool, no
+- `2` if doctor itself couldn't set up (can't find the tool, no
   pyproject, etc.).
+"""
+
+_DOCTOR = """\
+# afi doctor [path] [--json] [--fix] [--dry-run] [--strict]
+
+The diagnosability pillar of the agent-first contract. `doctor` answers
+*what is wrong, and how do I fix it?* — distinct from `learn` (what is
+this?), `explain` (what does this verb do?), and `overview` (what is
+present?).
+
+## Two modes
+
+- **No path** — self-diagnosis of afi's own install. In-process, fast,
+  read-only. Surveys version consistency (pyproject vs.
+  importlib.metadata), CHANGELOG entry, surface coherence (every
+  argparse leaf appears in `learn` and `explain`), reference-tree
+  integrity, and rubric-module loadability.
+- **With path** — black-box rubric audit of the target CLI, identical
+  to `afi cli doctor <path>`.
+
+## --fix and --dry-run
+
+When run against a target, `--fix` applies auto-fixable remediations
+(checks with `auto_fixable: true` and a `fix_id` in
+`afi.doctor.fixes`); `--dry-run` previews the fix list without
+mutating. Self-doctor is read-only; `--fix` and `--dry-run` are no-ops
+there (a diagnostic message is emitted to stderr).
+
+## JSON shape
+
+    {
+      "tool": str,
+      "subject": str,
+      "healthy": bool,
+      "checks": [
+        {
+          "id": str,
+          "bundle": str,
+          "passed": bool,
+          "severity": "error" | "warn" | "info",
+          "message": str,
+          "remediation": str,
+          "auto_fixable": bool,
+          "fix_id": str
+        }, ...
+      ],
+      "summary": {"total": int, "passed": int, "failed": int,
+                  "errors": int, "warnings": int}
+    }
+
+The `healthy` and `checks` keys, plus the per-check `id` / `passed` /
+`severity` / `message` / `remediation` shape, are mandated by rubric
+bundle 7 — every agent-first CLI's `doctor --json` must conform.
+
+## Exit codes
+
+- `0` if no `error`-severity check failed (strict: no failure at all).
+- `1` if any check failed.
+- `2` if doctor itself couldn't set up.
 """
 
 
@@ -291,8 +375,12 @@ ENTRIES: dict[tuple[str, ...], str] = {
     ("learn",): _LEARN,
     ("explain",): _EXPLAIN,
     ("overview",): _OVERVIEW,
+    ("doctor",): _DOCTOR,
     ("cli",): _CLI,
     ("cli", "cite"): _CLI_CITE,
-    ("cli", "verify"): _CLI_VERIFY,
+    ("cli", "doctor"): _CLI_DOCTOR,
+    # Deprecated alias — keep the catalog entry so `afi explain cli verify`
+    # still resolves while the alias is supported. Removed in v0.6.0.
+    ("cli", "verify"): _CLI_DOCTOR,
     ("cli", "overview"): _OVERVIEW,
 }

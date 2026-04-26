@@ -55,13 +55,13 @@ the host project's existing module layout, prog name, and commands.
    `register(sub)` functions in the host's argparse setup.
 5. Ensure the host's top-level parser installs the `_ArgumentParser`
    override so unknown-verb errors emit with a `hint:` line.
-6. Run `afi cli verify .` from the host project to confirm the five rubric
-   bundles pass.
+6. Run `afi cli doctor .` from the host project to confirm the seven
+   rubric bundles pass.
 
-## Rubric bundles checked by `afi cli verify`
+## Rubric bundles checked by `afi cli doctor`
 
 1. **Structure** — `pyproject.toml` with `[project.scripts]`, `tests/` dir,
-   `<tool> --help` exits 0.
+   `<tool> --help` exits 0, `main(argv) -> int` signature conforms.
 2. **Learnability** — `<tool> learn` exits 0, stdout ≥ 200 chars,
    mentions purpose, commands, exit codes, `--json`, `explain`.
 3. **JSON** — `<tool> learn --json` is parseable; stderr clean on success;
@@ -70,8 +70,29 @@ the host project's existing module layout, prog name, and commands.
    Python traceback.
 5. **Explain** — `explain`, `explain <tool>`, and bogus-path-failure with
    hint all work.
+6. **Overview** — `<tool> overview` and `<tool> cli overview` succeed;
+   `overview --json` carries `subject` + `sections` keys; missing target
+   paths fall back gracefully (descriptive verbs do not hard-fail).
+7. **Doctor** — `<tool> doctor` produces a non-empty report;
+   `<tool> doctor --json` carries `healthy` (bool) + `checks` (list);
+   each check entry has `id`, `passed`, `severity`, `message`; failed
+   checks supply a non-empty `remediation`.
+
+> Note: this reference tree currently scaffolds `learn` and `explain` only.
+> A target CLI must also implement `overview` (bundle 6) and `doctor`
+> (bundle 7) to pass the full rubric. Use afi's own implementations as
+> templates: `afi explain overview` and `afi explain doctor` describe the
+> contract; the source under `afi/overview/` and `afi/doctor/` shows the
+> shape. (Tracked: ship `overview.py` and `doctor.py` reference templates
+> in a follow-up cite refresh.)
 
 ## After integration
 
 Delete this reference (`rm -rf .afi/reference/`) or re-run `afi cli cite` to
 refresh it. The `.afi/` entry in `.gitignore` keeps it out of commits.
+
+## Rubric audit verb
+
+Run `afi cli doctor .` from the host project to confirm the seven rubric
+bundles pass. `afi cli verify` is a deprecated alias for the same command
+and will be removed in v0.6.0.

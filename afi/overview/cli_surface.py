@@ -1,7 +1,7 @@
 """CLI-subject inspector — descriptive snapshot of a target CLI project.
 
 Inspection strategy — **static only**. No subprocesses are spawned in the
-target (that's what ``afi cli verify`` is for; ``overview`` is the cheap
+target (that's what ``afi cli doctor`` is for; ``overview`` is the cheap
 read-only survey that runs in milliseconds and never imports foreign code).
 
 Two modes:
@@ -37,8 +37,11 @@ from afi.overview import OverviewReport, OverviewSection
 # uses a format the regex can't see is reported with a warning, not a crash.
 _ADD_PARSER_RE = re.compile(r'add_parser\(\s*[\'"]([^\'"]+)[\'"]')
 
-# Agent-first universal verbs. These are the "triple" afi mandates.
-_TRIPLE = ("learn", "explain", "overview")
+# Agent-first universal verbs. v0.5 expanded the set from the introspection
+# triple (learn/explain/overview) to include the diagnosability pillar
+# (doctor); the constant name avoids fixed arity ("triple") so it can grow
+# further if afi mandates another verb in a future version.
+_UNIVERSAL_VERBS = ("learn", "explain", "overview", "doctor")
 
 # Where afi's bundled reference template lives (for the zero-target fallback).
 _TEMPLATE_ROOT = Path(__file__).resolve().parent.parent / "cite" / "references" / "python-cli"
@@ -106,7 +109,7 @@ def inspect(path: Path | None) -> OverviewReport:
         f"deeper walk: read {info.package_root}/_commands/*.py directly for the "
         "full verb wiring — overview uses best-effort static regex."
     )
-    report.notes.append(f"for rubric grading (pass/fail), run: afi cli verify {target}")
+    report.notes.append(f"for rubric grading (pass/fail), run: afi cli doctor {target}")
     return report
 
 
@@ -255,13 +258,13 @@ def _scan_verbs(source: Path) -> list[str]:
 
 def _emit_agent_first_triple_section(report: OverviewReport, info: _TargetInfo) -> None:
     commands_dir = info.package_root / "_commands"
-    present: dict[str, bool] = dict.fromkeys(_TRIPLE, False)
+    present: dict[str, bool] = dict.fromkeys(_UNIVERSAL_VERBS, False)
     if commands_dir.is_dir():
-        for verb in _TRIPLE:
+        for verb in _UNIVERSAL_VERBS:
             present[verb] = (commands_dir / f"{verb}.py").is_file()
 
     body_lines = ["Universal verbs an agent expects on any agent-first CLI:", ""]
-    for verb in _TRIPLE:
+    for verb in _UNIVERSAL_VERBS:
         mark = "✅" if present[verb] else "❌"
         body_lines.append(f"- {mark} `{info.script_name} {verb}`")
     missing = [v for v, ok in present.items() if not ok]
@@ -273,9 +276,9 @@ def _emit_agent_first_triple_section(report: OverviewReport, info: _TargetInfo) 
         )
     report.sections.append(
         OverviewSection(
-            heading="Agent-first triple",
+            heading="Agent-first universals",
             body_md="\n".join(body_lines),
-            findings=[{"verb": v, "present": present[v]} for v in _TRIPLE],
+            findings=[{"verb": v, "present": present[v]} for v in _UNIVERSAL_VERBS],
         )
     )
 
@@ -285,7 +288,7 @@ def _emit_rubric_posture_section(report: OverviewReport, info: _TargetInfo) -> N
     cited = cited_dir.is_dir()
     has_tests = (info.path / "tests").is_dir()
     body_lines = [
-        f"- Rubric grade: run `afi cli verify {info.path}` (not invoked by overview).",
+        f"- Rubric grade: run `afi cli doctor {info.path}` (not invoked by overview).",
         f"- Tests dir: {'present' if has_tests else 'missing'} (`tests/`)",
         f"- afi reference tree cited: {'yes' if cited else 'no'}"
         + (f" (at `{cited_dir}`)" if cited else ""),
@@ -341,7 +344,7 @@ def _zero_target_report(
     report.notes.append(
         "scaffold into a real project: `afi cli cite <path>` (see `afi explain cli cite`)."
     )
-    report.notes.append("then audit: `afi cli verify <path>` (see `afi explain cli verify`).")
+    report.notes.append("then audit: `afi cli doctor <path>` (see `afi explain cli doctor`).")
     return report
 
 
@@ -426,12 +429,12 @@ def _build_template_triple_section(files: list) -> OverviewSection:
         for f in files
         if isinstance(f, dict) and "/cli/_commands/" in f.get("path", "")
     ]
-    triple_present = {v: any(c.endswith(f"{v}.py") for c in commands) for v in _TRIPLE}
+    universals_present = {v: any(c.endswith(f"{v}.py") for c in commands) for v in _UNIVERSAL_VERBS}
     body_lines = ["Universal verbs the scaffolded CLI ships with:", ""]
-    for verb in _TRIPLE:
-        mark = "✅" if triple_present[verb] else "❌"
+    for verb in _UNIVERSAL_VERBS:
+        mark = "✅" if universals_present[verb] else "❌"
         body_lines.append(f"- {mark} `{verb}`")
-    missing = [v for v, ok in triple_present.items() if not ok]
+    missing = [v for v, ok in universals_present.items() if not ok]
     if missing:
         body_lines.append("")
         body_lines.append(
@@ -439,7 +442,7 @@ def _build_template_triple_section(files: list) -> OverviewSection:
             "afi is tracked to add them as it grows."
         )
     return OverviewSection(
-        heading="Agent-first triple (template)",
+        heading="Agent-first universals (template)",
         body_md="\n".join(body_lines),
-        findings=[{"verb": v, "present": triple_present[v]} for v in _TRIPLE],
+        findings=[{"verb": v, "present": universals_present[v]} for v in _UNIVERSAL_VERBS],
     )

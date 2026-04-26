@@ -1,55 +1,31 @@
-"""The ``cli`` noun group — verbs ``cite``, ``verify``, and ``overview``.
+"""The ``cli`` noun group — verbs ``cite``, ``doctor``, ``overview``.
 
 ``afi cli cite``     — drop the agent-first CLI reference tree into the target
                        project under ``.afi/reference/<lang>-cli/``.
-``afi cli verify``   — run the six-bundle rubric against a target CLI.
+``afi cli doctor``   — run the seven-bundle rubric against a target CLI
+                       and surface inconsistencies with actionable remediation
+                       (replaces ``afi cli verify``; ``--fix`` applies any
+                       auto-fixable handlers).
 ``afi cli overview`` — read-only descriptive snapshot of a target CLI.
+
+``afi cli verify`` is kept as a deprecated alias that forwards to
+``cli doctor`` for one minor cycle; removed in v0.6.0.
 """
 
 from __future__ import annotations
 
 import argparse
-import tomllib
 from pathlib import Path
 
 from afi.cite import SUPPORTED_LANGS, emit_reference
-from afi.cli._errors import EXIT_USER_ERROR, AfiError
-from afi.cli._output import emit_diagnostic, emit_result
+from afi.cli._commands.doctor import cmd_cli_doctor, cmd_cli_verify_deprecated
+from afi.cli._output import emit_result
 from afi.overview import build as build_overview
 from afi.overview import to_json_dict, to_markdown
-from afi.rubric import run_rubric
-from afi.rubric._runner import SubprocessRunner
-from afi.rubric._types import CheckResult, VerifyContext
 
 _JSON_HELP = "Emit structured JSON."
-
-
-def _resolve_tool_name(target_path: Path) -> str:
-    pp = target_path / "pyproject.toml"
-    if not pp.is_file():
-        raise AfiError(
-            code=EXIT_USER_ERROR,
-            message=f"no pyproject.toml at {pp}",
-            remediation="run verify from the root of a Python project with pyproject.toml",
-        )
-    try:
-        data = tomllib.loads(pp.read_text())
-    except tomllib.TOMLDecodeError as err:
-        raise AfiError(
-            code=EXIT_USER_ERROR,
-            message=f"invalid TOML in {pp}: {err}",
-            remediation="fix the TOML syntax error in pyproject.toml",
-        ) from err
-    scripts = data.get("project", {}).get("scripts", {})
-    if not scripts:
-        raise AfiError(
-            code=EXIT_USER_ERROR,
-            message=f"no [project.scripts] in {pp}",
-            remediation=(
-                "add a [project.scripts] entry to pyproject.toml so the tool has an entry point"
-            ),
-        )
-    return next(iter(scripts.keys()))
+_PATH_HELP = "Target project path (default: .)."
+_STRICT_HELP = "Treat warnings as failures (non-zero exit on any not-passed check)."
 
 
 def cmd_cite(args: argparse.Namespace) -> None:
@@ -57,10 +33,7 @@ def cmd_cite(args: argparse.Namespace) -> None:
 
     Returns ``None`` on success (treated as ``EXIT_SUCCESS`` by
     :func:`afi.cli._dispatch`); every failure path raises
-    :class:`AfiError`. This keeps the handler protocol simple: "raise on
-    failure, return an int only when the success exit code varies" — the
-    way :func:`cmd_verify` does, and the way future verbs that need
-    nuanced exit codes (e.g. rubric fail) will.
+    :class:`AfiError`.
     """
     target_path = Path(args.path).resolve()
     lang = args.lang
@@ -71,9 +44,6 @@ def cmd_cite(args: argparse.Namespace) -> None:
         emit_result(report.to_dict(), json_mode=True)
         return
 
-    # The cite report IS the command's result — must go to stdout to honour
-    # the stdout/stderr split (results → stdout). `emit_diagnostic` is
-    # reserved for optional progress/side info and is unused in this path.
     lines = [
         f"Wrote {report.written_count} files to {report.out}",
         (
@@ -90,39 +60,10 @@ def cmd_cite(args: argparse.Namespace) -> None:
         [
             "",
             "For details on any step:  afi explain cli cite",
-            "For the rubric itself:    afi explain cli verify",
+            "For the rubric itself:    afi explain cli doctor",
         ]
     )
     emit_result("\n".join(lines), json_mode=False)
-
-
-def cmd_verify(args: argparse.Namespace) -> int:
-    target_path = Path(args.path).resolve()
-    tool_name = _resolve_tool_name(target_path)
-    runner = SubprocessRunner(cwd=target_path, tool_name=tool_name)
-    ctx = VerifyContext(target_path=target_path, tool_name=tool_name, runner=runner)
-
-    results = run_rubric(ctx)
-    summary = _summarize(results)
-    json_mode = bool(getattr(args, "json", False))
-    strict = bool(getattr(args, "strict", False))
-
-    if json_mode:
-        emit_result(
-            {
-                "tool": tool_name,
-                "path": str(target_path),
-                "results": [r.to_dict() for r in results],
-                "summary": summary,
-            },
-            json_mode=True,
-        )
-    else:
-        _render_text(results, summary)
-
-    if strict:
-        return 0 if summary["failed"] == 0 else 1
-    return 0 if summary["errors"] == 0 else 1
 
 
 def cmd_cli_overview(args: argparse.Namespace) -> int:
@@ -143,47 +84,10 @@ def cmd_cli_overview(args: argparse.Namespace) -> int:
     return 0
 
 
-def _summarize(results: list[CheckResult]) -> dict[str, object]:
-    passed = sum(1 for r in results if r.passed)
-    failed = sum(1 for r in results if not r.passed)
-    errors = sum(1 for r in results if not r.passed and r.severity == "error")
-    warnings = sum(1 for r in results if not r.passed and r.severity == "warn")
-    bundles: dict[str, dict[str, int]] = {}
-    for r in results:
-        b = bundles.setdefault(r.bundle, {"passed": 0, "failed": 0})
-        b["passed" if r.passed else "failed"] += 1
-    return {
-        "total": len(results),
-        "passed": passed,
-        "failed": failed,
-        "errors": errors,
-        "warnings": warnings,
-        "bundles": bundles,
-    }
-
-
-def _render_text(results: list[CheckResult], summary: dict[str, object]) -> None:
-    by_bundle: dict[str, list[CheckResult]] = {}
-    for r in results:
-        by_bundle.setdefault(r.bundle, []).append(r)
-    for bundle, items in by_bundle.items():
-        emit_result(f"[{bundle}]", json_mode=False)
-        for r in items:
-            mark = "PASS" if r.passed else f"FAIL ({r.severity})"
-            emit_result(f"  {mark:<12} {r.check}: {r.evidence}", json_mode=False)
-            if not r.passed and r.remediation:
-                emit_result(f"               hint: {r.remediation}", json_mode=False)
-        emit_result("", json_mode=False)
-    emit_diagnostic(
-        f"Summary: {summary['passed']}/{summary['total']} passed, "
-        f"{summary['errors']} errors, {summary['warnings']} warnings"
-    )
-
-
 def register(sub: argparse._SubParsersAction) -> None:
     cli_parser = sub.add_parser(
         "cli",
-        help="CLI-related commands: cite a reference tree, verify against the rubric.",
+        help="CLI-related commands: cite a reference tree, doctor against the rubric.",
     )
     cli_sub = cli_parser.add_subparsers(dest="cli_command")
 
@@ -191,7 +95,7 @@ def register(sub: argparse._SubParsersAction) -> None:
         "cite",
         help="Emit the agent-first CLI reference tree into <path>/.afi/reference/.",
     )
-    cite.add_argument("path", nargs="?", default=".", help="Target project path (default: .).")
+    cite.add_argument("path", nargs="?", default=".", help=_PATH_HELP)
     cite.add_argument(
         "--lang",
         default="python",
@@ -206,18 +110,52 @@ def register(sub: argparse._SubParsersAction) -> None:
     cite.add_argument("--json", action="store_true", help=_JSON_HELP)
     cite.set_defaults(func=cmd_cite)
 
+    doctor = cli_sub.add_parser(
+        "doctor",
+        help=(
+            "Audit the CLI at <path> against the seven-bundle agent-first rubric "
+            "and surface remediations; --fix applies auto-fixable ones."
+        ),
+    )
+    doctor.add_argument("path", nargs="?", default=".", help=_PATH_HELP)
+    doctor.add_argument("--json", action="store_true", help=_JSON_HELP)
+    # --fix and --dry-run are alternatives: --dry-run previews what --fix
+    # would do. Mutually exclusive at the argparse layer so passing both
+    # gives a clear error instead of silent precedence.
+    fix_group = doctor.add_mutually_exclusive_group()
+    fix_group.add_argument(
+        "--fix",
+        action="store_true",
+        help="Apply auto-fixable remediations.",
+    )
+    fix_group.add_argument(
+        "--dry-run",
+        action="store_true",
+        dest="dry_run",
+        help="Preview which fixes would be applied without mutating.",
+    )
+    doctor.add_argument(
+        "--strict",
+        action="store_true",
+        help=_STRICT_HELP,
+    )
+    doctor.set_defaults(func=cmd_cli_doctor)
+
+    # Deprecated alias for one minor cycle. Mirror the v0.4 verify shape so
+    # CI and scripts that call `afi cli verify .` keep working; the deprecation
+    # diagnostic is emitted by cmd_cli_verify_deprecated to stderr.
     verify = cli_sub.add_parser(
         "verify",
-        help="Audit a CLI at <path> against the six-bundle agent-first rubric.",
+        help="(Deprecated) Alias for `afi cli doctor`. Removed in v0.6.0.",
     )
-    verify.add_argument("path", nargs="?", default=".", help="Target project path (default: .).")
+    verify.add_argument("path", nargs="?", default=".", help=_PATH_HELP)
     verify.add_argument("--json", action="store_true", help=_JSON_HELP)
     verify.add_argument(
         "--strict",
         action="store_true",
-        help="Treat warnings as failures (non-zero exit on any not-passed check).",
+        help=_STRICT_HELP,
     )
-    verify.set_defaults(func=cmd_verify)
+    verify.set_defaults(func=cmd_cli_verify_deprecated)
 
     overview = cli_sub.add_parser(
         "overview",

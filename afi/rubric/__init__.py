@@ -1,4 +1,4 @@
-"""Agent-first rubric — six bundles of checks.
+"""Agent-first rubric — seven bundles of checks.
 
 Public API:
 
@@ -13,6 +13,7 @@ Individual checker modules live under :mod:`afi.rubric.checks`.
 from __future__ import annotations
 
 from afi.rubric._types import CheckResult, RunOutput, Severity, VerifyContext
+from afi.rubric.checks import doctor as _doctor_checks
 from afi.rubric.checks import errors as _errors_checks
 from afi.rubric.checks import explain_cmd as _explain_checks
 from afi.rubric.checks import json_output as _json_checks
@@ -30,6 +31,7 @@ def default_rubric() -> list:
         _errors_checks,
         _explain_checks,
         _overview_checks,
+        _doctor_checks,
     ]
 
 
