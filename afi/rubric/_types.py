@@ -31,6 +31,11 @@ class CheckResult:
     ``severity`` is only meaningful when ``passed`` is False — it tells the
     verifier whether this counts as a hard failure (``error``), a
     recommendation (``warn``), or informational (``info``).
+
+    ``auto_fixable`` and ``fix_id`` are doctor's contract: when a failed check
+    declares ``auto_fixable=True`` and a non-empty ``fix_id``, ``afi doctor
+    --fix`` will look the id up in :mod:`afi.doctor.fixes` and apply the
+    handler. Checks that need a code edit must leave both at the defaults.
     """
 
     bundle: str
@@ -39,6 +44,8 @@ class CheckResult:
     severity: Severity
     evidence: str
     remediation: str = ""
+    auto_fixable: bool = False
+    fix_id: str = ""
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -48,6 +55,8 @@ class CheckResult:
             "severity": self.severity,
             "evidence": self.evidence,
             "remediation": self.remediation,
+            "auto_fixable": self.auto_fixable,
+            "fix_id": self.fix_id,
         }
 
 

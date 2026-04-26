@@ -31,7 +31,12 @@ def test_cli_overview_on_real_target_reports_surface(
     rc = main(["cli", "overview", str(Path.cwd())])
     out = capsys.readouterr().out
     assert rc == 0
-    for heading in ("Project root", "Command surface", "Agent-first triple", "Rubric posture"):
+    for heading in (
+        "Project root",
+        "Command surface",
+        "Agent-first universals",
+        "Rubric posture",
+    ):
         assert heading in out
 
 

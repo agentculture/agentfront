@@ -3,9 +3,11 @@ title: Rubric
 nav_order: 3
 ---
 
-The rubric is the concrete, checkable form of the [Agent First](./agent-first.md) discipline. It is what `afi cli verify` enforces and what `afi cli cite` emits a reference for.
+The rubric is the concrete, checkable form of the [Agent First](./agent-first.md) discipline. It is what `afi cli doctor` enforces and what `afi cli cite` emits a reference for.
 
-Five bundles. Every bundle contains a small set of mechanical checks. A CLI that passes every bundle is "agent-first compliant" by afi's definition. `afi-cli` itself must pass — the `tests/test_self_verify.py` acceptance gate blocks any regression.
+Seven bundles. Every bundle contains a small set of mechanical checks. A CLI that passes every bundle is "agent-first compliant" by afi's definition. `afi-cli` itself must pass — the `tests/test_self_doctor.py` acceptance gate blocks any regression.
+
+> Note: `afi cli verify` is a deprecated alias for `afi cli doctor` retained through one minor cycle (removed in v0.6.0).
 
 ## Exit-code policy
 
@@ -67,9 +69,30 @@ Five bundles. Every bundle contains a small set of mechanical checks. A CLI that
 
 **Why:** `--help` is positional and terse. `explain <path>` is global and addressable: an agent can fetch any noun/verb's full markdown by path, and the tool itself points at valid paths when a miss happens. This is how an agent navigates the tool's menu without `--help` scraping.
 
+## Bundle 6 — overview
+
+**What it checks** *(black-box)*:
+
+- `<tool> overview` and `<tool> cli overview` exit `0` with non-empty stdout.
+- `<tool> overview --json` parses and carries the stable keys `subject` and `sections`.
+- `<tool> overview <bogus-path>` falls back gracefully (exit `0` with a warning) — descriptive verbs do not hard-fail the way diagnostic verbs do.
+
+**Why:** *what is present* is a different question from *what is wrong*. `overview` answers the former; `doctor` answers the latter. An agent integrating with the tool reads `overview` to learn the shape, `doctor` to learn the health.
+
+## Bundle 7 — doctor
+
+**What it checks** *(black-box)*:
+
+- `<tool> doctor` produces a non-empty report on stdout (any exit code — a healthy doctor exits `0`, an unhealthy doctor exits non-zero, both satisfy the contract).
+- `<tool> doctor --json` parses to an object with stable keys `healthy` (bool) and `checks` (list).
+- Every entry in `checks` carries `id`, `passed`, `severity`, `message`.
+- When `healthy: false`, every failed check supplies a non-empty `remediation` — doctor's promise is that failures are always actionable.
+
+**Why:** the diagnosability pillar of the agent-first contract. An agent hitting an unhealthy tool needs to know *what's wrong and how to fix it* without reading source. The `doctor` verb is also the natural home for `--fix` (auto-apply remediations declared `auto_fixable: true` with a `fix_id`); the rubric does not assert `--fix` itself because it has side effects, but checks declaring it satisfy the wider doctor contract.
+
 ## Severities
 
-Each check returns a `CheckResult` with a `severity` field (`error`, `warn`, or `info`). Only `error`-severity failures cause `afi cli verify` to exit non-zero by default. `--strict` promotes all failures (including `warn`) to non-zero exit.
+Each check returns a `CheckResult` with a `severity` field (`error`, `warn`, or `info`). Only `error`-severity failures cause `afi cli doctor` to exit non-zero by default. `--strict` promotes all failures (including `warn`) to non-zero exit.
 
 ## Adding checks
 
@@ -86,7 +109,7 @@ A new check is a function `(VerifyContext) -> CheckResult`. Add it to `CHECKS`. 
 
 ## Not-in-scope (on purpose)
 
-The rubric checks **generic agent-first affordances**, not tool-specific verbs. A tool that only has `learn`, `explain`, and two domain verbs can pass. A tool with dozens of verbs also passes if it satisfies the five bundles. afi's own `cli cite` / `cli verify` are NOT rubric requirements.
+The rubric checks **generic agent-first affordances**, not tool-specific verbs. A tool that only has `learn`, `explain`, `overview`, `doctor`, and two domain verbs can pass. A tool with dozens of verbs also passes if it satisfies the seven bundles. afi's own `cli cite` is NOT a rubric requirement.
 
 CI configuration, pre-commit hooks, and agent-workflow tooling are deliberately out of scope — those belong to the sibling project `agex-cli` (Agent Experience).
 
