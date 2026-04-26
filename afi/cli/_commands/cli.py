@@ -24,6 +24,8 @@ from afi.overview import build as build_overview
 from afi.overview import to_json_dict, to_markdown
 
 _JSON_HELP = "Emit structured JSON."
+_PATH_HELP = "Target project path (default: .)."
+_STRICT_HELP = "Treat warnings as failures (non-zero exit on any not-passed check)."
 
 
 def cmd_cite(args: argparse.Namespace) -> None:
@@ -93,7 +95,7 @@ def register(sub: argparse._SubParsersAction) -> None:
         "cite",
         help="Emit the agent-first CLI reference tree into <path>/.afi/reference/.",
     )
-    cite.add_argument("path", nargs="?", default=".", help="Target project path (default: .).")
+    cite.add_argument("path", nargs="?", default=".", help=_PATH_HELP)
     cite.add_argument(
         "--lang",
         default="python",
@@ -115,7 +117,7 @@ def register(sub: argparse._SubParsersAction) -> None:
             "and surface remediations; --fix applies auto-fixable ones."
         ),
     )
-    doctor.add_argument("path", nargs="?", default=".", help="Target project path (default: .).")
+    doctor.add_argument("path", nargs="?", default=".", help=_PATH_HELP)
     doctor.add_argument("--json", action="store_true", help=_JSON_HELP)
     # --fix and --dry-run are alternatives: --dry-run previews what --fix
     # would do. Mutually exclusive at the argparse layer so passing both
@@ -135,7 +137,7 @@ def register(sub: argparse._SubParsersAction) -> None:
     doctor.add_argument(
         "--strict",
         action="store_true",
-        help="Treat warnings as failures (non-zero exit on any not-passed check).",
+        help=_STRICT_HELP,
     )
     doctor.set_defaults(func=cmd_cli_doctor)
 
@@ -146,12 +148,12 @@ def register(sub: argparse._SubParsersAction) -> None:
         "verify",
         help="(Deprecated) Alias for `afi cli doctor`. Removed in v0.6.0.",
     )
-    verify.add_argument("path", nargs="?", default=".", help="Target project path (default: .).")
+    verify.add_argument("path", nargs="?", default=".", help=_PATH_HELP)
     verify.add_argument("--json", action="store_true", help=_JSON_HELP)
     verify.add_argument(
         "--strict",
         action="store_true",
-        help="Treat warnings as failures (non-zero exit on any not-passed check).",
+        help=_STRICT_HELP,
     )
     verify.set_defaults(func=cmd_cli_verify_deprecated)
 

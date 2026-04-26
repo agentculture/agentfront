@@ -38,6 +38,12 @@ BUNDLE = "doctor"
 _REQUIRED_TOP_KEYS = ("healthy", "checks")
 _REQUIRED_CHECK_KEYS = ("id", "passed", "severity", "message")
 
+# Cascading remediation: when `doctor --json` cannot be parsed at all, every
+# downstream check has the same root cause and the same fix — go look at
+# doctor_json_shape's evidence and repair that first. Centralised so the
+# message stays in lockstep across check modules.
+_PARSE_FAILURE_REMEDIATION = "fix `doctor_json_shape` first"
+
 
 def _check_doctor_global_exists(ctx: VerifyContext) -> CheckResult:
     out = ctx.runner.run(["doctor"], timeout=10.0)
@@ -132,7 +138,7 @@ def _check_doctor_check_shape(ctx: VerifyContext) -> CheckResult:
             False,
             "error",
             "`doctor --json` did not parse — see doctor_json_shape",
-            remediation="fix `doctor_json_shape` first",
+            remediation=_PARSE_FAILURE_REMEDIATION,
         )
     checks = payload.get("checks") if isinstance(payload, dict) else None
     if not isinstance(checks, list):
@@ -142,7 +148,7 @@ def _check_doctor_check_shape(ctx: VerifyContext) -> CheckResult:
             False,
             "error",
             "`checks` is not an array — see doctor_json_shape",
-            remediation="fix `doctor_json_shape` first",
+            remediation=_PARSE_FAILURE_REMEDIATION,
         )
     if not checks:
         # An empty list is shape-valid; treat as info-pass.
@@ -194,7 +200,7 @@ def _check_doctor_remediation_when_unhealthy(ctx: VerifyContext) -> CheckResult:
             False,
             "error",
             "`doctor --json` did not parse — see doctor_json_shape",
-            remediation="fix `doctor_json_shape` first",
+            remediation=_PARSE_FAILURE_REMEDIATION,
         )
     if not isinstance(payload, dict):
         return CheckResult(
@@ -203,7 +209,7 @@ def _check_doctor_remediation_when_unhealthy(ctx: VerifyContext) -> CheckResult:
             False,
             "error",
             "top-level is not an object — see doctor_json_shape",
-            remediation="fix `doctor_json_shape` first",
+            remediation=_PARSE_FAILURE_REMEDIATION,
         )
     if payload.get("healthy") is True:
         return CheckResult(

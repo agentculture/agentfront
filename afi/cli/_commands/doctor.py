@@ -205,7 +205,7 @@ def _run_target_audit(
                 emit_diagnostic(f"  - [{r.bundle}] {r.check} → fix_id={r.fix_id}")
         return tool_name, results
 
-    # fix=True
+    # Apply branch — --fix is set, --dry-run is not (mutually exclusive).
     if not fixable:
         emit_diagnostic("--fix: no auto-fixable failures.")
         return tool_name, results
