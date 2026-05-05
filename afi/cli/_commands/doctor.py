@@ -84,6 +84,56 @@ def _summarize(results: Iterable[CheckResult]) -> dict[str, int]:
     }
 
 
+def _group_by_bundle(results: list[CheckResult]) -> dict[str, list[CheckResult]]:
+    by_bundle: dict[str, list[CheckResult]] = {}
+    for r in results:
+        by_bundle.setdefault(r.bundle, []).append(r)
+    return by_bundle
+
+
+def _format_check_lines(r: CheckResult) -> list[str]:
+    mark = "PASS" if r.passed else f"FAIL ({r.severity})"
+    lines = [f"  {mark:<12} {r.check}: {r.evidence}"]
+    if not r.passed and r.remediation:
+        lines.append(f"               hint: {r.remediation}")
+    return lines
+
+
+def _emit_text_body(results: list[CheckResult]) -> None:
+    for bundle, items in _group_by_bundle(results).items():
+        emit_result(f"[{bundle}]", json_mode=False)
+        for r in items:
+            for line in _format_check_lines(r):
+                emit_result(line, json_mode=False)
+        emit_result("", json_mode=False)
+
+
+def _self_headline(summary: dict[str, int], healthy: bool) -> str:
+    # Self-mode headline scopes the verdict to "structural self-check" so an
+    # agent doesn't read a green light here as a green light on the CLI it's
+    # actually working with. See agentculture/afi-cli#13.
+    suffix = "Run 'afi doctor <path>' to audit a target CLI."
+    if healthy:
+        return (
+            f"afi doctor: structural self-check passed "
+            f"({summary['passed']}/{summary['total']}). {suffix}"
+        )
+    return (
+        f"afi doctor: structural self-check failed "
+        f"({summary['passed']}/{summary['total']} passed, "
+        f"{summary['errors']} errors, {summary['warnings']} warnings). "
+        f"{suffix}"
+    )
+
+
+def _target_headline(summary: dict[str, int], healthy: bool) -> str:
+    verdict = "healthy" if healthy else "unhealthy"
+    return (
+        f"{verdict}: {summary['passed']}/{summary['total']} passed, "
+        f"{summary['errors']} errors, {summary['warnings']} warnings"
+    )
+
+
 def _emit_payload(
     *,
     subject: str,
@@ -107,40 +157,9 @@ def _emit_payload(
         )
         return
 
-    by_bundle: dict[str, list[CheckResult]] = {}
-    for r in results:
-        by_bundle.setdefault(r.bundle, []).append(r)
-    for bundle, items in by_bundle.items():
-        emit_result(f"[{bundle}]", json_mode=False)
-        for r in items:
-            mark = "PASS" if r.passed else f"FAIL ({r.severity})"
-            emit_result(f"  {mark:<12} {r.check}: {r.evidence}", json_mode=False)
-            if not r.passed and r.remediation:
-                emit_result(f"               hint: {r.remediation}", json_mode=False)
-        emit_result("", json_mode=False)
-    if is_self:
-        # Self-mode headline scopes the verdict to "structural self-check"
-        # so an agent doesn't read a green light here as a green light on
-        # the CLI it's actually working with. See agentculture/afi-cli#13.
-        suffix = "Run 'afi doctor <path>' to audit a target CLI."
-        if healthy:
-            emit_diagnostic(
-                f"afi doctor: structural self-check passed "
-                f"({summary['passed']}/{summary['total']}). {suffix}"
-            )
-        else:
-            emit_diagnostic(
-                f"afi doctor: structural self-check failed "
-                f"({summary['passed']}/{summary['total']} passed, "
-                f"{summary['errors']} errors, {summary['warnings']} warnings). "
-                f"{suffix}"
-            )
-        return
-    verdict = "healthy" if healthy else "unhealthy"
-    emit_diagnostic(
-        f"{verdict}: {summary['passed']}/{summary['total']} passed, "
-        f"{summary['errors']} errors, {summary['warnings']} warnings"
-    )
+    _emit_text_body(results)
+    headline = _self_headline if is_self else _target_headline
+    emit_diagnostic(headline(summary, healthy))
 
 
 def _exit_code(results: list[CheckResult], *, strict: bool) -> int:
