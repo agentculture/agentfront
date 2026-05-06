@@ -47,6 +47,11 @@ _PACKAGE_HELP = (
     "root via PEP 610 direct_url.json). Mutually exclusive with the path "
     "positional."
 )
+# Default verb name woven into resolver-error remediations. The global
+# `afi doctor` is the default; `cmd_cli_doctor` overrides with
+# "afi cli doctor" so diagnostics from the noun-scoped form name the verb
+# the user actually invoked.
+_DEFAULT_DOCTOR_COMMAND = "afi doctor"
 
 
 def _check_to_dict(r: CheckResult) -> dict[str, object]:
@@ -169,7 +174,7 @@ def _exit_code(results: list[CheckResult], *, strict: bool) -> int:
     return 0 if summary["errors"] == 0 else 1
 
 
-def _resolve_tool_name(target_path: Path, *, command: str = "afi doctor") -> str:
+def _resolve_tool_name(target_path: Path, *, command: str = _DEFAULT_DOCTOR_COMMAND) -> str:
     """Read the first ``[project.scripts]`` entry from ``target_path/pyproject.toml``.
 
     Mirrors the helper that used to live in ``cli.py`` for ``cmd_verify``;
@@ -229,7 +234,7 @@ def _resolve_tool_name(target_path: Path, *, command: str = "afi doctor") -> str
     return next(iter(scripts.keys()))
 
 
-def _resolve_package_source_root(name: str, *, command: str = "afi doctor") -> Path:
+def _resolve_package_source_root(name: str, *, command: str = _DEFAULT_DOCTOR_COMMAND) -> Path:
     """Return the editable-install source root for distribution ``name``.
 
     Reads PEP 610 ``direct_url.json`` from the installed distribution and
@@ -329,7 +334,7 @@ def _run_target_audit(
     *,
     fix: bool,
     dry_run: bool,
-    command: str = "afi doctor",
+    command: str = _DEFAULT_DOCTOR_COMMAND,
 ) -> tuple[str, list[CheckResult]]:
     """Run the rubric against ``target_path``; optionally apply auto-fixes.
 
@@ -376,7 +381,7 @@ def _resolve_target_or_raise(
     *,
     raw_path: str | None,
     package: str | None,
-    command: str = "afi doctor",
+    command: str = _DEFAULT_DOCTOR_COMMAND,
 ) -> Path:
     """Pick the audit target from the (path, package) pair.
 
@@ -446,9 +451,11 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         return _exit_code(diagnosis.checks, strict=strict)
 
     # Target audit (alias for `afi cli doctor <path>` / `--package <name>`).
-    target_path = _resolve_target_or_raise(raw_path=raw, package=package, command="afi doctor")
+    target_path = _resolve_target_or_raise(
+        raw_path=raw, package=package, command=_DEFAULT_DOCTOR_COMMAND
+    )
     tool_name, results = _run_target_audit(
-        target_path, fix=fix, dry_run=dry_run, command="afi doctor"
+        target_path, fix=fix, dry_run=dry_run, command=_DEFAULT_DOCTOR_COMMAND
     )
     _emit_payload(
         subject=str(target_path),

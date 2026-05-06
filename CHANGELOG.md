@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/). This project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.2] - 2026-05-06
+
+
+### Changed
+
+- doctor: extract _DEFAULT_DOCTOR_COMMAND constant for the default verb name threaded into resolver remediations (SonarCloud duplicate-literal finding on PR #14)
+
 ## [0.6.1] - 2026-05-06
 
 ### Fixed
