@@ -108,6 +108,41 @@ def test_file_url_without_pyproject_is_rejected(
     assert "no pyproject.toml is there" in exc_info.value.message
 
 
+def test_non_editable_file_install_is_rejected(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A file:// install with ``dir_info.editable == False`` is not a valid target.
+
+    The CLI help text scopes ``--package`` to *editable* installs; a plain
+    ``pip install /path`` (no ``-e``) yields a file:// direct_url without
+    the editable flag. Accepting that path silently would let ``--fix``
+    mutate a tree the install copy isn't tracking.
+    """
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "demo"\n')
+    payload = json.dumps({"url": f"file://{quote(str(tmp_path))}", "dir_info": {"editable": False}})
+    _patch_distribution(monkeypatch, payload)
+    with pytest.raises(AfiError) as exc_info:
+        _resolve_package_source_root("not-editable")
+    assert "not editable" in exc_info.value.message
+    assert "uv pip install -e" in exc_info.value.remediation
+
+
+def test_file_install_without_dir_info_is_rejected(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """``direct_url.json`` with no ``dir_info`` block is treated as non-editable.
+
+    PEP 610 lets an installer omit ``dir_info``; absent the flag we can't
+    prove editability, so the resolver must refuse rather than guess.
+    """
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "demo"\n')
+    payload = json.dumps({"url": f"file://{quote(str(tmp_path))}"})
+    _patch_distribution(monkeypatch, payload)
+    with pytest.raises(AfiError) as exc_info:
+        _resolve_package_source_root("no-dir-info")
+    assert "not editable" in exc_info.value.message
+
+
 def test_file_url_with_pyproject_returns_source_root(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

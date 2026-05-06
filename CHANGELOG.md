@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/). This project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2026-05-06
+
+### Fixed
+
+- afi doctor --package: validate PEP 610 dir_info.editable so non-editable file:// installs are rejected with a clear remediation (PR #14 review)
+- afi doctor / afi cli doctor: error remediation now names the verb the user invoked instead of hardcoding afi doctor (PR #14 review)
+
 ## [0.6.0] - 2026-05-05
 
 ### Added

@@ -195,3 +195,31 @@ def test_cli_doctor_path_and_package_mutually_exclusive() -> None:
     assert result.returncode != 0
     assert "Traceback" not in result.stderr
     assert "mutually exclusive" in result.stderr
+
+
+def test_cli_doctor_unknown_path_names_the_cli_verb_in_remediation() -> None:
+    """`afi cli doctor /bad` must point at `afi cli doctor`, not `afi doctor`.
+
+    Regression for the Copilot review on PR #14: the diagnostic
+    remediation for a non-project-root path used to hardcode the global
+    verb (``afi doctor ...``), which misleads agents that invoked the
+    noun-scoped form.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        result = _run_afi("cli", "doctor", "culture", cwd=Path(tmp))
+    assert result.returncode != 0
+    assert "Traceback" not in result.stderr
+    assert "is not a project root" in result.stderr
+    assert "afi cli doctor" in result.stderr
+
+
+def test_cli_doctor_unknown_package_names_the_cli_verb_in_remediation() -> None:
+    """`afi cli doctor --package <unknown>` remediation names the cli verb.
+
+    Same threading as the path branch: the package-resolver remediations
+    must follow the verb the user invoked.
+    """
+    result = _run_afi("cli", "doctor", "--package", "definitely-not-a-package", cwd=REPO_ROOT)
+    assert result.returncode != 0
+    assert "Traceback" not in result.stderr
+    assert "afi cli doctor /path/to/" in result.stderr

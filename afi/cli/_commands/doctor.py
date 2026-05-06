@@ -169,11 +169,15 @@ def _exit_code(results: list[CheckResult], *, strict: bool) -> int:
     return 0 if summary["errors"] == 0 else 1
 
 
-def _resolve_tool_name(target_path: Path) -> str:
+def _resolve_tool_name(target_path: Path, *, command: str = "afi doctor") -> str:
     """Read the first ``[project.scripts]`` entry from ``target_path/pyproject.toml``.
 
     Mirrors the helper that used to live in ``cli.py`` for ``cmd_verify``;
     kept here so doctor stays the source of truth for target audits.
+
+    ``command`` is the verb the user invoked (``afi doctor`` or
+    ``afi cli doctor``); it is woven into the not-a-project-root remediation
+    so the diagnostic names the runnable command the user actually typed.
     """
     import tomllib
 
@@ -183,10 +187,10 @@ def _resolve_tool_name(target_path: Path) -> str:
             code=EXIT_USER_ERROR,
             message=f"'{target_path}' is not a project root (no pyproject.toml at {pp})",
             remediation=(
-                "pass a path to a Python project root (e.g. `afi doctor .` from "
-                "inside the repo, or `afi doctor /path/to/<project>`); to audit "
-                "an editable-installed distribution by name, use "
-                "`afi doctor --package <name>`"
+                f"pass a path to a Python project root (e.g. `{command} .` from "
+                f"inside the repo, or `{command} /path/to/<project>`); to audit "
+                f"an editable-installed distribution by name, use "
+                f"`{command} --package <name>`"
             ),
         )
     try:
@@ -225,14 +229,18 @@ def _resolve_tool_name(target_path: Path) -> str:
     return next(iter(scripts.keys()))
 
 
-def _resolve_package_source_root(name: str) -> Path:
+def _resolve_package_source_root(name: str, *, command: str = "afi doctor") -> Path:
     """Return the editable-install source root for distribution ``name``.
 
     Reads PEP 610 ``direct_url.json`` from the installed distribution and
-    returns the recorded source path when it points at a real project root
-    (``file://`` URL with a ``pyproject.toml``). Raises :class:`AfiError`
-    on every other branch with a remediation that names the next step
-    (install editable, or pass a path).
+    returns the recorded source path when it points at a real *editable*
+    project root (``file://`` URL with ``dir_info.editable == true`` and a
+    ``pyproject.toml`` on disk). Raises :class:`AfiError` on every other
+    branch with a remediation that names the next step (install editable,
+    or pass a path).
+
+    ``command`` is the verb the user invoked; threaded into every
+    remediation so error output names the runnable command they typed.
     """
     try:
         dist = _metadata.distribution(name)
@@ -243,7 +251,7 @@ def _resolve_package_source_root(name: str) -> Path:
             remediation=(
                 f"install '{name}' editable in this environment (e.g. "
                 f"`uv pip install -e /path/to/{name}`), or pass a path: "
-                f"`afi doctor /path/to/{name}`"
+                f"`{command} /path/to/{name}`"
             ),
         ) from err
 
@@ -255,7 +263,7 @@ def _resolve_package_source_root(name: str) -> Path:
             remediation=(
                 f"reinstall editable from a source checkout (e.g. "
                 f"`uv pip install -e /path/to/{name}`), or pass a path: "
-                f"`afi doctor /path/to/{name}`"
+                f"`{command} /path/to/{name}`"
             ),
         )
     try:
@@ -279,7 +287,27 @@ def _resolve_package_source_root(name: str) -> Path:
             remediation=(
                 f"reinstall editable from a local checkout (e.g. "
                 f"`uv pip install -e /path/to/{name}`), or pass a path: "
-                f"`afi doctor /path/to/{name}`"
+                f"`{command} /path/to/{name}`"
+            ),
+        )
+
+    # Enforce the contract the help text already promises: --package only
+    # accepts editable installs. A non-editable file:// install (e.g.
+    # `pip install /path/to/repo` without -e) would otherwise be silently
+    # accepted, and a later `--fix` could mutate a source tree the install
+    # copy isn't tracking. Surface this *before* the pyproject probe so the
+    # diagnostic names the real cause instead of a downstream symptom.
+    dir_info = info.get("dir_info") if isinstance(info, dict) else None
+    if not (isinstance(dir_info, dict) and dir_info.get("editable") is True):
+        raise AfiError(
+            code=EXIT_USER_ERROR,
+            message=(
+                f"'{name}' is installed from a local source but not editable; "
+                f"afi doctor needs an editable install so source mutations are visible"
+            ),
+            remediation=(
+                f"reinstall with -e (e.g. `uv pip install -e /path/to/{name}`), "
+                f"or pass a path: `{command} /path/to/{name}`"
             ),
         )
 
@@ -290,7 +318,7 @@ def _resolve_package_source_root(name: str) -> Path:
             message=(f"'{name}' resolves to '{src}' but no pyproject.toml is there"),
             remediation=(
                 f"reinstall editable from a real project root, or pass a path "
-                f"directly: `afi doctor /path/to/{name}`"
+                f"directly: `{command} /path/to/{name}`"
             ),
         )
     return src
@@ -301,15 +329,18 @@ def _run_target_audit(
     *,
     fix: bool,
     dry_run: bool,
+    command: str = "afi doctor",
 ) -> tuple[str, list[CheckResult]]:
     """Run the rubric against ``target_path``; optionally apply auto-fixes.
 
     Returns ``(tool_name, results)``. ``--fix`` re-runs the rubric after
     applying handlers so the returned results reflect post-fix state;
     ``--dry-run`` only prints a fix preview to stderr and returns the
-    pre-fix results unchanged.
+    pre-fix results unchanged. ``command`` is forwarded to
+    :func:`_resolve_tool_name` so its remediations name the verb the user
+    typed.
     """
-    tool_name = _resolve_tool_name(target_path)
+    tool_name = _resolve_tool_name(target_path, command=command)
     runner = SubprocessRunner(cwd=target_path, tool_name=tool_name)
     ctx = VerifyContext(target_path=target_path, tool_name=tool_name, runner=runner)
     results = run_rubric(ctx)
@@ -345,6 +376,7 @@ def _resolve_target_or_raise(
     *,
     raw_path: str | None,
     package: str | None,
+    command: str = "afi doctor",
 ) -> Path:
     """Pick the audit target from the (path, package) pair.
 
@@ -355,27 +387,29 @@ def _resolve_target_or_raise(
     * ``raw_path`` set → resolve as a filesystem path.
 
     The "neither set" case is handled by callers (it means different things
-    for ``afi doctor`` vs. ``afi cli doctor``).
+    for ``afi doctor`` vs. ``afi cli doctor``). ``command`` is the verb the
+    user invoked; threaded into mutex/no-target remediations so they name
+    the runnable command they typed.
     """
     if package is not None and raw_path is not None:
         raise AfiError(
             code=EXIT_USER_ERROR,
             message="--package and a path argument are mutually exclusive",
             remediation=(
-                "pass exactly one: either a path "
-                "(`afi doctor /path/to/project`) or a package name "
-                "(`afi doctor --package <name>`)"
+                f"pass exactly one: either a path "
+                f"(`{command} /path/to/project`) or a package name "
+                f"(`{command} --package <name>`)"
             ),
         )
     if package is not None:
-        return _resolve_package_source_root(package)
+        return _resolve_package_source_root(package, command=command)
     if raw_path is None:
         # Defensive: callers gate the "neither set" branch themselves.
         # If we ever land here it means a new caller forgot to do so.
         raise AfiError(
             code=EXIT_USER_ERROR,
             message="no audit target supplied",
-            remediation="pass a path or `--package <name>`",
+            remediation=f"pass a path or `{command} --package <name>`",
         )
     return Path(raw_path).resolve()
 
@@ -412,8 +446,10 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         return _exit_code(diagnosis.checks, strict=strict)
 
     # Target audit (alias for `afi cli doctor <path>` / `--package <name>`).
-    target_path = _resolve_target_or_raise(raw_path=raw, package=package)
-    tool_name, results = _run_target_audit(target_path, fix=fix, dry_run=dry_run)
+    target_path = _resolve_target_or_raise(raw_path=raw, package=package, command="afi doctor")
+    tool_name, results = _run_target_audit(
+        target_path, fix=fix, dry_run=dry_run, command="afi doctor"
+    )
     _emit_payload(
         subject=str(target_path),
         tool=tool_name,
@@ -443,9 +479,13 @@ def cmd_cli_doctor(args: argparse.Namespace) -> int:
     if raw is None and package is None:
         target_path = Path(".").resolve()
     else:
-        target_path = _resolve_target_or_raise(raw_path=raw, package=package)
+        target_path = _resolve_target_or_raise(
+            raw_path=raw, package=package, command="afi cli doctor"
+        )
 
-    tool_name, results = _run_target_audit(target_path, fix=fix, dry_run=dry_run)
+    tool_name, results = _run_target_audit(
+        target_path, fix=fix, dry_run=dry_run, command="afi cli doctor"
+    )
     _emit_payload(
         subject=str(target_path),
         tool=tool_name,
