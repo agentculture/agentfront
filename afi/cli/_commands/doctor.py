@@ -27,8 +27,11 @@ promotes ``warn`` failures to non-zero.
 from __future__ import annotations
 
 import argparse
+import json as _json
+from importlib import metadata as _metadata
 from pathlib import Path
 from typing import Iterable
+from urllib.parse import unquote, urlparse
 
 from afi.cli._errors import EXIT_USER_ERROR, AfiError
 from afi.cli._output import emit_diagnostic, emit_result
@@ -39,6 +42,16 @@ from afi.rubric._runner import SubprocessRunner
 from afi.rubric._types import CheckResult, VerifyContext
 
 _JSON_HELP = "Emit structured JSON."
+_PACKAGE_HELP = (
+    "Audit an editable-installed distribution by name (looks up its source "
+    "root via PEP 610 direct_url.json). Mutually exclusive with the path "
+    "positional."
+)
+# Default verb name woven into resolver-error remediations. The global
+# `afi doctor` is the default; `cmd_cli_doctor` overrides with
+# "afi cli doctor" so diagnostics from the noun-scoped form name the verb
+# the user actually invoked.
+_DEFAULT_DOCTOR_COMMAND = "afi doctor"
 
 
 def _check_to_dict(r: CheckResult) -> dict[str, object]:
@@ -76,12 +89,63 @@ def _summarize(results: Iterable[CheckResult]) -> dict[str, int]:
     }
 
 
+def _group_by_bundle(results: list[CheckResult]) -> dict[str, list[CheckResult]]:
+    by_bundle: dict[str, list[CheckResult]] = {}
+    for r in results:
+        by_bundle.setdefault(r.bundle, []).append(r)
+    return by_bundle
+
+
+def _format_check_lines(r: CheckResult) -> list[str]:
+    mark = "PASS" if r.passed else f"FAIL ({r.severity})"
+    lines = [f"  {mark:<12} {r.check}: {r.evidence}"]
+    if not r.passed and r.remediation:
+        lines.append(f"               hint: {r.remediation}")
+    return lines
+
+
+def _emit_text_body(results: list[CheckResult]) -> None:
+    for bundle, items in _group_by_bundle(results).items():
+        emit_result(f"[{bundle}]", json_mode=False)
+        for r in items:
+            for line in _format_check_lines(r):
+                emit_result(line, json_mode=False)
+        emit_result("", json_mode=False)
+
+
+def _self_headline(summary: dict[str, int], healthy: bool) -> str:
+    # Self-mode headline scopes the verdict to "structural self-check" so an
+    # agent doesn't read a green light here as a green light on the CLI it's
+    # actually working with. See agentculture/afi-cli#13.
+    suffix = "Run 'afi doctor <path>' to audit a target CLI."
+    if healthy:
+        return (
+            f"afi doctor: structural self-check passed "
+            f"({summary['passed']}/{summary['total']}). {suffix}"
+        )
+    return (
+        f"afi doctor: structural self-check failed "
+        f"({summary['passed']}/{summary['total']} passed, "
+        f"{summary['errors']} errors, {summary['warnings']} warnings). "
+        f"{suffix}"
+    )
+
+
+def _target_headline(summary: dict[str, int], healthy: bool) -> str:
+    verdict = "healthy" if healthy else "unhealthy"
+    return (
+        f"{verdict}: {summary['passed']}/{summary['total']} passed, "
+        f"{summary['errors']} errors, {summary['warnings']} warnings"
+    )
+
+
 def _emit_payload(
     *,
     subject: str,
     tool: str,
     results: list[CheckResult],
     json_mode: bool,
+    is_self: bool = False,
 ) -> None:
     summary = _summarize(results)
     healthy = is_healthy(results)
@@ -98,22 +162,9 @@ def _emit_payload(
         )
         return
 
-    by_bundle: dict[str, list[CheckResult]] = {}
-    for r in results:
-        by_bundle.setdefault(r.bundle, []).append(r)
-    for bundle, items in by_bundle.items():
-        emit_result(f"[{bundle}]", json_mode=False)
-        for r in items:
-            mark = "PASS" if r.passed else f"FAIL ({r.severity})"
-            emit_result(f"  {mark:<12} {r.check}: {r.evidence}", json_mode=False)
-            if not r.passed and r.remediation:
-                emit_result(f"               hint: {r.remediation}", json_mode=False)
-        emit_result("", json_mode=False)
-    verdict = "healthy" if healthy else "unhealthy"
-    emit_diagnostic(
-        f"{verdict}: {summary['passed']}/{summary['total']} passed, "
-        f"{summary['errors']} errors, {summary['warnings']} warnings"
-    )
+    _emit_text_body(results)
+    headline = _self_headline if is_self else _target_headline
+    emit_diagnostic(headline(summary, healthy))
 
 
 def _exit_code(results: list[CheckResult], *, strict: bool) -> int:
@@ -123,11 +174,15 @@ def _exit_code(results: list[CheckResult], *, strict: bool) -> int:
     return 0 if summary["errors"] == 0 else 1
 
 
-def _resolve_tool_name(target_path: Path) -> str:
+def _resolve_tool_name(target_path: Path, *, command: str = _DEFAULT_DOCTOR_COMMAND) -> str:
     """Read the first ``[project.scripts]`` entry from ``target_path/pyproject.toml``.
 
     Mirrors the helper that used to live in ``cli.py`` for ``cmd_verify``;
     kept here so doctor stays the source of truth for target audits.
+
+    ``command`` is the verb the user invoked (``afi doctor`` or
+    ``afi cli doctor``); it is woven into the not-a-project-root remediation
+    so the diagnostic names the runnable command the user actually typed.
     """
     import tomllib
 
@@ -135,8 +190,13 @@ def _resolve_tool_name(target_path: Path) -> str:
     if not pp.is_file():
         raise AfiError(
             code=EXIT_USER_ERROR,
-            message=f"no pyproject.toml at {pp}",
-            remediation="run doctor from the root of a Python project with pyproject.toml",
+            message=f"'{target_path}' is not a project root (no pyproject.toml at {pp})",
+            remediation=(
+                f"pass a path to a Python project root (e.g. `{command} .` from "
+                f"inside the repo, or `{command} /path/to/<project>`); to audit "
+                f"an editable-installed distribution by name, use "
+                f"`{command} --package <name>`"
+            ),
         )
     try:
         data = tomllib.loads(pp.read_text())
@@ -174,20 +234,118 @@ def _resolve_tool_name(target_path: Path) -> str:
     return next(iter(scripts.keys()))
 
 
+def _resolve_package_source_root(name: str, *, command: str = _DEFAULT_DOCTOR_COMMAND) -> Path:
+    """Return the editable-install source root for distribution ``name``.
+
+    Reads PEP 610 ``direct_url.json`` from the installed distribution and
+    returns the recorded source path when it points at a real *editable*
+    project root (``file://`` URL with ``dir_info.editable == true`` and a
+    ``pyproject.toml`` on disk). Raises :class:`AfiError` on every other
+    branch with a remediation that names the next step (install editable,
+    or pass a path).
+
+    ``command`` is the verb the user invoked; threaded into every
+    remediation so error output names the runnable command they typed.
+    """
+    try:
+        dist = _metadata.distribution(name)
+    except _metadata.PackageNotFoundError as err:
+        raise AfiError(
+            code=EXIT_USER_ERROR,
+            message=f"no installed distribution named '{name}'",
+            remediation=(
+                f"install '{name}' editable in this environment (e.g. "
+                f"`uv pip install -e /path/to/{name}`), or pass a path: "
+                f"`{command} /path/to/{name}`"
+            ),
+        ) from err
+
+    raw = dist.read_text("direct_url.json")
+    if not raw:
+        raise AfiError(
+            code=EXIT_USER_ERROR,
+            message=f"'{name}' is installed but not as an editable file:// install",
+            remediation=(
+                f"reinstall editable from a source checkout (e.g. "
+                f"`uv pip install -e /path/to/{name}`), or pass a path: "
+                f"`{command} /path/to/{name}`"
+            ),
+        )
+    try:
+        info = _json.loads(raw)
+    except _json.JSONDecodeError as err:
+        raise AfiError(
+            code=EXIT_USER_ERROR,
+            message=f"'{name}': direct_url.json is not valid JSON ({err})",
+            remediation=f"reinstall '{name}' to refresh its install metadata",
+        ) from err
+
+    url = info.get("url", "") if isinstance(info, dict) else ""
+    parsed = urlparse(url)
+    if parsed.scheme != "file":
+        raise AfiError(
+            code=EXIT_USER_ERROR,
+            message=(
+                f"'{name}' was installed from a non-file source ({url!r}); "
+                f"afi doctor needs a source checkout with pyproject.toml"
+            ),
+            remediation=(
+                f"reinstall editable from a local checkout (e.g. "
+                f"`uv pip install -e /path/to/{name}`), or pass a path: "
+                f"`{command} /path/to/{name}`"
+            ),
+        )
+
+    # Enforce the contract the help text already promises: --package only
+    # accepts editable installs. A non-editable file:// install (e.g.
+    # `pip install /path/to/repo` without -e) would otherwise be silently
+    # accepted, and a later `--fix` could mutate a source tree the install
+    # copy isn't tracking. Surface this *before* the pyproject probe so the
+    # diagnostic names the real cause instead of a downstream symptom.
+    dir_info = info.get("dir_info") if isinstance(info, dict) else None
+    if not (isinstance(dir_info, dict) and dir_info.get("editable") is True):
+        raise AfiError(
+            code=EXIT_USER_ERROR,
+            message=(
+                f"'{name}' is installed from a local source but not editable; "
+                f"afi doctor needs an editable install so source mutations are visible"
+            ),
+            remediation=(
+                f"reinstall with -e (e.g. `uv pip install -e /path/to/{name}`), "
+                f"or pass a path: `{command} /path/to/{name}`"
+            ),
+        )
+
+    src = Path(unquote(parsed.path)).resolve()
+    if not (src / "pyproject.toml").is_file():
+        raise AfiError(
+            code=EXIT_USER_ERROR,
+            message=(f"'{name}' resolves to '{src}' but no pyproject.toml is there"),
+            remediation=(
+                f"reinstall editable from a real project root, or pass a path "
+                f"directly: `{command} /path/to/{name}`"
+            ),
+        )
+    return src
+
+
 def _run_target_audit(
     target_path: Path,
     *,
     fix: bool,
     dry_run: bool,
+    command: str = _DEFAULT_DOCTOR_COMMAND,
 ) -> tuple[str, list[CheckResult]]:
     """Run the rubric against ``target_path``; optionally apply auto-fixes.
 
     Returns ``(tool_name, results)``. ``--fix`` re-runs the rubric after
     applying handlers so the returned results reflect post-fix state;
     ``--dry-run`` only prints a fix preview to stderr and returns the
-    pre-fix results unchanged.
+    pre-fix results unchanged. ``command`` is forwarded to
+    :func:`_resolve_tool_name` so its remediations name the verb the user
+    typed.
     """
-    tool_name = _resolve_tool_name(target_path)
+    tool_name = _resolve_tool_name(target_path, command=command)
     runner = SubprocessRunner(cwd=target_path, tool_name=tool_name)
     ctx = VerifyContext(target_path=target_path, tool_name=tool_name, runner=runner)
     results = run_rubric(ctx)
@@ -219,11 +377,53 @@ def _run_target_audit(
     return tool_name, results
 
 
+def _resolve_target_or_raise(
+    *,
+    raw_path: str | None,
+    package: str | None,
+    command: str = _DEFAULT_DOCTOR_COMMAND,
+) -> Path:
+    """Pick the audit target from the (path, package) pair.
+
+    Caller policies:
+
+    * Both set → user error (mutually exclusive).
+    * ``package`` set → resolve via :func:`_resolve_package_source_root`.
+    * ``raw_path`` set → resolve as a filesystem path.
+
+    The "neither set" case is handled by callers (it means different things
+    for ``afi doctor`` vs. ``afi cli doctor``). ``command`` is the verb the
+    user invoked; threaded into mutex/no-target remediations so they name
+    the runnable command they typed.
+    """
+    if package is not None and raw_path is not None:
+        raise AfiError(
+            code=EXIT_USER_ERROR,
+            message="--package and a path argument are mutually exclusive",
+            remediation=(
+                f"pass exactly one: either a path "
+                f"(`{command} /path/to/project`) or a package name "
+                f"(`{command} --package <name>`)"
+            ),
+        )
+    if package is not None:
+        return _resolve_package_source_root(package, command=command)
+    if raw_path is None:
+        # Defensive: callers gate the "neither set" branch themselves.
+        # If we ever land here it means a new caller forgot to do so.
+        raise AfiError(
+            code=EXIT_USER_ERROR,
+            message="no audit target supplied",
+            remediation=f"pass a path or `{command} --package <name>`",
+        )
+    return Path(raw_path).resolve()
+
+
 def cmd_doctor(args: argparse.Namespace) -> int:
     """Handler for ``afi doctor [path]`` — global verb.
 
-    No path → self-diagnosis (in-process, fast, read-only). With path →
-    rubric audit of the target (delegates to the same engine that powers
+    No path and no ``--package`` → self-diagnosis (in-process, fast,
+    read-only). With either, runs the rubric audit (same engine as
     ``afi cli doctor``).
     """
     json_mode = bool(getattr(args, "json", False))
@@ -232,7 +432,8 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     strict = bool(getattr(args, "strict", False))
 
     raw = getattr(args, "path", None)
-    if raw is None:
+    package = getattr(args, "package", None)
+    if raw is None and package is None:
         # self-doctor
         if fix or dry_run:
             emit_diagnostic(
@@ -245,12 +446,17 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             tool="afi",
             results=diagnosis.checks,
             json_mode=json_mode,
+            is_self=True,
         )
         return _exit_code(diagnosis.checks, strict=strict)
 
-    # Target audit (alias for `afi cli doctor <path>`).
-    target_path = Path(raw).resolve()
-    tool_name, results = _run_target_audit(target_path, fix=fix, dry_run=dry_run)
+    # Target audit (alias for `afi cli doctor <path>` / `--package <name>`).
+    target_path = _resolve_target_or_raise(
+        raw_path=raw, package=package, command=_DEFAULT_DOCTOR_COMMAND
+    )
+    tool_name, results = _run_target_audit(
+        target_path, fix=fix, dry_run=dry_run, command=_DEFAULT_DOCTOR_COMMAND
+    )
     _emit_payload(
         subject=str(target_path),
         tool=tool_name,
@@ -261,14 +467,32 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
 
 def cmd_cli_doctor(args: argparse.Namespace) -> int:
-    """Handler for ``afi cli doctor <path>`` — target audit with optional --fix."""
-    target_path = Path(args.path).resolve()
+    """Handler for ``afi cli doctor [path] | --package <name>``.
+
+    Path positional defaults to ``.``; ``--package`` overrides it. Passing
+    a non-default path together with ``--package`` is rejected.
+    """
     json_mode = bool(getattr(args, "json", False))
     fix = bool(getattr(args, "fix", False))
     dry_run = bool(getattr(args, "dry_run", False))
     strict = bool(getattr(args, "strict", False))
 
-    tool_name, results = _run_target_audit(target_path, fix=fix, dry_run=dry_run)
+    raw = getattr(args, "path", None)
+    package = getattr(args, "package", None)
+    # `afi cli doctor` (no args) audits cwd. We can't tell "user typed `.`"
+    # from "argparse default" via the resolved value, so we keep the
+    # default as None and apply the cwd fallback here when neither input
+    # was given.
+    if raw is None and package is None:
+        target_path = Path(".").resolve()
+    else:
+        target_path = _resolve_target_or_raise(
+            raw_path=raw, package=package, command="afi cli doctor"
+        )
+
+    tool_name, results = _run_target_audit(
+        target_path, fix=fix, dry_run=dry_run, command="afi cli doctor"
+    )
     _emit_payload(
         subject=str(target_path),
         tool=tool_name,
@@ -304,7 +528,16 @@ def register(sub: argparse._SubParsersAction) -> None:
         "path",
         nargs="?",
         default=None,
-        help="Target project path. Omit to self-diagnose afi's own install.",
+        help=(
+            "Target project root (with pyproject.toml). Omit (and skip "
+            "--package) to self-diagnose afi's own install."
+        ),
+    )
+    p.add_argument(
+        "--package",
+        default=None,
+        metavar="NAME",
+        help=_PACKAGE_HELP,
     )
     p.add_argument("--json", action="store_true", help=_JSON_HELP)
     # --fix and --dry-run are alternatives, not orthogonal: --dry-run previews

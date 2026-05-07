@@ -117,7 +117,25 @@ def register(sub: argparse._SubParsersAction) -> None:
             "and surface remediations; --fix applies auto-fixable ones."
         ),
     )
-    doctor.add_argument("path", nargs="?", default=".", help=_PATH_HELP)
+    # Default kept as None (not "."): the cwd fallback lives in cmd_cli_doctor
+    # so we can tell "no args" from "explicit path" and reject `--package`
+    # combined with an explicit path.
+    doctor.add_argument(
+        "path",
+        nargs="?",
+        default=None,
+        help=_PATH_HELP + " Omit and pass --package to audit by distribution name.",
+    )
+    doctor.add_argument(
+        "--package",
+        default=None,
+        metavar="NAME",
+        help=(
+            "Audit an editable-installed distribution by name (looks up "
+            "its source root via PEP 610 direct_url.json). Mutually "
+            "exclusive with the path positional."
+        ),
+    )
     doctor.add_argument("--json", action="store_true", help=_JSON_HELP)
     # --fix and --dry-run are alternatives: --dry-run previews what --fix
     # would do. Mutually exclusive at the argparse layer so passing both

@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import subprocess  # noqa: S404 - integration tests need subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -31,7 +32,23 @@ def test_global_doctor_no_path_runs_self_diagnosis() -> None:
     assert result.returncode == 0, f"self-doctor failed:\n{result.stderr}"
     # Self-doctor uses the [self] bundle name.
     assert "[self]" in result.stdout
+    # Self-mode headline is scoped (issue #13) — bare `healthy:` is reserved
+    # for target audits to avoid the "green light is over-confident" framing.
+    assert "structural self-check passed" in result.stderr
+    assert "Run 'afi doctor" in result.stderr
+
+
+def test_global_doctor_target_headline_unchanged() -> None:
+    """Target audits keep the v0.5 `healthy:` headline.
+
+    The self-mode rephrasing in issue #13 must not leak into the target
+    audit path — agents that already parse the `healthy:` headline keep
+    working unchanged.
+    """
+    result = _run_afi("doctor", str(REPO_ROOT), cwd=REPO_ROOT)
+    assert result.returncode == 0, result.stderr
     assert "healthy:" in result.stderr
+    assert "structural self-check" not in result.stderr
 
 
 def test_global_doctor_json_shape_satisfies_bundle_seven() -> None:
@@ -105,3 +122,104 @@ def test_cli_doctor_fix_and_dry_run_are_mutually_exclusive() -> None:
     result = _run_afi("cli", "doctor", str(REPO_ROOT), "--fix", "--dry-run", cwd=REPO_ROOT)
     assert result.returncode != 0
     assert "Traceback" not in result.stderr
+
+
+def test_doctor_unknown_path_gives_helpful_error() -> None:
+    """A non-project path surfaces both escape hatches in the remediation.
+
+    Reproduces the agent-experience trip-up from issue #13: someone types
+    `afi doctor culture` from outside that repo. Today's error names the
+    wrong layer (a deep `culture/culture/pyproject.toml`); the new error
+    names both `afi doctor .` and `--package` so the agent learns the
+    contract from the diagnostic.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        result = _run_afi("doctor", "culture", cwd=Path(tmp))
+    assert result.returncode != 0
+    assert "Traceback" not in result.stderr
+    assert "is not a project root" in result.stderr
+    assert "afi doctor /path/to/" in result.stderr
+    assert "--package" in result.stderr
+
+
+def test_doctor_package_resolves_editable_install() -> None:
+    """`afi doctor --package afi-cli` from anywhere audits the repo.
+
+    afi-cli is editable-installed in the dev environment (and CI runs
+    `uv sync` before tests), so this exercises the PEP 610 path
+    end-to-end.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        result = _run_afi("doctor", "--package", "afi-cli", "--json", cwd=Path(tmp))
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["tool"] == "afi"
+    # The audit should land at the afi-cli source root, not at site-packages.
+    assert Path(payload["subject"]).resolve() == REPO_ROOT.resolve()
+
+
+def test_doctor_path_and_package_mutually_exclusive() -> None:
+    """Passing both `<path>` and `--package` errors at the policy layer.
+
+    Argparse alone can't reject this (path positional + optional flag
+    can't share a mutually-exclusive group cleanly), so the handler
+    raises ``AfiError``. The contract is still: non-zero exit, no
+    traceback, named in the diagnostic.
+    """
+    result = _run_afi("doctor", ".", "--package", "afi-cli", cwd=REPO_ROOT)
+    assert result.returncode != 0
+    assert "Traceback" not in result.stderr
+    assert "mutually exclusive" in result.stderr
+
+
+def test_doctor_unknown_package_gives_helpful_error() -> None:
+    """`afi doctor --package <unknown>` names the dist and points at next steps."""
+    result = _run_afi("doctor", "--package", "definitely-not-a-package", cwd=REPO_ROOT)
+    assert result.returncode != 0
+    assert "Traceback" not in result.stderr
+    assert "no installed distribution named 'definitely-not-a-package'" in result.stderr
+    assert "uv pip install -e" in result.stderr
+
+
+def test_cli_doctor_package_flag_works() -> None:
+    """`afi cli doctor --package afi-cli` mirrors the global verb."""
+    with tempfile.TemporaryDirectory() as tmp:
+        result = _run_afi("cli", "doctor", "--package", "afi-cli", "--json", cwd=Path(tmp))
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert Path(payload["subject"]).resolve() == REPO_ROOT.resolve()
+
+
+def test_cli_doctor_path_and_package_mutually_exclusive() -> None:
+    result = _run_afi("cli", "doctor", ".", "--package", "afi-cli", cwd=REPO_ROOT)
+    assert result.returncode != 0
+    assert "Traceback" not in result.stderr
+    assert "mutually exclusive" in result.stderr
+
+
+def test_cli_doctor_unknown_path_names_the_cli_verb_in_remediation() -> None:
+    """`afi cli doctor /bad` must point at `afi cli doctor`, not `afi doctor`.
+
+    Regression for the Copilot review on PR #14: the diagnostic
+    remediation for a non-project-root path used to hardcode the global
+    verb (``afi doctor ...``), which misleads agents that invoked the
+    noun-scoped form.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        result = _run_afi("cli", "doctor", "culture", cwd=Path(tmp))
+    assert result.returncode != 0
+    assert "Traceback" not in result.stderr
+    assert "is not a project root" in result.stderr
+    assert "afi cli doctor" in result.stderr
+
+
+def test_cli_doctor_unknown_package_names_the_cli_verb_in_remediation() -> None:
+    """`afi cli doctor --package <unknown>` remediation names the cli verb.
+
+    Same threading as the path branch: the package-resolver remediations
+    must follow the verb the user invoked.
+    """
+    result = _run_afi("cli", "doctor", "--package", "definitely-not-a-package", cwd=REPO_ROOT)
+    assert result.returncode != 0
+    assert "Traceback" not in result.stderr
+    assert "afi cli doctor /path/to/" in result.stderr

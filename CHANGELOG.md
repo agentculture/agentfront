@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/). This project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.2] - 2026-05-06
+
+
+### Changed
+
+- doctor: extract _DEFAULT_DOCTOR_COMMAND constant for the default verb name threaded into resolver remediations (SonarCloud duplicate-literal finding on PR #14)
+
+## [0.6.1] - 2026-05-06
+
+### Fixed
+
+- afi doctor --package: validate PEP 610 dir_info.editable so non-editable file:// installs are rejected with a clear remediation (PR #14 review)
+- afi doctor / afi cli doctor: error remediation now names the verb the user invoked instead of hardcoding afi doctor (PR #14 review)
+
+## [0.6.0] - 2026-05-05
+
+### Added
+
+- `afi doctor --package <name>` and `afi cli doctor --package <name>`: resolve an editable-installed distribution to its source root via PEP 610 `direct_url.json` so an agent can audit a target tool from anywhere without knowing its filesystem location (issue #13).
+
+### Changed
+
+- `afi doctor` self-mode headline now reads `afi doctor: structural self-check passed (N/M). Run 'afi doctor <path>' to audit a target CLI.` instead of the bare `healthy: N/M passed, ...`. Target-audit headline is unchanged. Removes the "green light is over-confident" framing flagged in issue #13.
+
+### Fixed
+
+- `afi doctor`: clearer error when the positional argument is not a project root. The remediation now names both `afi doctor .` and `--package <name>` so an agent learns the contract from the diagnostic (issue #13).
+
 ## [0.5.0] - 2026-04-26
 
 ### Added
