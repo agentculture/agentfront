@@ -3,14 +3,26 @@ name: Tests
 on:
   pull_request:
     branches: [main]
+  push:
+    branches: [main]
 
 jobs:
   test:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    # Promote a *presence flag* (not the secret itself) to job env so the
+    # SonarCloud step can gate on it — `secrets.*` isn't allowed in `if:`.
+    # The real SONAR_TOKEN is injected only at the scan step's env, keeping
+    # it out of earlier steps (checkout, pytest, etc.) and reducing blast
+    # radius if a step accidentally logs its environment. See katvan PR #6.
+    env:
+      SONAR_TOKEN_PRESENT: ${{ secrets.SONAR_TOKEN != '' }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          # Sonar needs full git history for accurate "new code" blame attribution.
+          fetch-depth: 0
 
       - uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4
 
@@ -20,7 +32,19 @@ jobs:
 
       - run: uv run pytest -n auto --cov=afi --cov-report=xml:coverage.xml --cov-report=term -v
 
+      - name: SonarCloud Scan
+        if: env.SONAR_TOKEN_PRESENT == 'true'
+        uses: SonarSource/sonarqube-scan-action@fd88b7d7ccbaefd23d8f36f73b59db7a3d246602 # v6
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
+
   version-check:
+    # Only run on PR events. On push to main after a merged PR, the
+    # comparison would always fail (PR_VERSION == MAIN_VERSION because HEAD
+    # and origin/main point at the same commit) and `gh pr comment` would
+    # have no PR number on push. Restricting the trigger avoids both.
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read

@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/). This project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.3] - 2026-05-12
+
+
+### Added
+
+- SonarCloud pipeline: integrate scan step into tests workflow with coverage.xml input; add sonar-project.properties pointing at agentculture_afi-cli.
+
 ## [0.6.2] - 2026-05-06
 
 
