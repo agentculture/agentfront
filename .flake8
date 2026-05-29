@@ -12,9 +12,9 @@ exclude =
     __pycache__,
     dist,
     build,
-    # Reference trees for `teken cli cite` — contain literal {{tokens}} and are
-    # intentionally not valid Python. They're package data, not code.
-    teken/cite/references,
+    # Reference trees for `agentfront cli cite` — contain literal {{tokens}} and
+    # are intentionally not valid Python. They're package data, not code.
+    agentfront/cite/references,
 per-file-ignores =
     # Bandit S-rules are noisy in tests (assert, subprocess, etc.) — mute them.
     tests/*:S101,S404,S603

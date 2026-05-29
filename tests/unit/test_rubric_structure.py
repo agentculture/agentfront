@@ -8,8 +8,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from teken.rubric._types import RunOutput, VerifyContext
-from teken.rubric.checks import structure
+from agentfront.rubric._types import RunOutput, VerifyContext
+from agentfront.rubric.checks import structure
 from tests.unit._fake_runner import FakeRunner
 
 

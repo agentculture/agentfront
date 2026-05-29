@@ -1,4 +1,4 @@
-"""Tests for ``teken learn`` — ensures it satisfies agent-first rubric bundle 2.
+"""Tests for ``agentfront learn`` — ensures it satisfies agent-first rubric bundle 2.
 
 Bundle 2 requires stdout ≥ 200 chars and mentions of: purpose, commands,
 exit codes, ``--json``, ``explain``.
@@ -10,7 +10,7 @@ import json
 
 import pytest
 
-from teken.cli import main
+from agentfront.cli import main
 
 
 def test_learn_exits_zero(capsys: pytest.CaptureFixture[str]) -> None:
@@ -39,7 +39,7 @@ def test_learn_json_mode_emits_parseable_structure(
     rc = main(["learn", "--json"])
     assert rc == 0
     payload = json.loads(capsys.readouterr().out)
-    assert payload["tool"] == "teken"
+    assert payload["tool"] == "agentfront"
     assert "purpose" in payload
     assert isinstance(payload["commands"], list) and payload["commands"]
     assert "0" in payload["exit_codes"]

@@ -3,11 +3,11 @@ title: Rubric
 nav_order: 3
 ---
 
-The rubric is the concrete, checkable form of the [Agent First](./agent-first.md) discipline. It is what `teken cli doctor` enforces and what `teken cli cite` emits a reference for.
+The rubric is the concrete, checkable form of the [Agent First](./agent-first.md) discipline. It is what `agentfront cli doctor` enforces and what `agentfront cli cite` emits a reference for.
 
-Seven bundles. Every bundle contains a small set of mechanical checks. A CLI that passes every bundle is "agent-first compliant" by teken's definition. `teken` itself must pass — the `tests/test_self_doctor.py` acceptance gate blocks any regression.
+Seven bundles. Every bundle contains a small set of mechanical checks. A CLI that passes every bundle is "agent-first compliant" by agentfront's definition. `agentfront` itself must pass — the `tests/test_self_doctor.py` acceptance gate blocks any regression.
 
-> Note: `teken cli verify` is a deprecated alias for `teken cli doctor` retained through one minor cycle (removed in v0.6.0).
+> Note: `agentfront cli verify` is a deprecated alias for `agentfront cli doctor` retained through one minor cycle (removed in v0.6.0).
 
 ## Exit-code policy
 
@@ -92,11 +92,11 @@ Seven bundles. Every bundle contains a small set of mechanical checks. A CLI tha
 
 ## Severities
 
-Each check returns a `CheckResult` with a `severity` field (`error`, `warn`, or `info`). Only `error`-severity failures cause `teken cli doctor` to exit non-zero by default. `--strict` promotes all failures (including `warn`) to non-zero exit.
+Each check returns a `CheckResult` with a `severity` field (`error`, `warn`, or `info`). Only `error`-severity failures cause `agentfront cli doctor` to exit non-zero by default. `--strict` promotes all failures (including `warn`) to non-zero exit.
 
 ## Adding checks
 
-Each bundle is a module under `teken/rubric/checks/`, exposing:
+Each bundle is a module under `agentfront/rubric/checks/`, exposing:
 
 ```python
 CHECKS = [check_1, check_2, ...]
@@ -109,12 +109,12 @@ A new check is a function `(VerifyContext) -> CheckResult`. Add it to `CHECKS`. 
 
 ## Not-in-scope (on purpose)
 
-The rubric checks **generic agent-first affordances**, not tool-specific verbs. A tool that only has `learn`, `explain`, `overview`, `doctor`, and two domain verbs can pass. A tool with dozens of verbs also passes if it satisfies the seven bundles. teken's own `cli cite` is NOT a rubric requirement.
+The rubric checks **generic agent-first affordances**, not tool-specific verbs. A tool that only has `learn`, `explain`, `overview`, `doctor`, and two domain verbs can pass. A tool with dozens of verbs also passes if it satisfies the seven bundles. agentfront's own `cli cite` is NOT a rubric requirement.
 
 CI configuration, pre-commit hooks, and agent-workflow tooling are deliberately out of scope — those belong to the sibling project `agex-cli` (Agent Experience).
 
 ## See also
 
 - [`agent-first.md`](./agent-first.md) — the paradigm behind the rubric.
-- [`../teken/rubric/`](../teken/rubric/) — implementation.
-- [`../teken/cite/references/python-cli/AGENT.md`](../teken/cite/references/python-cli/AGENT.md) — integration guide for the reference tree that `teken cli cite` emits.
+- [`../agentfront/rubric/`](../agentfront/rubric/) — implementation.
+- [`../agentfront/cite/references/python-cli/AGENT.md`](../agentfront/cite/references/python-cli/AGENT.md) — integration guide for the reference tree that `agentfront cli cite` emits.

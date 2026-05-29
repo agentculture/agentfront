@@ -1,4 +1,4 @@
-"""Guard test: ``teken cli cite`` must not touch anything outside ``.teken/``
+"""Guard test: ``agentfront cli cite`` must not touch anything outside ``.agentfront/``
 and the single ``.gitignore`` line.
 """
 
@@ -16,9 +16,9 @@ def _hash(p: Path) -> str:
     return hashlib.sha256(p.read_bytes()).hexdigest()
 
 
-def _run_afi(*args: str, cwd: Path) -> subprocess.CompletedProcess[str]:
+def _run_agentfront(*args: str, cwd: Path) -> subprocess.CompletedProcess[str]:
     return subprocess.run(  # noqa: S603
-        [sys.executable, "-m", "teken", *args],
+        [sys.executable, "-m", "agentfront", *args],
         cwd=cwd,
         capture_output=True,
         text=True,
@@ -47,14 +47,14 @@ def test_cite_does_not_touch_unrelated_files(tmp_path: Path) -> None:
     (tmp_path / "README.md").write_text("# demo\n")
     (tmp_path / "pyproject.toml").write_text('[project]\nname = "demo"\nversion="0"\n')
 
-    before = _snapshot(tmp_path, skip=(".teken", ".gitignore"))
+    before = _snapshot(tmp_path, skip=(".agentfront", ".gitignore"))
 
-    result = _run_afi("cli", "cite", str(tmp_path), cwd=tmp_path)
+    result = _run_agentfront("cli", "cite", str(tmp_path), cwd=tmp_path)
     assert result.returncode == 0, result.stderr
 
-    after = _snapshot(tmp_path, skip=(".teken", ".gitignore"))
+    after = _snapshot(tmp_path, skip=(".agentfront", ".gitignore"))
     assert before == after, (
-        f"cite modified files outside .teken/ and .gitignore: "
+        f"cite modified files outside .agentfront/ and .gitignore: "
         f"{set(before.keys()) ^ set(after.keys())} / "
         f"changed: {[k for k in before if after.get(k) != before[k]]}"
     )
@@ -64,17 +64,17 @@ def test_cite_appends_gitignore_without_overwriting(tmp_path: Path) -> None:
     existing = "# user-maintained\n*.pyc\nlogs/\n"
     (tmp_path / ".gitignore").write_text(existing)
 
-    _run_afi("cli", "cite", str(tmp_path), cwd=tmp_path)
+    _run_agentfront("cli", "cite", str(tmp_path), cwd=tmp_path)
 
     after = (tmp_path / ".gitignore").read_text()
     assert existing in after
-    assert ".teken/" in after
+    assert ".agentfront/" in after
 
 
 def test_cite_preserves_gitignore_when_afi_already_ignored(tmp_path: Path) -> None:
-    existing = "*.pyc\n.teken/\n"
+    existing = "*.pyc\n.agentfront/\n"
     (tmp_path / ".gitignore").write_text(existing)
 
-    _run_afi("cli", "cite", str(tmp_path), cwd=tmp_path)
+    _run_agentfront("cli", "cite", str(tmp_path), cwd=tmp_path)
 
     assert (tmp_path / ".gitignore").read_text() == existing

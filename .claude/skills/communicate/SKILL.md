@@ -1,15 +1,15 @@
 ---
 name: communicate
 description: >
-  Cross-repo + mesh communication from afi-cli (vendored from steward):
+  Cross-repo + mesh communication from agentfront (vendored from steward):
   file tracked GitHub issues on sibling repos, fetch issues from sibling
   repos to inline current state into briefs, and send live messages to
-  Culture mesh channels. Use when the next step lives outside afi-cli
+  Culture mesh channels. Use when the next step lives outside agentfront
   (a brief for a sibling-repo agent, a status ping for a Culture channel,
   or pulling an issue body + comments into context). Issue posts
   auto-sign with `- <nick> (Claude)` (agtag resolves `<nick>` from
   `culture.yaml`, falling back to repo basename); mesh messages are
-  unsigned (the IRC nick is the speaker). Not for in-afi-cli issues —
+  unsigned (the IRC nick is the speaker). Not for in-agentfront issues —
   use `gh issue create` or the `cicd` skill for those. Renamed from
   `coordinate` in steward 0.8.0; absorbed `gh-issues` in 0.9.1. Issue
   I/O is backed by `agtag` (>=0.1) starting in 0.11.0.
@@ -17,7 +17,7 @@ description: >
 
 # Communicate (Cross-Repo + Mesh)
 
-afi-cli participates in alignment across the AgentCulture mesh; that
+agentfront participates in alignment across the AgentCulture mesh; that
 surfaces in four distinct channels:
 
 - **Tracked, async hand-offs** — a gap in another repo (a missing public
@@ -65,7 +65,7 @@ agtag mesh transport is slated for v0.2.
 
 ### Broadcast mode (`steward announce-skill-update`)
 
-afi-cli is a **downstream consumer** of these vendored skills, not a
+agentfront is a **downstream consumer** of these vendored skills, not a
 supplier — the broadcast verb lives in `steward-cli` and is what
 delivered issues #17 and #18 to this repo in the first place. Don't
 invoke `steward announce-skill-update` from here. The relevant
@@ -75,7 +75,7 @@ upstream behavior, kept for reference:
   change is more than identifier-only or doc-only.
 - The `steward announce-skill-update` verb (in steward-cli) renders
   the canonical six-section brief and pipes it through *its own*
-  `post-issue.sh` per consumer. afi-cli is on the receiving end.
+  `post-issue.sh` per consumer. agentfront is on the receiving end.
 
 ### Mesh mode (`mesh-message.sh`)
 
@@ -106,7 +106,7 @@ upstream behavior, kept for reference:
 
 ## When NOT to Use
 
-- **In-afi-cli issues** — open them with `gh issue create` directly, or
+- **In-agentfront issues** — open them with `gh issue create` directly, or
   work them through the `cicd` skill.
 - **PR review comments** — that's the `cicd` skill (which already
   auto-signs replies).
@@ -118,11 +118,11 @@ upstream behavior, kept for reference:
 
 ### 1. Briefs are self-contained
 
-The receiving agent must not need afi-cli-side context to act. Inline
-the relevant content; do not say "see afi-cli's plan."
+The receiving agent must not need agentfront-side context to act. Inline
+the relevant content; do not say "see agentfront's plan."
 
-A brief that says "see afi-cli#NN" is a bug. The receiving agent will
-look at it, get lost in afi-cli-specific context that's irrelevant to
+A brief that says "see agentfront#NN" is a bug. The receiving agent will
+look at it, get lost in agentfront-specific context that's irrelevant to
 them, and either ask for clarification (slow round-trip) or guess wrong
 (worse). Inline the ask, the rationale, and concrete acceptance
 criteria. Quote source-of-truth files (path + line numbers + small
@@ -143,7 +143,7 @@ vendors.
 ### 3. Issue title format
 
 `<verb> <thing> (unblocks <consumer>)` — e.g.,
-`Vendor portability-lint into <repo> (unblocks afi-cli rubric check)`.
+`Vendor portability-lint into <repo> (unblocks agentfront rubric check)`.
 The parenthetical tells the receiving repo's maintainers what's waiting
 on them. Drop the parenthetical only when the ask isn't blocking
 anything.
@@ -155,7 +155,7 @@ anything.
 ```bash
 bash .claude/skills/communicate/scripts/post-issue.sh \
     --repo agentculture/<sibling> \
-    --title "Vendor portability-lint into <sibling> (unblocks afi-cli rubric)" \
+    --title "Vendor portability-lint into <sibling> (unblocks agentfront rubric)" \
     --body-file /tmp/brief.md
 ```
 
@@ -177,7 +177,7 @@ the signature `- <nick> (Claude)` (resolved from `culture.yaml`).
 
 This is steward's role specifically — the verb lives in `steward-cli`,
 not in this skill's `scripts/`. Downstream vendors of `communicate`
-(afi-cli, cfafi, culture, auntiepypi, …) do not get a broadcast wrapper
+(agentfront, cfafi, culture, auntiepypi, …) do not get a broadcast wrapper
 because they don't broadcast — they only use the primitives above
 (`post-issue.sh`, `fetch-issues.sh`, `mesh-message.sh`). The block
 below is reference for what landed in this repo via #17 / #18:
@@ -282,9 +282,9 @@ Output is one JSON object per issue (separated by header bars) with
 on a single issue print `ERROR: Could not fetch issue #N` and continue
 with the next one.
 
-afi-cli is **not** a registered mesh agent today (see the cicd SKILL.md
-note). The script works once afi-cli has been registered and started
-via `culture agent register` + `culture start spark-afi-cli`; until
+agentfront is **not** a registered mesh agent today (see the cicd SKILL.md
+note). The script works once agentfront has been registered and started
+via `culture agent register` + `culture start spark-agentfront`; until
 then, calling it will fail with whatever error the Culture CLI returns,
 which is the right behavior — fix the registration, don't paper over it.
 
@@ -308,13 +308,13 @@ hypotheticals.
 
 **Never:**
 
-- Post a brief that says "see afi-cli's plan" without inlining the
+- Post a brief that says "see agentfront's plan" without inlining the
   content. Briefs must be self-contained.
 - Skip the issue signature. The script enforces it; do not introduce a
   `--no-signature` flag.
 - Sign mesh messages with `- <nick> (Claude)`. The nick already says
   who you are.
-- Use this skill for in-afi-cli issues — use `gh issue create` or the
+- Use this skill for in-agentfront issues — use `gh issue create` or the
   `cicd` skill instead.
 - Manually type `- <nick> (Claude)` at the end of an issue or comment
   body — agtag appends it. Manual typing creates double-signatures.

@@ -6,8 +6,8 @@ import argparse
 
 import pytest
 
-from teken.cli import _dispatch
-from teken.cli._errors import AfiError
+from agentfront.cli import _dispatch
+from agentfront.cli._errors import AfiError
 
 
 def _raising(err: Exception):

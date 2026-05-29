@@ -5,7 +5,7 @@ nav_order: 2
 
 **Agent First** is AgentCulture's guiding paradigm: when you design software, *the primary consumer is an AI agent, not a human*. Every other decision — CLI shape, docs layout, protocol menu, error messages — flows from that reversal.
 
-This document explains what the paradigm means, how it manifests in each interface surface, and why `teken` is the foundational tool for the rest of AgentCulture to ship it.
+This document explains what the paradigm means, how it manifests in each interface surface, and why `agentfront` is the foundational tool for the rest of AgentCulture to ship it.
 
 ## The reversal
 
@@ -49,7 +49,7 @@ An agent's fetch tool doesn't navigate like a human with a browser. It follows l
 
 Learnability tells the agent *what is here*; diagnosability tells it *what is wrong, and how to fix it*. Every agent-first tool exposes a `doctor` verb (CLI), tool (MCP), or endpoint (HTTP) that surveys its own install and surfaces inconsistencies with actionable remediation. The pillar joins learnability / minimalism / discoverability as a baseline contract: when the tool is broken, an agent must be able to diagnose it without reading source, and the failure mode must always carry a `remediation` string. `--fix` is offered when remediation is safe to auto-apply; otherwise the verb explains the fix in prose an agent can act on.
 
-## Why `teken` is foundational
+## Why `agentfront` is foundational
 
 Every AgentCulture tool eventually wants all three surfaces. Without a shared scaffolder, each project would:
 
@@ -57,7 +57,7 @@ Every AgentCulture tool eventually wants all three surfaces. Without a shared sc
 2. Drift over time — one project's CLI is more agent-friendly than another's, for no reason beyond author preference.
 3. Miss the baked-in best practices — the next `culture`-sized project might ship a CLI without `learn`, or an MCP with forty tools, or an HTTP doc site without a sitemap.
 
-`teken` solves this once:
+`agentfront` solves this once:
 
 - One manifest per tool describes verbs, arguments, outputs, and docs.
 - The scaffolder emits the CLI, the MCP server, and the HTTP site from that manifest.
@@ -66,11 +66,11 @@ Every AgentCulture tool eventually wants all three surfaces. Without a shared sc
   - MCP menu is filtered to the declared minimal set, with warnings when the menu grows past an opinionated threshold.
   - HTTP docs are markdown + sitemap by construction.
 
-Ship a new AgentCulture tool → write its manifest → `teken scaffold` → you have three agent-ergonomic surfaces, consistent with every other project in the org. That's the *foundational* claim: AgentCulture's surface-area compounds instead of fragmenting.
+Ship a new AgentCulture tool → write its manifest → `agentfront scaffold` → you have three agent-ergonomic surfaces, consistent with every other project in the org. That's the *foundational* claim: AgentCulture's surface-area compounds instead of fragmenting.
 
 ## Dogfooding
 
-`teken` itself is required to use its own output. Its current CLI is hand-written — unavoidable while the generator doesn't exist. Once the manifest schema and generator are designed, the next step is to regenerate `teken`'s own CLI from its own manifest and make the generated artifact the canonical source. The hand-written CLI in `teken/cli/` then becomes the reference the generator must reproduce byte-for-byte — a self-validating loop.
+`agentfront` itself is required to use its own output. Its current CLI is hand-written — unavoidable while the generator doesn't exist. Once the manifest schema and generator are designed, the next step is to regenerate `agentfront`'s own CLI from its own manifest and make the generated artifact the canonical source. The hand-written CLI in `agentfront/cli/` then becomes the reference the generator must reproduce byte-for-byte — a self-validating loop.
 
 Same loop applies to the MCP and HTTP surfaces when they're added.
 
@@ -87,7 +87,7 @@ If the answer to any of those is "no," the feature either changes shape or doesn
 
 ## The rubric
 
-The discipline above is made mechanical by the [**rubric**](./rubric.md) — seven bundles of concrete checks that `teken cli doctor` runs against any CLI. Each bundle corresponds to one of the principles above:
+The discipline above is made mechanical by the [**rubric**](./rubric.md) — seven bundles of concrete checks that `agentfront cli doctor` runs against any CLI. Each bundle corresponds to one of the principles above:
 
 1. **structure** — argparse discipline and project layout.
 2. **learnability** — a `learn` affordance that satisfies the CLI principle.
@@ -97,11 +97,11 @@ The discipline above is made mechanical by the [**rubric**](./rubric.md) — sev
 6. **overview** — descriptive snapshot of the surface; *what is present*.
 7. **doctor** — diagnosability with actionable remediation; *what is wrong, and how to fix it*.
 
-See [`rubric.md`](./rubric.md) for the exact checks and severities. teken itself is required to pass — the `tests/test_self_doctor.py` acceptance gate blocks any regression.
+See [`rubric.md`](./rubric.md) for the exact checks and severities. agentfront itself is required to pass — the `tests/test_self_doctor.py` acceptance gate blocks any regression.
 
 ## See also
 
 - [agentculture.md](./agentculture.md) — the org, membership model, and project list.
 - [rubric.md](./rubric.md) — the seven-bundle rubric, concrete check list.
-- [../CLAUDE.md](../CLAUDE.md) — teken stack choices and common commands.
+- [../CLAUDE.md](../CLAUDE.md) — agentfront stack choices and common commands.
 - [../README.md](../README.md) — install and quick-start.

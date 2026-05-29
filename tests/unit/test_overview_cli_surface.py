@@ -1,7 +1,7 @@
-"""Unit tests for :mod:`teken.overview.cli_surface`.
+"""Unit tests for :mod:`agentfront.overview.cli_surface`.
 
 The inspector is static-only — no subprocesses. Every test is a local file
-fixture plus a direct call to :func:`teken.overview.cli_surface.inspect`.
+fixture plus a direct call to :func:`agentfront.overview.cli_surface.inspect`.
 """
 
 from __future__ import annotations
@@ -9,8 +9,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from teken.overview import to_json_dict, to_markdown
-from teken.overview.cli_surface import inspect
+from agentfront.overview import to_json_dict, to_markdown
+from agentfront.overview.cli_surface import inspect
 
 
 def _write_minimal_cli_project(root: Path, *, with_triple: bool = True) -> None:
@@ -39,9 +39,9 @@ def test_zero_target_describes_afi_template() -> None:
     report = inspect(None)
     assert report.subject == "cli"
     assert report.path is None
-    # Must reference teken's bundled template.
+    # Must reference agentfront's bundled template.
     flat = to_markdown(report)
-    assert "teken default template" in flat
+    assert "agentfront default template" in flat
     assert "{{slug}}" in flat
     # JSON is well-formed and stable-keyed.
     payload = to_json_dict(report)
@@ -56,7 +56,7 @@ def test_missing_path_falls_back_with_warning(tmp_path: Path) -> None:
     assert report.path == str(missing)
     assert any("does not exist" in w for w in report.warnings)
     # Still renders the default template in the sections.
-    assert any(s.heading == "teken default template" for s in report.sections)
+    assert any(s.heading == "agentfront default template" for s in report.sections)
 
 
 def test_target_mode_enumerates_command_surface(tmp_path: Path) -> None:
@@ -95,14 +95,14 @@ def test_malformed_pyproject_falls_back(tmp_path: Path) -> None:
     (tmp_path / "pyproject.toml").write_text("this is :: not valid toml [[[[")
     report = inspect(tmp_path)
     # Fell back to zero-target because parsing failed.
-    assert any(s.heading == "teken default template" for s in report.sections)
+    assert any(s.heading == "agentfront default template" for s in report.sections)
     assert report.warnings  # at least one warning emitted
 
 
 def test_pyproject_without_scripts_falls_back(tmp_path: Path) -> None:
     (tmp_path / "pyproject.toml").write_text('[project]\nname = "demo"\nversion = "0.0.1"\n')
     report = inspect(tmp_path)
-    assert any(s.heading == "teken default template" for s in report.sections)
+    assert any(s.heading == "agentfront default template" for s in report.sections)
 
 
 def _posture_body(report) -> str:
@@ -111,17 +111,17 @@ def _posture_body(report) -> str:
 
 def test_rubric_posture_detects_teken_cited_tree(tmp_path: Path) -> None:
     _write_minimal_cli_project(tmp_path)
-    (tmp_path / ".teken" / "reference" / "python-cli").mkdir(parents=True)
+    (tmp_path / ".agentfront" / "reference" / "python-cli").mkdir(parents=True)
     assert "reference tree cited: yes" in _posture_body(inspect(tmp_path))
 
 
 def test_rubric_posture_falls_back_to_legacy_afi_tree(tmp_path: Path) -> None:
-    """A project cited before the rename (under ``.afi/``) is still detected."""
+    """A project cited before the rename (under ``.teken/``) is still detected."""
     _write_minimal_cli_project(tmp_path)
-    (tmp_path / ".afi" / "reference" / "python-cli").mkdir(parents=True)
+    (tmp_path / ".teken" / "reference" / "python-cli").mkdir(parents=True)
     body = _posture_body(inspect(tmp_path))
     assert "reference tree cited: yes" in body
-    assert ".afi" in body  # reports the legacy location it found
+    assert ".teken" in body  # reports the legacy location it found
 
 
 def test_rubric_posture_reports_uncited_when_no_tree(tmp_path: Path) -> None:

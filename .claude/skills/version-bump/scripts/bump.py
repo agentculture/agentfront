@@ -110,22 +110,23 @@ def format_changelog_section(new: str, entries: dict) -> str:
 
 
 def update_wrapper(project_root: Path, old: str, new: str) -> None:
-    """Keep the afi-cli compatibility wrapper in lockstep with the root version.
+    """Keep the teken compatibility wrapper in lockstep with the root version.
 
-    The wrapper (``packaging/afi-cli/pyproject.toml``) is a metadata-only
-    distribution that depends on ``teken==<version>``. Both its own ``version``
-    and the pinned ``teken==`` dependency must track the canonical version so
-    ``uv tool install afi-cli`` always resolves the matching ``teken``.
+    The wrapper (``packaging/teken/pyproject.toml``) is a metadata-only
+    distribution that depends on ``agentfront==<version>``. Both its own
+    ``version`` and the pinned ``agentfront==`` dependency must track the
+    canonical version so ``uv tool install teken`` always resolves the matching
+    ``agentfront``.
     """
-    wrapper = project_root / "packaging" / "afi-cli" / "pyproject.toml"
+    wrapper = project_root / "packaging" / "teken" / "pyproject.toml"
     if not wrapper.exists():
         return
     text = wrapper.read_text()
     updated = text.replace(f'version = "{old}"', f'version = "{new}"', 1)
-    updated = updated.replace(f"teken=={old}", f"teken=={new}")
+    updated = updated.replace(f"agentfront=={old}", f"agentfront=={new}")
     if updated != text:
         wrapper.write_text(updated)
-        print(f"Updated {wrapper.relative_to(project_root)} (version + teken pin)")
+        print(f"Updated {wrapper.relative_to(project_root)} (version + agentfront pin)")
 
 
 def update_changelog(project_root: Path, new: str, entries: dict) -> None:
@@ -180,7 +181,7 @@ def main():
                 ))
                 print(f"Updated {init.relative_to(path.parent)}")
 
-    # Keep the afi-cli compatibility wrapper version + teken pin in lockstep
+    # Keep the teken compatibility wrapper version + agentfront pin in lockstep
     update_wrapper(path.parent, current, new)
 
     # Update changelog

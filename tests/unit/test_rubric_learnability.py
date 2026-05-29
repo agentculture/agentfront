@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from teken.rubric._types import RunOutput, VerifyContext
-from teken.rubric.checks import learnability
+from agentfront.rubric._types import RunOutput, VerifyContext
+from agentfront.rubric.checks import learnability
 from tests.unit._fake_runner import FakeRunner
 
 GOOD_LEARN = (

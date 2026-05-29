@@ -1,13 +1,13 @@
-"""Acceptance gate: teken must pass its own seven-bundle rubric and self-doctor.
+"""Acceptance gate: agentfront must pass its own seven-bundle rubric and self-doctor.
 
-This is what makes teken a first citizen of the rubric it publishes. If any
+This is what makes agentfront a first citizen of the rubric it publishes. If any
 rubric check regresses — ``learn`` drops below 200 chars, ``explain``
 loses an entry, an error handler swallows the traceback, the new
 ``doctor`` verb breaks — this test fails and blocks the commit.
 
 The rubric runs via subprocess: a :class:`VerifyContext` is built pointed
-at the repo root, with a :class:`SubprocessRunner` that invokes ``teken``
-via the dev venv's ``teken`` script.
+at the repo root, with a :class:`SubprocessRunner` that invokes ``agentfront``
+via the dev venv's ``agentfront`` script.
 
 The self-doctor runs in-process (no subprocess) so we also assert it
 returns ``healthy=True`` against the live source tree — a faster signal
@@ -18,10 +18,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from teken.doctor import run_self_diagnosis
-from teken.rubric import run_rubric
-from teken.rubric._runner import SubprocessRunner
-from teken.rubric._types import VerifyContext
+from agentfront.doctor import run_self_diagnosis
+from agentfront.rubric import run_rubric
+from agentfront.rubric._runner import SubprocessRunner
+from agentfront.rubric._types import VerifyContext
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -39,8 +39,8 @@ EXPECTED_BUNDLES = {
 def test_self_verify_passes_every_bundle() -> None:
     ctx = VerifyContext(
         target_path=REPO_ROOT,
-        tool_name="teken",
-        runner=SubprocessRunner(cwd=REPO_ROOT, tool_name="teken"),
+        tool_name="agentfront",
+        runner=SubprocessRunner(cwd=REPO_ROOT, tool_name="agentfront"),
     )
 
     results = run_rubric(ctx)
@@ -54,8 +54,8 @@ def test_self_verify_passes_every_bundle() -> None:
 def test_self_verify_covers_all_seven_bundles() -> None:
     ctx = VerifyContext(
         target_path=REPO_ROOT,
-        tool_name="teken",
-        runner=SubprocessRunner(cwd=REPO_ROOT, tool_name="teken"),
+        tool_name="agentfront",
+        runner=SubprocessRunner(cwd=REPO_ROOT, tool_name="agentfront"),
     )
 
     results = run_rubric(ctx)
