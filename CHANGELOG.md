@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/). This project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-05-29
+
+### Added
+
+- Vendored the devague workflow trio under `.claude/skills/` (cite, don't import): `think` (idea→spec), `spec-to-plan` (spec→plan), and `assign-to-workforce` (plan→parallel implementation) — the agent-facing operator chain for the deterministic `devague` CLI. Cited from `agentculture/guildmaster`'s mesh-broadcast copy (authored upstream in `agentculture/devague`); each ships `type: command` frontmatter (load-bearing on the culture/agex backend) and a single entry-point script. Runtime dep: `uv tool install devague`. Recorded in `docs/skill-sources.md`. Closes #23.
+
 ## [0.9.0] - 2026-05-29
 
 ### Added
