@@ -3,6 +3,45 @@ revision = 3
 requires-python = ">=3.12"
 
 [[package]]
+name = "agentfront"
+version = "0.9.0"
+source = { editable = "." }
+
+[package.dev-dependencies]
+dev = [
+    { name = "bandit" },
+    { name = "black" },
+    { name = "coverage" },
+    { name = "flake8" },
+    { name = "flake8-bandit" },
+    { name = "flake8-bugbear" },
+    { name = "isort" },
+    { name = "pre-commit" },
+    { name = "pylint" },
+    { name = "pytest" },
+    { name = "pytest-cov" },
+    { name = "pytest-xdist" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "bandit", specifier = ">=1.7.5" },
+    { name = "black", specifier = ">=23.7.0" },
+    { name = "coverage", specifier = ">=7.2.0" },
+    { name = "flake8", specifier = ">=6.1" },
+    { name = "flake8-bandit", specifier = ">=4.1.1" },
+    { name = "flake8-bugbear", specifier = ">=23.7.10" },
+    { name = "isort", specifier = ">=5.12.0" },
+    { name = "pre-commit", specifier = ">=3.5.0" },
+    { name = "pylint", specifier = ">=2.17.0" },
+    { name = "pytest", specifier = ">=8.0" },
+    { name = "pytest-cov", specifier = ">=4.1" },
+    { name = "pytest-xdist", specifier = ">=3.0" },
+]
+
+[[package]]
 name = "astroid"
 version = "4.0.4"
 source = { registry = "https://pypi.org/simple" }
@@ -580,45 +619,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/a2/6d/90764092216fa560f6587f83bb70113a8ba510ba436c6476a2b47359057c/stevedore-5.7.0.tar.gz", hash = "sha256:31dd6fe6b3cbe921e21dcefabc9a5f1cf848cf538a1f27543721b8ca09948aa3", size = 516200, upload-time = "2026-02-20T13:27:06.765Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/69/06/36d260a695f383345ab5bbc3fd447249594ae2fa8dfd19c533d5ae23f46b/stevedore-5.7.0-py3-none-any.whl", hash = "sha256:fd25efbb32f1abb4c9e502f385f0018632baac11f9ee5d1b70f88cc5e22ad4ed", size = 54483, upload-time = "2026-02-20T13:27:05.561Z" },
-]
-
-[[package]]
-name = "teken"
-version = "0.8.0"
-source = { editable = "." }
-
-[package.dev-dependencies]
-dev = [
-    { name = "bandit" },
-    { name = "black" },
-    { name = "coverage" },
-    { name = "flake8" },
-    { name = "flake8-bandit" },
-    { name = "flake8-bugbear" },
-    { name = "isort" },
-    { name = "pre-commit" },
-    { name = "pylint" },
-    { name = "pytest" },
-    { name = "pytest-cov" },
-    { name = "pytest-xdist" },
-]
-
-[package.metadata]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "bandit", specifier = ">=1.7.5" },
-    { name = "black", specifier = ">=23.7.0" },
-    { name = "coverage", specifier = ">=7.2.0" },
-    { name = "flake8", specifier = ">=6.1" },
-    { name = "flake8-bandit", specifier = ">=4.1.1" },
-    { name = "flake8-bugbear", specifier = ">=23.7.10" },
-    { name = "isort", specifier = ">=5.12.0" },
-    { name = "pre-commit", specifier = ">=3.5.0" },
-    { name = "pylint", specifier = ">=2.17.0" },
-    { name = "pytest", specifier = ">=8.0" },
-    { name = "pytest-cov", specifier = ">=4.1" },
-    { name = "pytest-xdist", specifier = ">=3.0" },
 ]
 
 [[package]]

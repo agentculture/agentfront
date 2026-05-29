@@ -1,6 +1,6 @@
 [project]
-name = "teken"
-version = "0.8.0"
+name = "agentfront"
+version = "0.9.0"
 description = "Agent First Interface — scaffold CLI, MCP, and HTTP interfaces for agent-first tools."
 readme = "README.md"
 license = "MIT"
@@ -16,20 +16,20 @@ classifiers = [
 dependencies = []
 
 [project.urls]
-Homepage = "https://github.com/agentculture/teken"
-Issues = "https://github.com/agentculture/teken/issues"
+Homepage = "https://github.com/agentculture/agentfront"
+Issues = "https://github.com/agentculture/agentfront/issues"
 
 [project.scripts]
-teken = "teken.cli:main"
+agentfront = "agentfront.cli:main"
 # Deprecated alias for the renamed command; prints a stderr note then forwards.
-afi = "teken.cli:main_afi_alias"
+teken = "agentfront.cli:main_teken_alias"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["teken"]
+packages = ["agentfront"]
 
 [dependency-groups]
 dev = [
@@ -48,8 +48,8 @@ dev = [
 ]
 
 [tool.coverage.run]
-source = ["teken"]
-omit = ["teken/__pycache__/*"]
+source = ["agentfront"]
+omit = ["agentfront/__pycache__/*"]
 
 [tool.coverage.report]
 fail_under = 70
@@ -63,15 +63,15 @@ exclude_lines = [
 [tool.isort]
 profile = "black"
 line_length = 100
-known_first_party = ["teken"]
-extend_skip_glob = ["teken/cite/references/**"]
+known_first_party = ["agentfront"]
+extend_skip_glob = ["agentfront/cite/references/**"]
 
 [tool.black]
 line-length = 100
 target-version = ["py312"]
 extend-exclude = '''
 /(
-    teken/cite/references
+    agentfront/cite/references
 )/
 '''
 

@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from teken.rubric._types import RunOutput, VerifyContext
-from teken.rubric.checks import overview_cmd
+from agentfront.rubric._types import RunOutput, VerifyContext
+from agentfront.rubric.checks import overview_cmd
 from tests.unit._fake_runner import FakeRunner
 
 # Fixed path used by the FakeRunner keys; `_fresh_missing_path` is monkey-patched
@@ -134,8 +134,10 @@ def test_fresh_missing_path_is_not_predictable() -> None:
     from pathlib import Path as _P
 
     def real() -> str:
-        return str(_P(tempfile.gettempdir()) / f"teken-overview-missing-{secrets.token_hex(8)}")
+        return str(
+            _P(tempfile.gettempdir()) / f"agentfront-overview-missing-{secrets.token_hex(8)}"
+        )
 
     a, b = real(), real()
     assert a != b
-    assert "teken-overview-missing-" in a
+    assert "agentfront-overview-missing-" in a

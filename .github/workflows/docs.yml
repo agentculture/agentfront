@@ -58,7 +58,7 @@ jobs:
       # Deploy to Cloudflare Pages.
       # - push / workflow_dispatch -> `--branch=main` = production
       # - pull_request              -> `--branch=<sanitised-head-ref>` = preview
-      # The project `teken` is a Direct Upload project (to be created by
+      # The project `agentfront` is a Direct Upload project (to be created by
       # agentculture/cloudflare), so CF won't auto-build; this step IS
       # the build+deploy pipeline. Skipped until the CF secrets land.
       - name: Check Cloudflare secrets
@@ -90,7 +90,7 @@ jobs:
             echo "::notice::Cloudflare secrets not yet configured (missing: $missing); skipping deploy. See agentculture/cloudflare for wiring."
           fi
       # Secrets are necessary but not sufficient: the Cloudflare Pages
-      # project `teken` also has to exist (creation is tracked in
+      # project `agentfront` also has to exist (creation is tracked in
       # agentculture/cloudflare#16). Precheck against the CF API so the
       # deploy step only runs when there's an actual project to deploy
       # into — otherwise the workflow stays green and emits a notice
@@ -104,12 +104,12 @@ jobs:
         run: |
           status=$(curl -s -o /dev/null -w "%{http_code}" \
             -H "Authorization: Bearer $CF_API_TOKEN" \
-            "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects/teken")
+            "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects/agentfront")
           if [ "$status" = "200" ]; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Cloudflare Pages project 'teken' not found (HTTP $status); skipping deploy. See agentculture/cloudflare#16."
+            echo "::notice::Cloudflare Pages project 'agentfront' not found (HTTP $status); skipping deploy. See agentculture/cloudflare#16."
           fi
 
       - name: Deploy to Cloudflare Pages
@@ -119,11 +119,11 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy docs/_site --project-name=teken --branch=${{ github.event_name == 'pull_request' && steps.branch.outputs.name || 'main' }}
+          command: pages deploy docs/_site --project-name=agentfront --branch=${{ github.event_name == 'pull_request' && steps.branch.outputs.name || 'main' }}
 
       # Post the preview URL back on the PR so reviewers can click
       # through without digging into the workflow logs. Uses a marker
-      # (`<!-- teken-docs-preview -->`) to update the existing comment on
+      # (`<!-- agentfront-docs-preview -->`) to update the existing comment on
       # subsequent pushes instead of spamming a new comment per run.
       - name: Post (or update) preview URL comment
         if: github.event_name == 'pull_request' && steps.deploy.outputs.deployment-url != ''
@@ -135,12 +135,12 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           set -e
-          MARKER='<!-- teken-docs-preview -->'
-          # Jekyll builds with `baseurl: /teken`, so every asset, link, and
-          # canonical tag lives under /teken. Root of either preview URL
-          # returns a 404 — point reviewers at /teken/ directly.
-          DEPLOY_ENTRY="${DEPLOY_URL%/}/teken/"
-          ALIAS_URL="https://${BRANCH}.teken.pages.dev/teken/"
+          MARKER='<!-- agentfront-docs-preview -->'
+          # Jekyll builds with `baseurl: /agentfront`, so every asset, link, and
+          # canonical tag lives under /agentfront. Root of either preview URL
+          # returns a 404 — point reviewers at /agentfront/ directly.
+          DEPLOY_ENTRY="${DEPLOY_URL%/}/agentfront/"
+          ALIAS_URL="https://${BRANCH}.agentfront.pages.dev/agentfront/"
           BODY="$MARKER"$'\n'"📘 **docs preview** for this PR:"$'\n\n'"- **Latest deploy:** $DEPLOY_ENTRY  _(immutable — this specific commit)_"$'\n'"- **Branch alias:** $ALIAS_URL  _(always latest — updates on each push)_"
           EXISTING=$(gh api --paginate "repos/$REPO/issues/$PR_NUMBER/comments" \
             | jq -rs "add | [.[] | select(.body | contains(\"$MARKER\")) | .id] | first // empty")

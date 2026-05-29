@@ -1,18 +1,18 @@
 ---
 name: cicd
 description: >
-  afi-cli's CI/CD lane (vendored from steward), layered on `agex pr`.
+  agentfront's CI/CD lane (vendored from steward), layered on `agex pr`.
   Delegates lint / open / read / reply / delta to agex; adds two
   steward-derived extensions — `status` (SonarCloud quality gate +
   hotspots + unresolved-thread tally) and `await` (read --wait +
   status with non-zero exit on Sonar ERROR or unresolved threads).
-  Use when: creating PRs in afi-cli, handling review feedback,
+  Use when: creating PRs in agentfront, handling review feedback,
   polling CI status, or the user says "create PR", "review comments",
   "address feedback", "resolve threads". Renamed from `pr-review` in
   steward 0.7.0; rebased on agex in 0.12.0.
 ---
 
-# CI/CD — afi-cli edition (vendored from steward)
+# CI/CD — agentfront edition (vendored from steward)
 
 `agex pr` (in `agentculture/agex-cli`) is the upstream for the
 five core PR-lifecycle verbs — `lint`, `open`, `read`, `reply`,
@@ -79,7 +79,7 @@ The vendored single-comment helper `pr-reply.sh` (plus its
 and useful when a one-off reply doesn't merit batch JSONL. It is not
 called by `workflow.sh` anymore. The vendored `portability-lint.sh`
 is also still shipped — upstream `steward doctor`'s portability check
-runs it directly; in afi-cli it's available as a standalone helper.
+runs it directly; in agentfront it's available as a standalone helper.
 Both are scheduled for follow-up migration to agex.
 
 ## Long waits (background polling)
@@ -163,6 +163,6 @@ in the fix-up commit message.
 The `status` extension queries SonarCloud directly (it predates the
 upstream Sonar integration in `agex pr read`). Both surfaces are
 trustworthy — `agex pr read` for display in the briefing, `status` for
-the gate. afi-cli isn't yet a registered mesh agent, so the
+the gate. agentfront isn't yet a registered mesh agent, so the
 post-merge IRC ping that Culture's `pr-review` includes is still
-skipped — that returns when afi-cli joins the mesh.
+skipped — that returns when agentfront joins the mesh.

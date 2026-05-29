@@ -1,8 +1,8 @@
-"""End-to-end tests for the ``teken cli {cite,verify,overview}`` surface.
+"""End-to-end tests for the ``agentfront cli {cite,verify,overview}`` surface.
 
-These drive teken as a subprocess (via ``python -m teken``) to exercise the full
+These drive agentfront as a subprocess (via ``python -m agentfront``) to exercise the full
 argparse + dispatch + cite + rubric code path end-to-end — not via
-:func:`teken.cli.main`. They do NOT test the built wheel's packaging: the
+:func:`agentfront.cli.main`. They do NOT test the built wheel's packaging: the
 subprocess imports from the source tree directly. Packaging-specific
 coverage (that the reference tree ships in the wheel with `{{slug}}/`
 directories intact) is done at release time via ``uv build`` and a manual
@@ -21,9 +21,9 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
-def _run_afi(*args: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
+def _run_agentfront(*args: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
     return subprocess.run(  # noqa: S603
-        [sys.executable, "-m", "teken", *args],
+        [sys.executable, "-m", "agentfront", *args],
         cwd=cwd or REPO_ROOT,
         capture_output=True,
         text=True,
@@ -33,10 +33,10 @@ def _run_afi(*args: str, cwd: Path | None = None) -> subprocess.CompletedProcess
 
 
 def test_cite_writes_reference_and_gitignore(tmp_path: Path) -> None:
-    result = _run_afi("cli", "cite", str(tmp_path), cwd=tmp_path)
+    result = _run_agentfront("cli", "cite", str(tmp_path), cwd=tmp_path)
 
     assert result.returncode == 0, result.stderr
-    ref = tmp_path / ".teken" / "reference" / "python-cli"
+    ref = tmp_path / ".agentfront" / "reference" / "python-cli"
     assert ref.is_dir()
     assert (ref / "AGENT.md").is_file()
     assert (ref / "MANIFEST.json").is_file()
@@ -44,11 +44,11 @@ def test_cite_writes_reference_and_gitignore(tmp_path: Path) -> None:
     content = (ref / "{{slug}}" / "cli" / "__init__.py").read_text()
     assert "{{project_name}}" in content
     # gitignore updated.
-    assert ".teken/" in (tmp_path / ".gitignore").read_text()
+    assert ".agentfront/" in (tmp_path / ".gitignore").read_text()
 
 
 def test_cite_json_mode_emits_parseable_payload(tmp_path: Path) -> None:
-    result = _run_afi("cli", "cite", str(tmp_path), "--json", cwd=tmp_path)
+    result = _run_agentfront("cli", "cite", str(tmp_path), "--json", cwd=tmp_path)
 
     assert result.returncode == 0, result.stderr
     payload = json.loads(result.stdout)
@@ -64,18 +64,18 @@ def test_cite_then_doctor_round_trip(tmp_path: Path) -> None:
     scaffolder: cite DOES NOT produce a working CLI; it produces a
     reference for an agent to apply.
     """
-    _run_afi("cli", "cite", str(tmp_path), cwd=tmp_path)
+    _run_agentfront("cli", "cite", str(tmp_path), cwd=tmp_path)
 
     # The empty target is not a CLI project — doctor should bail at structure.
-    result = _run_afi("cli", "doctor", str(tmp_path), cwd=tmp_path)
+    result = _run_agentfront("cli", "doctor", str(tmp_path), cwd=tmp_path)
 
     assert result.returncode != 0
     assert "pyproject.toml" in (result.stderr + result.stdout).lower()
 
 
 def test_doctor_self_passes() -> None:
-    """`teken cli doctor .` on the teken repo passes every bundle."""
-    result = _run_afi("cli", "doctor", str(REPO_ROOT), cwd=REPO_ROOT)
+    """`agentfront cli doctor .` on the agentfront repo passes every bundle."""
+    result = _run_agentfront("cli", "doctor", str(REPO_ROOT), cwd=REPO_ROOT)
 
     assert (
         result.returncode == 0
@@ -83,11 +83,11 @@ def test_doctor_self_passes() -> None:
 
 
 def test_doctor_json_mode_emits_structured_report() -> None:
-    result = _run_afi("cli", "doctor", ".", "--json", cwd=REPO_ROOT)
+    result = _run_agentfront("cli", "doctor", ".", "--json", cwd=REPO_ROOT)
 
     assert result.returncode == 0, result.stderr
     payload = json.loads(result.stdout)
-    assert payload["tool"] == "teken"
+    assert payload["tool"] == "agentfront"
     assert payload["healthy"] is True
     assert payload["summary"]["errors"] == 0
     assert payload["summary"]["total"] > 0
@@ -104,17 +104,17 @@ def test_doctor_json_mode_emits_structured_report() -> None:
 
 
 def test_verify_alias_still_works_with_deprecation_diagnostic() -> None:
-    """`teken cli verify` is a deprecated alias for `cli doctor`. It must keep
+    """`agentfront cli verify` is a deprecated alias for `cli doctor`. It must keep
     working for one minor cycle (removed in v0.6.0) and emit a deprecation
     diagnostic to stderr so callers know to migrate.
     """
-    result = _run_afi("cli", "verify", str(REPO_ROOT), cwd=REPO_ROOT)
+    result = _run_agentfront("cli", "verify", str(REPO_ROOT), cwd=REPO_ROOT)
     assert result.returncode == 0, f"verify alias broke:\nstderr:\n{result.stderr}"
     assert "deprecated" in result.stderr.lower()
 
 
 def test_bogus_verb_exits_with_hint() -> None:
-    result = _run_afi("bogus-verb-zzz")
+    result = _run_agentfront("bogus-verb-zzz")
 
     assert result.returncode != 0
     assert "error:" in result.stderr
@@ -125,7 +125,7 @@ def test_bogus_verb_exits_with_hint() -> None:
 @pytest.mark.parametrize(
     "path",
     [
-        "teken",
+        "agentfront",
         "learn",
         "explain",
         "overview",
@@ -139,7 +139,7 @@ def test_bogus_verb_exits_with_hint() -> None:
 )
 def test_every_registered_path_has_explain_entry(path: str) -> None:
     tokens = path.split()
-    result = _run_afi("explain", *tokens)
+    result = _run_agentfront("explain", *tokens)
     assert result.returncode == 0, result.stderr
     assert result.stdout.startswith("#")
 
@@ -148,15 +148,15 @@ def test_every_registered_path_has_explain_entry(path: str) -> None:
 
 
 def test_cli_overview_zero_target_renders_template() -> None:
-    result = _run_afi("cli", "overview")
+    result = _run_agentfront("cli", "overview")
     assert result.returncode == 0, result.stderr
-    assert "teken default template" in result.stdout
+    assert "agentfront default template" in result.stdout
     # Tokens are literal in the scaffolded template — overview must surface them.
     assert "{{slug}}" in result.stdout
 
 
 def test_cli_overview_on_self_shows_universals_context() -> None:
-    result = _run_afi("cli", "overview", str(REPO_ROOT), cwd=REPO_ROOT)
+    result = _run_agentfront("cli", "overview", str(REPO_ROOT), cwd=REPO_ROOT)
     assert result.returncode == 0, result.stderr
     assert "Project root" in result.stdout
     assert "Command surface" in result.stdout
@@ -164,7 +164,7 @@ def test_cli_overview_on_self_shows_universals_context() -> None:
 
 
 def test_cli_overview_json_mode_has_stable_keys() -> None:
-    result = _run_afi("cli", "overview", "--json", str(REPO_ROOT), cwd=REPO_ROOT)
+    result = _run_agentfront("cli", "overview", "--json", str(REPO_ROOT), cwd=REPO_ROOT)
     assert result.returncode == 0, result.stderr
     payload = json.loads(result.stdout)
     assert set(payload.keys()) == {"subject", "path", "sections", "warnings", "notes"}
@@ -172,7 +172,7 @@ def test_cli_overview_json_mode_has_stable_keys() -> None:
 
 
 def test_top_level_overview_stub_works() -> None:
-    result = _run_afi("overview")
+    result = _run_agentfront("overview")
     assert result.returncode == 0, result.stderr
     assert "overview: all" in result.stdout
 
@@ -180,6 +180,6 @@ def test_top_level_overview_stub_works() -> None:
 def test_overview_is_graceful_on_missing_path(tmp_path: Path) -> None:
     # Read-only verb: falls back, does NOT hard-fail.
     missing = tmp_path / "does-not-exist"
-    result = _run_afi("cli", "overview", str(missing))
+    result = _run_agentfront("cli", "overview", str(missing))
     assert result.returncode == 0, result.stderr
-    assert "teken default template" in result.stdout
+    assert "agentfront default template" in result.stdout

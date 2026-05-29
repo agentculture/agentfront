@@ -1,12 +1,12 @@
-"""Tests for :mod:`teken.cli._output`."""
+"""Tests for :mod:`agentfront.cli._output`."""
 
 from __future__ import annotations
 
 import io
 import json
 
-from teken.cli._errors import AfiError
-from teken.cli._output import emit_diagnostic, emit_error, emit_result
+from agentfront.cli._errors import AfiError
+from agentfront.cli._output import emit_diagnostic, emit_error, emit_result
 
 
 def test_emit_result_text_adds_newline() -> None:

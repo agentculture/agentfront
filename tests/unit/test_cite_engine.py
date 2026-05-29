@@ -1,4 +1,4 @@
-"""Tests for :mod:`teken.cite._engine`."""
+"""Tests for :mod:`agentfront.cite._engine`."""
 
 from __future__ import annotations
 
@@ -6,16 +6,16 @@ from pathlib import Path
 
 import pytest
 
-from teken.cite import SUPPORTED_LANGS, CiteReport, emit_reference
-from teken.cite._engine import GITIGNORE_ENTRY
-from teken.cli._errors import AfiError
+from agentfront.cite import SUPPORTED_LANGS, CiteReport, emit_reference
+from agentfront.cite._engine import GITIGNORE_ENTRY
+from agentfront.cli._errors import AfiError
 
 
 def test_emit_reference_writes_files(tmp_path: Path) -> None:
     report = emit_reference(tmp_path, lang="python")
 
     assert isinstance(report, CiteReport)
-    assert report.out == tmp_path / ".teken" / "reference" / "python-cli"
+    assert report.out == tmp_path / ".agentfront" / "reference" / "python-cli"
     assert report.out.is_dir()
     assert report.written_count > 0
 
@@ -32,7 +32,7 @@ def test_tokens_remain_literal(tmp_path: Path) -> None:
     assert "{{project_name}}" in cli_init
     assert "{{module}}" in cli_init
     # The cite engine MUST NOT substitute tokens.
-    assert "teken" not in cli_init
+    assert "agentfront" not in cli_init
 
 
 def test_gitignore_created_when_missing(tmp_path: Path) -> None:
@@ -57,7 +57,7 @@ def test_gitignore_appended_when_afi_line_missing(tmp_path: Path) -> None:
 
 
 def test_gitignore_unchanged_when_afi_already_ignored(tmp_path: Path) -> None:
-    before = "# existing\n.teken/\nlogs/\n"
+    before = "# existing\n.agentfront/\nlogs/\n"
     (tmp_path / ".gitignore").write_text(before)
 
     report = emit_reference(tmp_path, lang="python")
@@ -66,7 +66,7 @@ def test_gitignore_unchanged_when_afi_already_ignored(tmp_path: Path) -> None:
     assert (tmp_path / ".gitignore").read_text() == before
 
 
-@pytest.mark.parametrize("existing", [".teken", ".teken/", ".teken/**"])
+@pytest.mark.parametrize("existing", [".agentfront", ".agentfront/", ".agentfront/**"])
 def test_gitignore_equivalents_detected(tmp_path: Path, existing: str) -> None:
     (tmp_path / ".gitignore").write_text(f"{existing}\n")
 
@@ -78,7 +78,7 @@ def test_gitignore_equivalents_detected(tmp_path: Path, existing: str) -> None:
 def test_rerun_is_idempotent(tmp_path: Path) -> None:
     emit_reference(tmp_path, lang="python")
     # Simulate stale edits in the reference dir.
-    marker = tmp_path / ".teken" / "reference" / "python-cli" / "STALE.txt"
+    marker = tmp_path / ".agentfront" / "reference" / "python-cli" / "STALE.txt"
     marker.write_text("stale")
     assert marker.exists()
 
@@ -86,7 +86,7 @@ def test_rerun_is_idempotent(tmp_path: Path) -> None:
 
     # Wiped on re-run.
     assert not marker.exists()
-    assert (tmp_path / ".teken" / "reference" / "python-cli" / "AGENT.md").is_file()
+    assert (tmp_path / ".agentfront" / "reference" / "python-cli" / "AGENT.md").is_file()
 
 
 def test_out_override(tmp_path: Path) -> None:
@@ -171,7 +171,7 @@ def test_report_to_dict_shape(tmp_path: Path) -> None:
     assert d["gitignore_updated"] is True
     assert isinstance(d["next_steps"], list) and len(d["next_steps"]) == 3
     assert d["further_reading"]["agent_md"].endswith("AGENT.md")
-    assert "teken explain cli cite" in d["further_reading"]["explain"]
+    assert "agentfront explain cli cite" in d["further_reading"]["explain"]
 
 
 def test_cited_manifest_is_valid_json(tmp_path: Path) -> None:

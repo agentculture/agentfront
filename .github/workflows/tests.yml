@@ -30,7 +30,7 @@ jobs:
 
       - run: uv sync
 
-      - run: uv run pytest -n auto --cov=teken --cov-report=xml:coverage.xml --cov-report=term -v
+      - run: uv run pytest -n auto --cov=agentfront --cov-report=xml:coverage.xml --cov-report=term -v
 
       - name: SonarCloud Scan
         if: env.SONAR_TOKEN_PRESENT == 'true'
@@ -98,16 +98,16 @@ jobs:
             echo "Version bumped: $MAIN_VERSION -> $PR_VERSION"
           fi
 
-      - name: Check afi-cli wrapper lockstep
+      - name: Check teken wrapper lockstep
         run: |
-          # The afi-cli compatibility wrapper must track the canonical teken
-          # version exactly — both its own version and its `teken==` pin — so
-          # `uv tool install afi-cli` always resolves the matching teken.
+          # The teken compatibility wrapper must track the canonical agentfront
+          # version exactly — both its own version and its `agentfront==` pin — so
+          # `uv tool install teken` always resolves the matching agentfront.
           ROOT=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
-          WRAP=$(python3 -c "import tomllib; print(tomllib.load(open('packaging/afi-cli/pyproject.toml','rb'))['project']['version'])")
-          PIN=$(python3 -c "import tomllib; print(tomllib.load(open('packaging/afi-cli/pyproject.toml','rb'))['project']['dependencies'][0])")
-          if [ "$WRAP" != "$ROOT" ] || [ "$PIN" != "teken==$ROOT" ]; then
-            echo "::error::afi-cli wrapper drift — root=$ROOT wrapper=$WRAP pin=$PIN (expected teken==$ROOT). Re-run the version-bump skill."
+          WRAP=$(python3 -c "import tomllib; print(tomllib.load(open('packaging/teken/pyproject.toml','rb'))['project']['version'])")
+          PIN=$(python3 -c "import tomllib; print(tomllib.load(open('packaging/teken/pyproject.toml','rb'))['project']['dependencies'][0])")
+          if [ "$WRAP" != "$ROOT" ] || [ "$PIN" != "agentfront==$ROOT" ]; then
+            echo "::error::teken wrapper drift — root=$ROOT wrapper=$WRAP pin=$PIN (expected agentfront==$ROOT). Re-run the version-bump skill."
             exit 1
           fi
-          echo "Wrapper in lockstep: afi-cli==$WRAP depends on $PIN"
+          echo "Wrapper in lockstep: teken==$WRAP depends on $PIN"

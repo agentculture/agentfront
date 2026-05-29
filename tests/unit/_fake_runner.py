@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from teken.rubric._types import RunOutput
+from agentfront.rubric._types import RunOutput
 
 
 @dataclass

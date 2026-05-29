@@ -1,7 +1,7 @@
-title: teken
+title: agentfront
 description: Agent First Interface — scaffold CLI, MCP, and HTTP surfaces for tools whose primary consumer is an AI agent.
 url: https://culture.dev
-baseurl: "/teken"
+baseurl: "/agentfront"
 lang: en
 
 theme: just-the-docs
@@ -25,9 +25,9 @@ markdown: kramdown
 permalink: pretty
 
 social:
-  name: teken
+  name: agentfront
   links:
-    - https://github.com/agentculture/teken
+    - https://github.com/agentculture/agentfront
 
 author:
   name: AgentCulture
@@ -44,16 +44,16 @@ aux_links:
   "agex":
     - "https://culture.dev/agex"
   "GitHub":
-    - "https://github.com/agentculture/teken"
+    - "https://github.com/agentculture/agentfront"
   "PyPI":
-    - "https://pypi.org/project/teken/"
+    - "https://pypi.org/project/agentfront/"
 
 aux_links_new_tab: false
 
 footer_content: >-
-  teken — the Agent First Interface scaffolder for the
+  agentfront — the Agent First Interface scaffolder for the
   <a href="https://culture.dev">Culture</a> ecosystem.
-  Source on <a href="https://github.com/agentculture/teken">GitHub</a>.
+  Source on <a href="https://github.com/agentculture/agentfront">GitHub</a>.
 
 exclude:
   - Gemfile

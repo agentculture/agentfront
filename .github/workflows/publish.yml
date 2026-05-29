@@ -5,14 +5,14 @@ on:
     branches: [main]
     paths:
       - "pyproject.toml"
-      - "teken/**"
-      - "packaging/afi-cli/**"
+      - "agentfront/**"
+      - "packaging/teken/**"
   pull_request:
     branches: [main]
     paths:
       - "pyproject.toml"
-      - "teken/**"
-      - "packaging/afi-cli/**"
+      - "agentfront/**"
+      - "packaging/teken/**"
 
 jobs:
   test:
@@ -54,25 +54,25 @@ jobs:
           BASE=$(uv run python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
           DEV_VERSION="${BASE}.dev${{ github.run_number }}"
           sed -i "s/^version = .*/version = \"${DEV_VERSION}\"/" pyproject.toml
-          # Keep the afi-cli wrapper in lockstep: its own version + the teken pin.
-          sed -i "s/^version = .*/version = \"${DEV_VERSION}\"/" packaging/afi-cli/pyproject.toml
-          sed -i "s/teken==${BASE}/teken==${DEV_VERSION}/" packaging/afi-cli/pyproject.toml
+          # Keep the teken wrapper in lockstep: its own version + the agentfront pin.
+          sed -i "s/^version = .*/version = \"${DEV_VERSION}\"/" packaging/teken/pyproject.toml
+          sed -i "s/agentfront==${BASE}/agentfront==${DEV_VERSION}/" packaging/teken/pyproject.toml
           echo "DEV_VERSION=${DEV_VERSION}" >> "$GITHUB_ENV"
           echo "Publishing ${DEV_VERSION} to TestPyPI"
 
       - name: Build and publish to TestPyPI
         run: |
-          # Build the canonical teken dist and the metadata-only afi-cli wrapper.
+          # Build the canonical agentfront dist and the metadata-only teken wrapper.
           uv build
-          uv build packaging/afi-cli -o dist/
+          uv build packaging/teken -o dist/
           # Publish each project separately so each gets its own trusted-publishing token.
+          uv publish --publish-url https://test.pypi.org/legacy/ --trusted-publishing always --check-url https://test.pypi.org/simple/ dist/agentfront-*
           uv publish --publish-url https://test.pypi.org/legacy/ --trusted-publishing always --check-url https://test.pypi.org/simple/ dist/teken-*
-          uv publish --publish-url https://test.pypi.org/legacy/ --trusted-publishing always --check-url https://test.pypi.org/simple/ dist/afi_cli-*
 
       - name: Print install commands
         if: always()
         run: |
-          echo "::notice::Test with: uv tool install --index-url https://test.pypi.org/simple/ --index-strategy unsafe-best-match teken==${DEV_VERSION}"
+          echo "::notice::Test with: uv tool install --index-url https://test.pypi.org/simple/ --index-strategy unsafe-best-match agentfront==${DEV_VERSION}"
 
   publish:
     if: github.event_name == 'push'
@@ -93,9 +93,9 @@ jobs:
 
       - name: Build and publish to PyPI
         run: |
-          # Build the canonical teken dist and the metadata-only afi-cli wrapper.
+          # Build the canonical agentfront dist and the metadata-only teken wrapper.
           uv build
-          uv build packaging/afi-cli -o dist/
+          uv build packaging/teken -o dist/
           # Publish each project separately so each gets its own trusted-publishing token.
+          uv publish --trusted-publishing always --check-url https://pypi.org/simple/ dist/agentfront-*
           uv publish --trusted-publishing always --check-url https://pypi.org/simple/ dist/teken-*
-          uv publish --trusted-publishing always --check-url https://pypi.org/simple/ dist/afi_cli-*

@@ -1,8 +1,8 @@
 """In-process tests for the ``doctor`` / ``cli doctor`` / ``cli cite`` handlers.
 
-The integration suite drives these verbs as subprocesses (``python -m teken``),
+The integration suite drives these verbs as subprocesses (``python -m agentfront``),
 which exercises the real entry point but is invisible to coverage (it runs in a
-child process). These tests call :func:`teken.cli.main` in-process so the
+child process). These tests call :func:`agentfront.cli.main` in-process so the
 handler dispatch, target resolution, and error/remediation paths are measured —
 the same code, observed from the parent process.
 """
@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from teken.cli import main
+from agentfront.cli import main
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -28,7 +28,7 @@ def test_doctor_path_without_pyproject_is_user_error(tmp_path: Path) -> None:
 
 
 def test_doctor_package_and_path_mutually_exclusive(tmp_path: Path) -> None:
-    rc = main(["doctor", "--package", "teken", str(tmp_path)])
+    rc = main(["doctor", "--package", "agentfront", str(tmp_path)])
     assert rc == 1
 
 
@@ -71,7 +71,7 @@ def test_cli_verify_deprecated_forwards(tmp_path: Path, capsys: pytest.CaptureFi
 def test_cli_cite_writes_dotteken(tmp_path: Path) -> None:
     rc = main(["cli", "cite", str(tmp_path)])
     assert rc == 0
-    assert (tmp_path / ".teken" / "reference" / "python-cli" / "AGENT.md").is_file()
+    assert (tmp_path / ".agentfront" / "reference" / "python-cli" / "AGENT.md").is_file()
 
 
 # --- real audit happy paths (spawn target probes; cover orchestration) -----
@@ -81,7 +81,7 @@ def test_doctor_self_json_in_process(capsys: pytest.CaptureFixture[str]) -> None
     rc = main(["doctor", "--json"])
     assert rc == 0
     payload = json.loads(capsys.readouterr().out)
-    assert payload["tool"] == "teken"
+    assert payload["tool"] == "agentfront"
     assert payload["healthy"] is True
 
 
@@ -89,7 +89,7 @@ def test_cli_doctor_repo_json_in_process(capsys: pytest.CaptureFixture[str]) -> 
     rc = main(["cli", "doctor", str(REPO_ROOT), "--json"])
     assert rc == 0
     payload = json.loads(capsys.readouterr().out)
-    assert payload["tool"] == "teken"
+    assert payload["tool"] == "agentfront"
     assert set(payload.keys()) == {"tool", "subject", "healthy", "checks", "summary"}
 
 
@@ -100,11 +100,11 @@ def test_cli_doctor_dry_run_repo(capsys: pytest.CaptureFixture[str]) -> None:
 
 
 def test_doctor_package_teken_in_process(capsys: pytest.CaptureFixture[str]) -> None:
-    # teken is editable-installed in the dev/CI venv; resolves its source root
+    # agentfront is editable-installed in the dev/CI venv; resolves its source root
     # via PEP 610 direct_url and audits it.
-    rc = main(["doctor", "--package", "teken", "--json"])
+    rc = main(["doctor", "--package", "agentfront", "--json"])
     assert rc == 0
-    assert json.loads(capsys.readouterr().out)["tool"] == "teken"
+    assert json.loads(capsys.readouterr().out)["tool"] == "agentfront"
 
 
 def test_doctor_self_text_mode_headline(capsys: pytest.CaptureFixture[str]) -> None:

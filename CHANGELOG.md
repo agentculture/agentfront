@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/). This project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-05-29
+
+### Added
+
+- `teken` retained as a deprecated CLI alias: it prints a one-line deprecation notice to stderr, then forwards to `agentfront`.
+- `teken` retained as a thin PyPI compatibility wrapper that depends on `agentfront==<version>`, so `uv tool install teken` keeps working and installs `agentfront`.
+
+### Changed
+
+- **Breaking:** Renamed the project from `teken` to `agentfront` — the agent-facing front a tool presents. The canonical PyPI distribution and the import package are now `agentfront`; the primary CLI command is `agentfront`.
+- Cited reference trees now write to `.agentfront/` instead of `.teken/` (existing `.teken/` trees are still detected on read for backward compatibility).
+- Renamed the GitHub repo, PyPI Trusted Publisher, Cloudflare Pages project, and SonarCloud project key (`agentculture_agentfront`) to match.
+
+### Removed
+
+- Retired the older `afi` surface left over from the previous rename: the `afi` console command, the `afi-cli` PyPI wrapper distribution, and `.afi/` read-detection are gone. (`afi-cli` stays on PyPI at its last release but is no longer published.)
+
 ## [0.8.0] - 2026-05-22
 
 ### Added
