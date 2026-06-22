@@ -103,9 +103,7 @@ def test_derive_input_schema_resolves_stringized_annotations():
     # get_type_hints must resolve them so the schema is still correctly typed.
     ns: dict = {}
     exec(  # noqa: S102 - exercising stringized annotations on purpose
-        "from __future__ import annotations\n"
-        "def fn(a: int, b: str = 'x'):\n"
-        "    return a\n",
+        "from __future__ import annotations\n" "def fn(a: int, b: str = 'x'):\n" "    return a\n",
         ns,
     )
     schema = derive_input_schema(ns["fn"])

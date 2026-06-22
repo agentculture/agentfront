@@ -51,28 +51,44 @@ Learnability tells the agent *what is here*; diagnosability tells it *what is wr
 
 ## Why `agentfront` is foundational
 
-Every AgentCulture tool eventually wants all three surfaces. Without a shared scaffolder, each project would:
+Every AgentCulture tool eventually wants all three surfaces. Without a shared runtime, each project would:
 
 1. Re-implement the three surfaces from scratch, inconsistently.
-2. Drift over time — one project's CLI is more agent-friendly than another's, for no reason beyond author preference.
+2. Drift over time — one project's CLI is more agent-friendly than another's, for no reason beyond author preference. Worse, *within* a project the CLI, MCP, and HTTP views of the same tool can disagree about what is exposed.
 3. Miss the baked-in best practices — the next `culture`-sized project might ship a CLI without `learn`, or an MCP with forty tools, or an HTTP doc site without a sitemap.
 
-`agentfront` solves this once:
+`agentfront` solves this once, as an **importable runtime library**:
 
-- One manifest per tool describes verbs, arguments, outputs, and docs.
-- The scaffolder emits the CLI, the MCP server, and the HTTP site from that manifest.
-- The discipline is enforced by the generator, not by author discipline:
-  - CLI always has `learn`.
-  - MCP menu is filtered to the declared minimal set, with warnings when the menu grows past an opinionated threshold.
-  - HTTP docs are markdown + sitemap by construction.
+```python
+from agentfront import App
 
-Ship a new AgentCulture tool → write its manifest → `agentfront scaffold` → you have three agent-ergonomic surfaces, consistent with every other project in the org. That's the *foundational* claim: AgentCulture's surface-area compounds instead of fragmenting.
+app = App(name="mytool", version="1.0")
+app.add_docs_dir("docs/")
+
+@app.tool
+def search(query: str) -> str:
+    """Search the corpus."""
+    ...
+
+app.cli()          # argparse CLI with the universal verbs
+app.mcp_server()   # minimal MCP tool menu
+app.http_app()     # markdown pages + sitemap
+```
+
+- Docs and tools are declared **once** into a single registry on the `App`.
+- The CLI, MCP server, and HTTP site each *read from that one registry* — they are derived, never separately authored, so they cannot drift apart.
+- The discipline is enforced by the runtime, not by author discipline:
+  - The CLI always has `learn`.
+  - The MCP surface exposes exactly the tools registered on the `App` — a minimal, declared menu.
+  - The HTTP docs are markdown + sitemap by construction.
+
+Ship a new AgentCulture tool → `import agentfront`, build an `App`, register your docs and tools → you have three agent-ergonomic surfaces, consistent with every other project in the org and consistent with each other. That's the *foundational* claim: AgentCulture's surface-area compounds instead of fragmenting.
+
+> Earlier alpha releases pursued a different shape — a `cli cite` scaffolder that dropped a reference tree into a project, plus a manifest-driven generator that would *emit* the three surfaces as files. That has been retired. agentfront is now a runtime you import, not a generator that writes code, so the surfaces stay live and in sync with the single registry rather than being snapshotted into files that drift.
 
 ## Dogfooding
 
-`agentfront` itself is required to use its own output. Its current CLI is hand-written — unavoidable while the generator doesn't exist. Once the manifest schema and generator are designed, the next step is to regenerate `agentfront`'s own CLI from its own manifest and make the generated artifact the canonical source. The hand-written CLI in `agentfront/cli/` then becomes the reference the generator must reproduce byte-for-byte — a self-validating loop.
-
-Same loop applies to the MCP and HTTP surfaces when they're added.
+`agentfront` itself is required to use its own runtime. Its hand-written CLI in `agentfront/cli/` is the reference implementation of the universal verbs and the rubric the runtime checks against; the runtime-derived CLI (`App.cli()`) builds the same surface from a registry. The same single-registry model backs the MCP and HTTP surfaces — a self-validating loop where agentfront's own three surfaces are produced by the very `App` it asks every other tool to use.
 
 ## Agent First is a discipline, not a switch
 

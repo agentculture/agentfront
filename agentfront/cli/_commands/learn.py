@@ -16,13 +16,24 @@ from agentfront import __version__, _brand
 from agentfront.cli._output import emit_result
 
 _TEXT = """\
-agentfront — Agent First Interface scaffolder.
+agentfront — Agent First Interface runtime.
 
 Purpose
 -------
-Generate and verify agent-first interfaces for CLIs (and, later, MCP
-servers and HTTP sites). agentfront itself demonstrates the patterns it checks:
-learn, explain, overview, doctor, --json output, structured errors.
+Import agentfront in your tool to derive all three agent-first surfaces — a CLI,
+an MCP server, and an HTTP docs site — from one `App`:
+
+  from agentfront import App
+  app = App(name="mytool", version="1.0")
+  app.add_docs_dir("docs/")
+  @app.tool
+  def search(query: str) -> str: ...
+  app.cli(); app.mcp_server(); app.http_app()
+
+Docs and tools are declared once into a single registry; the surfaces only
+read from it, so they cannot drift apart. agentfront's own CLI demonstrates the
+patterns it checks: learn, explain, overview, doctor, --json output,
+structured errors.
 
 Commands
 --------
@@ -34,9 +45,6 @@ Commands
   agentfront doctor [path]      Diagnose agentfront's own install (no path) or audit a
                          target CLI against the rubric (with path). With
                          --fix, applies auto-fixable remediations. (v0.5)
-  agentfront cli cite [path]    Emit the Python agent-first CLI reference tree
-                         into <path>/.agentfront/reference/python-cli/ for the
-                         agent to apply. (v0.2)
   agentfront cli doctor [path]  Audit the CLI at <path> against the seven-bundle
                          rubric; --fix applies auto-fixable remediations.
                          (v0.5; replaces `cli verify`.)
@@ -68,8 +76,8 @@ More detail
 -----------
   agentfront explain agentfront
   agentfront explain doctor
-  agentfront explain cli cite
   agentfront explain cli doctor
+  agentfront explain cli overview
 
 Homepage: https://github.com/agentculture/agentfront
 """
@@ -79,7 +87,10 @@ def _as_json_payload() -> dict[str, object]:
     return {
         "tool": _brand.PROG,
         "version": __version__,
-        "purpose": ("Generate and verify agent-first interfaces for CLIs (and later MCP + HTTP)."),
+        "purpose": (
+            "Import agentfront.App to derive agent-first CLI, MCP, and HTTP surfaces "
+            "from one registry; audit CLIs against the agent-first rubric."
+        ),
         "commands": [
             {"path": ["learn"], "summary": "Self-teaching prompt."},
             {"path": ["explain"], "summary": "Markdown docs by noun/verb path."},
@@ -91,7 +102,6 @@ def _as_json_payload() -> dict[str, object]:
                     "--fix applies auto-fixable remediations."
                 ),
             },
-            {"path": ["cli", "cite"], "summary": "Emit CLI reference drop."},
             {
                 "path": ["cli", "doctor"],
                 "summary": "Audit a CLI against the rubric (replaces `cli verify`).",

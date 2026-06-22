@@ -1,12 +1,9 @@
-"""End-to-end tests for the ``agentfront cli {cite,verify,overview}`` surface.
+"""End-to-end tests for the ``agentfront cli {doctor,verify,overview}`` surface.
 
 These drive agentfront as a subprocess (via ``python -m agentfront``) to exercise the full
-argparse + dispatch + cite + rubric code path end-to-end — not via
+argparse + dispatch + rubric code path end-to-end — not via
 :func:`agentfront.cli.main`. They do NOT test the built wheel's packaging: the
-subprocess imports from the source tree directly. Packaging-specific
-coverage (that the reference tree ships in the wheel with `{{slug}}/`
-directories intact) is done at release time via ``uv build`` and a manual
-wheel-contents check, not here.
+subprocess imports from the source tree directly.
 """
 
 from __future__ import annotations
@@ -32,41 +29,9 @@ def _run_agentfront(*args: str, cwd: Path | None = None) -> subprocess.Completed
     )
 
 
-def test_cite_writes_reference_and_gitignore(tmp_path: Path) -> None:
-    result = _run_agentfront("cli", "cite", str(tmp_path), cwd=tmp_path)
-
-    assert result.returncode == 0, result.stderr
-    ref = tmp_path / ".agentfront" / "reference" / "python-cli"
-    assert ref.is_dir()
-    assert (ref / "AGENT.md").is_file()
-    assert (ref / "MANIFEST.json").is_file()
-    # Tokens must be literal.
-    content = (ref / "{{slug}}" / "cli" / "__init__.py").read_text()
-    assert "{{project_name}}" in content
-    # gitignore updated.
-    assert ".agentfront/" in (tmp_path / ".gitignore").read_text()
-
-
-def test_cite_json_mode_emits_parseable_payload(tmp_path: Path) -> None:
-    result = _run_agentfront("cli", "cite", str(tmp_path), "--json", cwd=tmp_path)
-
-    assert result.returncode == 0, result.stderr
-    payload = json.loads(result.stdout)
-    assert "out" in payload
-    assert payload["gitignore_updated"] is True
-    assert len(payload["next_steps"]) == 3
-
-
-def test_cite_then_doctor_round_trip(tmp_path: Path) -> None:
-    """Citing into an empty dir makes the reference available, but the
-    target project itself isn't a CLI — doctor should fail on structure
-    (no pyproject.toml). This guards against the reference being a hidden
-    scaffolder: cite DOES NOT produce a working CLI; it produces a
-    reference for an agent to apply.
-    """
-    _run_agentfront("cli", "cite", str(tmp_path), cwd=tmp_path)
-
-    # The empty target is not a CLI project — doctor should bail at structure.
+def test_doctor_on_non_cli_dir_fails_on_structure(tmp_path: Path) -> None:
+    """An empty target is not a CLI project — doctor bails at structure
+    (no pyproject.toml) rather than crashing."""
     result = _run_agentfront("cli", "doctor", str(tmp_path), cwd=tmp_path)
 
     assert result.returncode != 0
@@ -131,7 +96,6 @@ def test_bogus_verb_exits_with_hint() -> None:
         "overview",
         "doctor",
         "cli",
-        "cli cite",
         "cli doctor",
         "cli verify",  # deprecated alias — entry still present for one cycle.
         "cli overview",
@@ -147,12 +111,12 @@ def test_every_registered_path_has_explain_entry(path: str) -> None:
 # --- overview verb (new in v0.3) -----------------------------------------
 
 
-def test_cli_overview_zero_target_renders_template() -> None:
+def test_cli_overview_zero_target_renders_runtime_model() -> None:
     result = _run_agentfront("cli", "overview")
     assert result.returncode == 0, result.stderr
-    assert "agentfront default template" in result.stdout
-    # Tokens are literal in the scaffolded template — overview must surface them.
-    assert "{{slug}}" in result.stdout
+    assert "agentfront runtime model" in result.stdout
+    # Zero-target describes the importable App, not a scaffolded tree.
+    assert "from agentfront import App" in result.stdout
 
 
 def test_cli_overview_on_self_shows_universals_context() -> None:
@@ -182,4 +146,4 @@ def test_overview_is_graceful_on_missing_path(tmp_path: Path) -> None:
     missing = tmp_path / "does-not-exist"
     result = _run_agentfront("cli", "overview", str(missing))
     assert result.returncode == 0, result.stderr
-    assert "agentfront default template" in result.stdout
+    assert "agentfront runtime model" in result.stdout

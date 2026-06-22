@@ -15,7 +15,6 @@ editing source) cannot be applied from inside a doctor run. The
 from __future__ import annotations
 
 import argparse
-import json
 import tomllib
 from pathlib import Path
 
@@ -28,11 +27,6 @@ from agentfront.rubric import default_rubric
 from agentfront.rubric._types import CheckResult
 
 BUNDLE = "self"
-
-# Files we expect inside an installed agentfront cite reference tree. Drift here
-# usually means a packaging bug (the wheel didn't pull every reference
-# file in) — informational, not auto-fixable in-place.
-_REFERENCE_ROOT = Path(agentfront.__file__).resolve().parent / "cite" / "references" / "python-cli"
 
 
 def _find_repo_root() -> Path | None:
@@ -246,59 +240,6 @@ def _check_surface_coherence_explain() -> CheckResult:
     )
 
 
-def _check_reference_tree_present() -> CheckResult:
-    manifest = _REFERENCE_ROOT / "MANIFEST.json"
-    if not manifest.is_file():
-        return CheckResult(
-            BUNDLE,
-            "reference_tree_present",
-            False,
-            "error",
-            f"missing reference manifest at {manifest}",
-            remediation=(
-                "agentfront's bundled reference tree is incomplete — likely a packaging bug. "
-                "Reinstall with `uv tool install --reinstall agentfront` or file an issue."
-            ),
-        )
-    try:
-        data = json.loads(manifest.read_text())
-    except (OSError, json.JSONDecodeError) as err:
-        return CheckResult(
-            BUNDLE,
-            "reference_tree_present",
-            False,
-            "error",
-            f"could not parse reference manifest: {err}",
-            remediation="reinstall agentfront or file an issue if the wheel is malformed",
-        )
-    files = data.get("files", []) if isinstance(data, dict) else []
-    missing = [
-        f.get("path")
-        for f in files
-        if isinstance(f, dict) and not (_REFERENCE_ROOT / f.get("path", "")).exists()
-    ]
-    if missing:
-        return CheckResult(
-            BUNDLE,
-            "reference_tree_present",
-            False,
-            "error",
-            f"reference tree missing {len(missing)} declared file(s): {', '.join(missing[:3])}"
-            + ("..." if len(missing) > 3 else ""),
-            remediation=(
-                "the bundled reference tree is incomplete; reinstall agentfront or report "
-                "the wheel as malformed"
-            ),
-        )
-    return CheckResult(
-        BUNDLE,
-        "reference_tree_present",
-        True,
-        "info",
-        f"reference tree intact ({len(files)} files declared, all present)",
-    )
-
-
 def _check_rubric_modules_loadable() -> CheckResult:
     bundles = default_rubric()
     bad: list[str] = []
@@ -337,7 +278,6 @@ CHECKS = [
     _check_changelog_entry,
     _check_surface_coherence_learn,
     _check_surface_coherence_explain,
-    _check_reference_tree_present,
     _check_rubric_modules_loadable,
 ]
 

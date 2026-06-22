@@ -15,9 +15,11 @@ from agentfront import _brand
 _ROOT = """\
 # agentfront
 
-agentfront is the AgentCulture Agent First Interface scaffolder. It emits reference
-drops for agent-first CLIs (and, later, MCP servers and HTTP sites) and
-audits any tool against the seven-bundle agent-first rubric.
+agentfront is the AgentCulture Agent First Interface runtime. A host package
+imports `agentfront.App`, declares its docs and tools once, and derives all
+three agent-first surfaces (CLI, MCP server, HTTP site) from that single
+registry. agentfront also audits any tool against the seven-bundle agent-first
+rubric via `cli doctor`.
 
 ## Verbs
 
@@ -26,7 +28,6 @@ audits any tool against the seven-bundle agent-first rubric.
 - `agentfront overview [path]` — descriptive rollup across all interface surfaces.
 - `agentfront doctor [path]` — self-diagnose agentfront or audit a target CLI; `--fix`
   applies auto-fixable remediations.
-- `agentfront cli cite [path]` — drop the CLI reference pattern into a project.
 - `agentfront cli doctor [path]` — audit a CLI against the rubric (replaces
   `cli verify` in v0.5).
 - `agentfront cli overview [path]` — read-only snapshot of a target CLI.
@@ -40,12 +41,28 @@ Every agent-first CLI exposes the four universal verbs:
 - `overview [path]` — what is *present* in the subject the command addresses?
 - `doctor [path]` — what is *wrong*, and how do I fix it?
 
-## Principles
+## The runtime model
 
-agentfront is deliberately dumb: it emits references with literal `{{tokens}}` and
-never merges into a consumer project. The agent running agentfront handles
-integration. Pre-commit, CI, and other agent-workflow tooling live in the
-sibling project `agex-cli`.
+agentfront is an importable library, not a scaffolder:
+
+```python
+from agentfront import App
+
+app = App(name="mytool", version="1.0")
+app.add_docs_dir("docs/")
+
+@app.tool
+def search(query: str) -> str:
+    \"\"\"Search the corpus.\"\"\"
+    ...
+
+app.cli()          # argparse CLI (learn / doctor)
+app.mcp_server()   # MCP server (minimal tool menu)
+app.http_app()     # WSGI site (markdown pages + sitemap)
+```
+
+Docs and tools are declared once into a single registry; the three surfaces
+only read from it, so they cannot drift apart.
 
 ## Exit-code policy
 
@@ -60,7 +77,6 @@ sibling project `agex-cli`.
 - `agentfront explain explain`
 - `agentfront explain overview`
 - `agentfront explain doctor`
-- `agentfront explain cli cite`
 - `agentfront explain cli doctor`
 - `agentfront explain cli overview`
 """
@@ -98,7 +114,7 @@ Prints markdown documentation for any noun/verb path. Unlike `--help`
     agentfront explain agentfront
     agentfront explain learn
     agentfront explain cli
-    agentfront explain cli cite
+    agentfront explain cli doctor
     agentfront explain cli verify --json
 
 In text mode emits the markdown to stdout. In JSON mode emits
@@ -106,8 +122,8 @@ In text mode emits the markdown to stdout. In JSON mode emits
 
 ## Path resolution
 
-Paths are shell-tokenised: `agentfront explain cli cite` resolves to the catalog
-entry `("cli", "cite")`. Unknown paths exit `1` with a `hint:` pointing at
+Paths are shell-tokenised: `agentfront explain cli doctor` resolves to the catalog
+entry `("cli", "doctor")`. Unknown paths exit `1` with a `hint:` pointing at
 `agentfront explain agentfront` for the top-level map.
 
 ## Rubric role
@@ -120,63 +136,18 @@ _CLI = """\
 # agentfront cli
 
 The `cli` noun groups verbs that act on *a CLI project* (the target
-project). From v0.5 there are three active verbs plus one deprecated alias:
+project). From v0.5 there are two active verbs plus one deprecated alias:
 
-- `agentfront cli cite [path]` — drop the Python agent-first reference tree into
-  `<path>/.agentfront/reference/python-cli/` for an agent to integrate.
 - `agentfront cli doctor [path]` — run the seven-bundle agent-first rubric against
   the CLI at `<path>` and surface remediations; `--fix` applies any
   auto-fixable ones, `--dry-run` previews them.
 - `agentfront cli overview [path]` — read-only descriptive snapshot of the CLI at
-  `<path>` (or agentfront's own scaffolded template when no path is given).
+  `<path>` (or agentfront's own runtime model when no path is given).
 - `agentfront cli verify [path]` — *deprecated* alias for `agentfront cli doctor`; will be
   removed in v0.6.0.
 
-See `agentfront explain cli cite`, `agentfront explain cli doctor`, and
-`agentfront explain cli overview` for details.
-"""
-
-_CLI_CITE = """\
-# agentfront cli cite [path] [--lang LANG] [--out DIR] [--json]
-
-Emit the agent-first CLI reference tree into the target project.
-
-## What it does
-
-1. Copies the reference tree (bundled with agentfront under
-   `agentfront/cite/references/<lang>-cli/`) to `<path>/.agentfront/reference/<lang>-cli/`
-   wholesale. Tokens `{{project_name}}`, `{{slug}}`, `{{module}}` are left
-   **literal** — the agent consuming the reference substitutes them.
-2. Adds `.agentfront/` to `<path>/.gitignore` if missing. Never modifies
-   `.gitignore` otherwise.
-3. Never touches anything outside `<path>/.agentfront/` and the single gitignore
-   line.
-
-Re-running wipes and re-writes `<path>/.agentfront/reference/<lang>-cli/` —
-always the latest reference. The `.gitignore` line is check-before-modify.
-
-## Arguments
-
-- `path` (optional, default `.`) — target project directory.
-- `--lang` — reference language. v0.2 supports `python`.
-- `--out DIR` — override the output directory (default:
-  `<path>/.agentfront/reference/<lang>-cli/`).
-- `--json` — emit the report as a JSON object instead of text.
-
-## Output contains
-
-- Count of files written and their root directory.
-- Whether `.gitignore` was updated.
-- A three-step `next_steps` list: read AGENT.md, apply the pattern,
-  run `agentfront cli verify .`.
-- Pointers to `agentfront explain cli cite` and `agentfront explain cli verify` for
-  more detail.
-
-## Exit codes
-
-- `0` success
-- `1` user error (bad lang, missing target, bad `--out`)
-- `2` environment error (reference tree missing in install)
+See `agentfront explain cli doctor` and `agentfront explain cli overview` for
+details.
 """
 
 _CLI_DOCTOR = """\
@@ -331,9 +302,10 @@ same pattern:
 ## Zero-target default
 
 If `path` is omitted, or the target has no detectable CLI surface, agentfront
-describes **its own scaffolded reference template** (the tree under
-`agentfront/cite/references/python-cli/`). agentfront knows its own creations
-perfectly, so this fallback is complete and deterministic.
+describes **its own runtime model** — the importable `App` that derives the
+CLI / MCP / HTTP surfaces from one registry, and the agent-first universal
+verbs every surface ships. No file is read, so this fallback is complete and
+deterministic.
 
 ## Usage
 
@@ -381,7 +353,6 @@ ENTRIES: dict[tuple[str, ...], str] = {
     ("overview",): _OVERVIEW,
     ("doctor",): _DOCTOR,
     ("cli",): _CLI,
-    ("cli", "cite"): _CLI_CITE,
     ("cli", "doctor"): _CLI_DOCTOR,
     # Deprecated alias — keep the catalog entry so `agentfront explain cli verify`
     # still resolves while the alias is supported. Removed in v0.6.0.

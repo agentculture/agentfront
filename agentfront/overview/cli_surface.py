@@ -13,10 +13,11 @@ Two modes:
   (best-effort — static regex, not a real AST).
 
 * **Zero-target mode** — ``path`` is ``None`` or the target has no
-  pyproject (fresh project, caller just wants to know what agentfront would
-  scaffold). We describe agentfront's bundled reference template from
-  ``agentfront/cite/references/python-cli/MANIFEST.json`` — agentfront knows its own
-  creations perfectly, so this path is deterministic and complete.
+  pyproject (fresh project, caller just wants to know what agentfront is).
+  We describe agentfront's own runtime model — the importable :class:`App`
+  that derives the CLI / MCP / HTTP surfaces from one registry, and the
+  agent-first universal verbs every surface ships. No file is read; the
+  description is deterministic and complete.
 
 The module never raises on inspection failure; it emits ``> ⚠️`` warnings
 into the report and returns the best partial view it has. Callers get a
@@ -25,13 +26,11 @@ useful answer even on malformed targets.
 
 from __future__ import annotations
 
-import json
 import re
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
-from agentfront import _brand
 from agentfront.overview import OverviewReport, OverviewSection
 
 # Module-internal regex cache. Best-effort; a target CLI whose parser wiring
@@ -43,9 +42,6 @@ _ADD_PARSER_RE = re.compile(r'add_parser\(\s*[\'"]([^\'"]+)[\'"]')
 # (doctor); the constant name avoids fixed arity ("triple") so it can grow
 # further if agentfront mandates another verb in a future version.
 _UNIVERSAL_VERBS = ("learn", "explain", "overview", "doctor")
-
-# Where agentfront's bundled reference template lives (for the zero-target fallback).
-_TEMPLATE_ROOT = Path(__file__).resolve().parent.parent / "cite" / "references" / "python-cli"
 
 
 @dataclass
@@ -74,7 +70,7 @@ def inspect(path: Path | None) -> OverviewReport:
     if not target.exists():
         return _zero_target_report(
             warning=(
-                f"path does not exist: {target}; falling back to " "agentfront's default template."
+                f"path does not exist: {target}; falling back to " "agentfront's runtime model."
             ),
             attempted_path=str(target),
         )
@@ -84,7 +80,7 @@ def inspect(path: Path | None) -> OverviewReport:
         return _zero_target_report(
             warning=(
                 f"no pyproject.toml at {pyproject}; target has no detectable CLI surface, "
-                "falling back to agentfront's default template."
+                "falling back to agentfront's runtime model."
             ),
             attempted_path=str(target),
         )
@@ -95,7 +91,7 @@ def inspect(path: Path | None) -> OverviewReport:
         report = _zero_target_report(
             warning=(
                 f"{pyproject} has no usable [project.scripts] entry; "
-                "falling back to agentfront's default template."
+                "falling back to agentfront's runtime model."
             ),
             attempted_path=str(target),
         )
@@ -207,7 +203,8 @@ def _emit_command_surface_section(report: OverviewReport, info: _TargetInfo) -> 
     if not commands_dir.is_dir():
         body = (
             f"No `_commands/` directory at `{commands_dir}`. The target CLI does not "
-            "follow agentfront's scaffolded layout; static command enumeration is not possible."
+            "follow the noun/verb `_commands/` layout; static command enumeration "
+            "is not possible."
         )
         report.warnings.append(
             f"no _commands/ directory at {commands_dir}; command surface unknown."
@@ -275,7 +272,8 @@ def _emit_agent_first_triple_section(report: OverviewReport, info: _TargetInfo) 
         body_lines.append("")
         body_lines.append(
             f"Missing verbs: {', '.join(missing)}. "
-            f"Run `agentfront cli cite {info.path}` to scaffold the reference pattern."
+            "Wire them on the host App (see `agentfront learn`) so every "
+            "surface exposes the agent-first universals."
         )
     report.sections.append(
         OverviewSection(
@@ -287,20 +285,10 @@ def _emit_agent_first_triple_section(report: OverviewReport, info: _TargetInfo) 
 
 
 def _emit_rubric_posture_section(report: OverviewReport, info: _TargetInfo) -> None:
-    # Probe the current `.agentfront/` location first, then fall back to a legacy
-    # `.teken/` tree so projects cited before the rename are still detected.
-    cited_dir = info.path / _brand.DOTDIR / "reference" / "python-cli"
-    if not cited_dir.is_dir():
-        legacy_dir = info.path / _brand.LEGACY_DOTDIR / "reference" / "python-cli"
-        if legacy_dir.is_dir():
-            cited_dir = legacy_dir
-    cited = cited_dir.is_dir()
     has_tests = (info.path / "tests").is_dir()
     body_lines = [
         f"- Rubric grade: run `agentfront cli doctor {info.path}` (not invoked by overview).",
         f"- Tests dir: {'present' if has_tests else 'missing'} (`tests/`)",
-        f"- agentfront reference tree cited: {'yes' if cited else 'no'}"
-        + (f" (at `{cited_dir}`)" if cited else ""),
     ]
     report.sections.append(
         OverviewSection(
@@ -308,8 +296,6 @@ def _emit_rubric_posture_section(report: OverviewReport, info: _TargetInfo) -> N
             body_md="\n".join(body_lines),
             findings=[
                 {"key": "tests_dir", "value": has_tests},
-                {"key": "reference_cited", "value": cited},
-                {"key": "reference_path", "value": str(cited_dir) if cited else None},
             ],
         )
     )
@@ -323,138 +309,68 @@ def _emit_rubric_posture_section(report: OverviewReport, info: _TargetInfo) -> N
 def _zero_target_report(
     *, warning: str | None = None, attempted_path: str | None = None
 ) -> OverviewReport:
-    """Describe agentfront's bundled CLI reference template.
+    """Describe agentfront's own runtime model.
 
     Used when no ``path`` was given, or the target has no detectable CLI
-    surface. Reads ``agentfront/cite/references/python-cli/MANIFEST.json`` — agentfront
-    knows its own scaffolded template exactly, so this report is complete
-    and deterministic.
+    surface. agentfront is an importable runtime: a host package builds an
+    :class:`agentfront.App`, declares docs and tools once, and derives the
+    CLI / MCP / HTTP surfaces from that single registry. This report
+    describes that model — it reads no files, so it is deterministic and
+    complete.
     """
     report = OverviewReport(subject="cli", path=attempted_path)
     if warning:
         report.warnings.append(warning)
 
-    manifest = _load_template_manifest(report)
-    if manifest is None:
-        return report
-
-    files = manifest.get("files", []) if isinstance(manifest, dict) else []
-    tokens = manifest.get("tokens", {}) if isinstance(manifest, dict) else {}
-
-    report.sections.append(_build_template_intro_section(manifest, files))
-    tokens_section = _build_tokens_section(tokens)
-    if tokens_section is not None:
-        report.sections.append(tokens_section)
-    inventory_section = _build_inventory_section(files)
-    if inventory_section is not None:
-        report.sections.append(inventory_section)
-    report.sections.append(_build_template_triple_section(files))
+    report.sections.append(_build_runtime_intro_section())
+    report.sections.append(_build_runtime_triple_section())
 
     report.notes.append(
-        "scaffold into a real project: `agentfront cli cite <path>` "
-        "(see `agentfront explain cli cite`)."
+        "wire your tool: `from agentfront import App` → declare docs/tools once → "
+        "derive surfaces with `app.cli()` / `app.mcp_server()` / `app.http_app()`."
     )
     report.notes.append(
-        "then audit: `agentfront cli doctor <path>` (see `agentfront explain cli doctor`)."
+        "audit a target CLI: `agentfront cli doctor <path>` "
+        "(see `agentfront explain cli doctor`)."
     )
     return report
 
 
-def _load_template_manifest(report: OverviewReport) -> dict | None:
-    """Load MANIFEST.json; append a warning to ``report`` and return None on failure."""
-    manifest_path = _TEMPLATE_ROOT / "MANIFEST.json"
-    if not manifest_path.is_file():
-        report.warnings.append(
-            f"agentfront's bundled template is missing at {manifest_path}; "
-            "this is a packaging bug, please file an issue."
-        )
-        return None
-    try:
-        return json.loads(manifest_path.read_text())
-    except (OSError, json.JSONDecodeError) as err:
-        report.warnings.append(f"could not read agentfront's bundled manifest: {err}")
-        return None
-
-
-def _build_template_intro_section(manifest: dict, files: list) -> OverviewSection:
+def _build_runtime_intro_section() -> OverviewSection:
     return OverviewSection(
-        heading="agentfront default template",
+        heading="agentfront runtime model",
         body_md=(
-            "No target CLI to inspect; showing the reference tree agentfront would "
-            "scaffold when you run `agentfront cli cite <path>`.\n\n"
-            f"- **Language:** `{manifest.get('lang', 'unknown')}`\n"
-            f"- **Source:** `{_TEMPLATE_ROOT}`\n"
-            f"- **File count:** {len(files)}"
+            "No target CLI to inspect; describing agentfront's own runtime model.\n\n"
+            "agentfront is an importable library, not a scaffolder. A host package "
+            "builds one `App`, declares its docs and tools once, and derives all "
+            "three agent-first surfaces from that single registry:\n\n"
+            "```python\n"
+            "from agentfront import App\n\n"
+            'app = App(name="mytool", version="1.0")\n'
+            'app.add_docs_dir("docs/")\n\n'
+            "@app.tool\n"
+            "def search(query: str) -> str:\n"
+            '    """Search the corpus."""\n'
+            "    ...\n\n"
+            "app.cli()          # argparse CLI (learn / doctor)\n"
+            "app.mcp_server()   # MCP server (minimal tool menu)\n"
+            "app.http_app()     # WSGI site (markdown pages + sitemap)\n"
+            "```"
         ),
         findings=[
-            {"key": "lang", "value": manifest.get("lang")},
-            {"key": "template_root", "value": str(_TEMPLATE_ROOT)},
-            {"key": "file_count", "value": len(files)},
+            {"key": "model", "value": "importable-runtime"},
+            {"key": "entrypoint", "value": "agentfront.App"},
+            {"key": "surfaces", "value": ["cli", "mcp", "http"]},
         ],
     )
 
 
-def _build_tokens_section(tokens: dict) -> OverviewSection | None:
-    if not tokens:
-        return None
-    lines = ["Agents consuming the scaffolded tree substitute these tokens:", ""]
-    for tok, desc in tokens.items():
-        lines.append(f"- `{{{{{tok}}}}}` — {desc}")
-    return OverviewSection(
-        heading="Tokens",
-        body_md="\n".join(lines),
-        findings=[{"token": t, "description": d} for t, d in tokens.items()],
-    )
-
-
-def _build_inventory_section(files: list) -> OverviewSection | None:
-    by_role: dict[str, list[dict]] = {}
-    for f in files:
-        if not isinstance(f, dict):
-            continue
-        role = f.get("role", "unknown")
-        by_role.setdefault(role, []).append(f)
-
-    body_lines: list[str] = []
-    for role in sorted(by_role.keys()):
-        body_lines.append(f"### {role}")
-        body_lines.append("")
-        for f in by_role[role]:
-            body_lines.append(f"- `{f.get('path', '?')}` — {f.get('summary', '')}")
-        body_lines.append("")
-    if not body_lines:
-        return None
-    return OverviewSection(
-        heading="File inventory",
-        body_md="\n".join(body_lines).rstrip(),
-        findings=[
-            {"path": f.get("path"), "role": f.get("role"), "summary": f.get("summary")}
-            for f in files
-            if isinstance(f, dict)
-        ],
-    )
-
-
-def _build_template_triple_section(files: list) -> OverviewSection:
-    commands = [
-        f.get("path", "")
-        for f in files
-        if isinstance(f, dict) and "/cli/_commands/" in f.get("path", "")
-    ]
-    universals_present = {v: any(c.endswith(f"{v}.py") for c in commands) for v in _UNIVERSAL_VERBS}
-    body_lines = ["Universal verbs the scaffolded CLI ships with:", ""]
+def _build_runtime_triple_section() -> OverviewSection:
+    body_lines = ["Universal verbs every agent-first CLI surface ships:", ""]
     for verb in _UNIVERSAL_VERBS:
-        mark = "✅" if universals_present[verb] else "❌"
-        body_lines.append(f"- {mark} `{verb}`")
-    missing = [v for v, ok in universals_present.items() if not ok]
-    if missing:
-        body_lines.append("")
-        body_lines.append(
-            "The template does not yet scaffold: " + ", ".join(missing) + ". "
-            "agentfront is tracked to add them as it grows."
-        )
+        body_lines.append(f"- `{verb}`")
     return OverviewSection(
-        heading="Agent-first universals (template)",
+        heading="Agent-first universals",
         body_md="\n".join(body_lines),
-        findings=[{"verb": v, "present": universals_present[v]} for v in _UNIVERSAL_VERBS],
+        findings=[{"verb": v, "present": True} for v in _UNIVERSAL_VERBS],
     )

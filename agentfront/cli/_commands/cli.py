@@ -1,7 +1,5 @@
-"""The ``cli`` noun group — verbs ``cite``, ``doctor``, ``overview``.
+"""The ``cli`` noun group — verbs ``doctor``, ``overview``.
 
-``agentfront cli cite``     — drop the agent-first CLI reference tree into the target
-                       project under ``.agentfront/reference/<lang>-cli/``.
 ``agentfront cli doctor``   — run the seven-bundle rubric against a target CLI
                        and surface inconsistencies with actionable remediation
                        (replaces ``agentfront cli verify``; ``--fix`` applies any
@@ -17,7 +15,6 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from agentfront.cite import SUPPORTED_LANGS, emit_reference
 from agentfront.cli._commands.doctor import cmd_cli_doctor, cmd_cli_verify_deprecated
 from agentfront.cli._output import emit_result
 from agentfront.overview import build as build_overview
@@ -28,50 +25,12 @@ _PATH_HELP = "Target project path (default: .)."
 _STRICT_HELP = "Treat warnings as failures (non-zero exit on any not-passed check)."
 
 
-def cmd_cite(args: argparse.Namespace) -> None:
-    """Handler for ``agentfront cli cite``.
-
-    Returns ``None`` on success (treated as ``EXIT_SUCCESS`` by
-    :func:`agentfront.cli._dispatch`); every failure path raises
-    :class:`AfiError`.
-    """
-    target_path = Path(args.path).resolve()
-    lang = args.lang
-    out = Path(args.out).resolve() if args.out else None
-    report = emit_reference(target_path, lang=lang, out=out)
-    json_mode = bool(getattr(args, "json", False))
-    if json_mode:
-        emit_result(report.to_dict(), json_mode=True)
-        return
-
-    lines = [
-        f"Wrote {report.written_count} files to {report.out}",
-        (
-            "Added `.agentfront/` to .gitignore"
-            if report.gitignore_updated
-            else ".gitignore already ignores `.agentfront/`"
-        ),
-        "",
-        "Next steps:",
-    ]
-    for i, step in enumerate(report.describe_next_steps(), start=1):
-        lines.append(f"  {i}. {step}")
-    lines.extend(
-        [
-            "",
-            "For details on any step:  agentfront explain cli cite",
-            "For the rubric itself:    agentfront explain cli doctor",
-        ]
-    )
-    emit_result("\n".join(lines), json_mode=False)
-
-
 def cmd_cli_overview(args: argparse.Namespace) -> int:
     """Handler for ``agentfront cli overview [path]``.
 
     Read-only descriptive snapshot. If ``path`` is missing or points at a
     project without a detectable CLI surface, emits the overview of agentfront's
-    own scaffolded template (the "zero-target default").
+    own runtime model (the "zero-target default").
     """
     raw = getattr(args, "path", None)
     path: Path | None = Path(raw).resolve() if raw else None
@@ -87,28 +46,9 @@ def cmd_cli_overview(args: argparse.Namespace) -> int:
 def register(sub: argparse._SubParsersAction) -> None:
     cli_parser = sub.add_parser(
         "cli",
-        help="CLI-related commands: cite a reference tree, doctor against the rubric.",
+        help="CLI-related commands: doctor a target against the agent-first rubric.",
     )
     cli_sub = cli_parser.add_subparsers(dest="cli_command")
-
-    cite = cli_sub.add_parser(
-        "cite",
-        help="Emit the agent-first CLI reference tree into <path>/.agentfront/reference/.",
-    )
-    cite.add_argument("path", nargs="?", default=".", help=_PATH_HELP)
-    cite.add_argument(
-        "--lang",
-        default="python",
-        choices=list(SUPPORTED_LANGS),
-        help="Reference language (default: python).",
-    )
-    cite.add_argument(
-        "--out",
-        default=None,
-        help="Override output directory (default: <path>/.agentfront/reference/<lang>-cli/).",
-    )
-    cite.add_argument("--json", action="store_true", help=_JSON_HELP)
-    cite.set_defaults(func=cmd_cite)
 
     doctor = cli_sub.add_parser(
         "doctor",
@@ -177,7 +117,10 @@ def register(sub: argparse._SubParsersAction) -> None:
 
     overview = cli_sub.add_parser(
         "overview",
-        help="Read-only descriptive snapshot of the CLI at <path> (defaults: agentfront template).",
+        help=(
+            "Read-only descriptive snapshot of the CLI at <path> "
+            "(defaults: agentfront's runtime model)."
+        ),
     )
     overview.add_argument(
         "path",
@@ -185,7 +128,7 @@ def register(sub: argparse._SubParsersAction) -> None:
         default=None,
         help=(
             "Target project path. If omitted (or the target has no CLI surface), "
-            "describe agentfront's default scaffolded template."
+            "describe agentfront's own runtime model."
         ),
     )
     overview.add_argument("--json", action="store_true", help=_JSON_HELP)

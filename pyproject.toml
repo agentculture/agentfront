@@ -66,16 +66,10 @@ exclude_lines = [
 profile = "black"
 line_length = 100
 known_first_party = ["agentfront"]
-extend_skip_glob = ["agentfront/cite/references/**"]
 
 [tool.black]
 line-length = 100
 target-version = ["py312"]
-extend-exclude = '''
-/(
-    agentfront/cite/references
-)/
-'''
 
 [tool.bandit]
 exclude_dirs = ["tests"]

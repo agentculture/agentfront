@@ -1,4 +1,4 @@
-"""In-process tests for the ``doctor`` / ``cli doctor`` / ``cli cite`` handlers.
+"""In-process tests for the ``doctor`` / ``cli doctor`` handlers.
 
 The integration suite drives these verbs as subprocesses (``python -m agentfront``),
 which exercises the real entry point but is invisible to coverage (it runs in a
@@ -63,15 +63,6 @@ def test_cli_verify_deprecated_forwards(tmp_path: Path, capsys: pytest.CaptureFi
     rc = main(["cli", "verify", str(tmp_path)])
     assert rc == 1  # forwards to cli doctor; tmp has no pyproject
     assert "deprecated" in capsys.readouterr().err.lower()
-
-
-# --- cite (in-process) -----------------------------------------------------
-
-
-def test_cli_cite_writes_dotteken(tmp_path: Path) -> None:
-    rc = main(["cli", "cite", str(tmp_path)])
-    assert rc == 0
-    assert (tmp_path / ".agentfront" / "reference" / "python-cli" / "AGENT.md").is_file()
 
 
 # --- real audit happy paths (spawn target probes; cover orchestration) -----
