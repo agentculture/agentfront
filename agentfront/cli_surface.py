@@ -97,8 +97,12 @@ def run_cli(app: App, argv: list[str] | None = None) -> int:
     parser = make_cli(app)
     try:
         args = parser.parse_args(argv)
-    except SystemExit:
-        return 1
+    except SystemExit as exc:
+        # argparse exits 0 for --help and 2 for a parse error; preserve that
+        # instead of flattening --help to a failure.
+        if exc.code is None:
+            return 0
+        return exc.code if isinstance(exc.code, int) else 1
 
     if args.command is None:
         parser.print_usage(sys.stderr)

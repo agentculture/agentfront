@@ -32,6 +32,8 @@ def make_http_app(app: App) -> Any:
 
         if path == "/sitemap.xml":
             status, headers, body = _sitemap(app)
+        elif path == "/llms.txt":
+            status, headers, body = _llms_txt(app)
         elif path == "/":
             status, headers, body = _index(app)
         else:
@@ -66,6 +68,29 @@ def _index(app: App) -> tuple[str, list[tuple[str, str]], bytes]:
     lines: list[str] = ["# Documentation"]
     for entry in app.list_docs():
         lines.append(f"- [{entry.title}](/{entry.slug})")
+    body = "\n".join(lines) + "\n"
+    return (
+        "200 OK",
+        [("Content-Type", "text/markdown; charset=utf-8")],
+        body.encode("utf-8"),
+    )
+
+
+def _llms_txt(app: App) -> tuple[str, list[tuple[str, str]], bytes]:
+    """Render an ``/llms.txt`` discovery file (the agent-first entry point).
+
+    A single fetch tells an agent the tool's name, its docs (as links), and its
+    tool menu — both surfaces' contents from one well-known URL.
+    """
+    lines: list[str] = [f"# {app.name}"]
+    if app.description:
+        lines += ["", f"> {app.description}"]
+    lines += ["", "## Docs"]
+    for entry in app.list_docs():
+        lines.append(f"- [{entry.title}](/{entry.slug})")
+    lines += ["", "## Tools"]
+    for tool in app.list_tools():
+        lines.append(f"- {tool.name}: {tool.description}")
     body = "\n".join(lines) + "\n"
     return (
         "200 OK",

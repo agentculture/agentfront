@@ -61,20 +61,20 @@ def _cli_inventory(app: App) -> tuple[set[str], set[str]]:
 
 
 def _mcp_tool_names(app: App) -> set[str]:
-    """The tool names the MCP surface actually lists."""
-    import anyio
-    from mcp import types
+    """The tool names the MCP surface actually lists.
 
-    server = app.mcp_server()
+    Uses the mcp SDK's public in-memory client session (a real
+    initialize + list_tools round-trip) rather than poking at server
+    internals, so this stays robust across SDK refactors.
+    """
+    import anyio
+    from mcp.shared.memory import create_connected_server_and_client_session as connect
 
     async def _list() -> set[str]:
-        handler = server.request_handlers[types.ListToolsRequest]
-        request = types.ListToolsRequest(
-            method="tools/list",
-            params=types.PaginatedRequestParams(cursor=None),
-        )
-        result = await handler(request)
-        return {tool.name for tool in result.root.tools}
+        async with connect(app.mcp_server()) as client:
+            await client.initialize()
+            tools = await client.list_tools()
+            return {tool.name for tool in tools.tools}
 
     return anyio.run(_list)
 

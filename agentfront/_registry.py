@@ -71,6 +71,11 @@ def derive_input_schema(func: Callable[..., Any]) -> dict[str, Any]:
     whether the host uses real annotations or stringized ones (``from __future__
     import annotations`` / PEP 563). Anything that cannot be resolved falls back
     to ``"string"``.
+
+    Limitation: only the base types in ``_PY_TO_JSON`` map to JSON-Schema types;
+    ``Optional[T]``, ``Union[...]``, and parameterized generics (``list[int]``
+    etc.) currently fall back to ``"string"``. That is acceptable for an
+    agent-facing menu but is a known coarse edge.
     """
     try:
         hints = get_type_hints(func)

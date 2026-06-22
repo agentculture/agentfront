@@ -79,6 +79,13 @@ def _check_sitemap(app: App) -> Check:
     if locs == expected and locs:
         return Check(name="sitemap", status="ok", remediation="")
 
+    if not expected:
+        return Check(
+            name="sitemap",
+            status="fail",
+            remediation="no docs registered; add at least one via app.add_doc()/add_docs_dir().",
+        )
+
     return Check(
         name="sitemap",
         status="fail",
