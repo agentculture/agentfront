@@ -11,8 +11,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      # Post the coverage.xml summary as a sticky PR comment (PR events only).
-      pull-requests: write
     # Promote a *presence flag* (not the secret itself) to job env so the
     # SonarCloud step can gate on it — `secrets.*` isn't allowed in `if:`.
     # The real SONAR_TOKEN is injected only at the scan step's env, keeping
@@ -38,16 +36,6 @@ jobs:
       # config and have them agree (fails the build on cross-surface drift).
       - name: Dogfood — agentfront serves its own three surfaces
         run: uv run python -m agentfront._dogfood
-
-      # Surface the coverage.xml result directly on the PR as a sticky comment.
-      # Runs before the Sonar scan so a red quality gate can't skip it.
-      - name: Coverage comment
-        if: github.event_name == 'pull_request'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: python3 .github/scripts/coverage_comment.py coverage.xml
 
       - name: SonarCloud Scan
         if: env.SONAR_TOKEN_PRESENT == 'true'

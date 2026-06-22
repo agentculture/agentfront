@@ -52,6 +52,13 @@ dev = [
 [tool.coverage.run]
 source = ["agentfront"]
 omit = ["agentfront/__pycache__/*"]
+# Write repo-relative filenames into coverage.xml (e.g. "agentfront/cli/main.py")
+# so SonarCloud can match them against the files it indexed under
+# sonar.sources=agentfront. WITHOUT this, coverage.py records an absolute source
+# root inside the package dir and strips the "agentfront/" prefix from filenames,
+# so the keys never match Sonar's and coverage is silently dropped from the PR
+# decoration ("the SonarCloud message"). Mirrors the sibling devex repo.
+relative_files = true
 
 [tool.coverage.report]
 fail_under = 70

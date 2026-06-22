@@ -32,6 +32,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `run_cli` preserves argparse's exit codes, so `--help` exits 0 instead of being reported as a failure.
 - The three-surface agreement check uses the `mcp` SDK's public in-memory client session instead of private server internals.
 
+## [0.10.2] - 2026-05-29
+
+### Changed
+
+- SonarCloud now ingests test coverage and shows it in the PR decoration. Added `relative_files = true` to `[tool.coverage.run]` so `coverage.xml` records repo-relative filenames (`agentfront/...`) that match `sonar.sources`; previously `coverage.py` recorded an absolute source root and stripped the `agentfront/` prefix from filenames, so SonarCloud could not match them and silently dropped coverage. Mirrors the sibling `devex` repo.
+
+### Removed
+
+- The `coverage.xml` sticky-comment bot (`.github/scripts/coverage_comment.py` and its Tests-workflow step), now redundant with native SonarCloud coverage in the PR decoration — matching `devex`, which has no such bot.
+
 ## [0.10.1] - 2026-05-29
 
 ### Added
