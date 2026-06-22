@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/). This project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2026-06-23
+
+
+### Added
+
+- Importable runtime: `from agentfront import App` declares docs + tools once into a single registry (SSOT).
+- HTTP surface — `app.http_app()` serves each markdown doc as a page plus an auto-generated `/sitemap.xml` (stdlib only, markdown+sitemap, no SPA).
+- MCP surface — `app.mcp_server()` exposes registered functions as MCP tools via the official `mcp` SDK (name/description/schema from the signature+docstring); zero protocol code in the host.
+- CLI surface — `app.cli()` / `run_cli()` build an argparse CLI (learn/doctor, --json) from the same registry.
+- Runtime doctor (`agentfront.doctor_live`) auditing the live surfaces: sitemap presence, MCP menu-size threshold warning, learn affordance, each with remediation.
+- Three-surface assembly (`agentfront.serve`) with a cross-surface agreement check proving CLI/MCP/HTTP enumerate the same set.
+- Dogfood gate — agentfront serves its own three surfaces from its own config (`python -m agentfront._dogfood`), wired into CI.
+- Worked-example third package under `examples/quickstart/` (~20-line config).
+- Dependency on the `mcp` SDK (the first sanctioned outside-org dependency).
+
+
+### Changed
+
+- Pivot from a build-time code scaffolder to an importable runtime library: a host imports agentfront and gets all three agent-first surfaces from one code-first config.
+- README and docs/agent-first.md now describe the runtime model as the shipped behavior.
+- Retired the `cli cite` scaffolder and the manifest->three-surfaces generation vision (the `agentfront/cite/` package and the `cli cite` verb were removed). `cli doctor` and the rubric remain.
+
+
+### Fixed
+
+- `derive_input_schema` now resolves stringized annotations (PEP 563 / `from __future__ import annotations`) via `get_type_hints`, so tool schemas are correctly typed.
+
 ## [0.10.1] - 2026-05-29
 
 ### Added
