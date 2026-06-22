@@ -7,7 +7,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.11.0] - 2026-06-23
 
-
 ### Added
 
 - Importable runtime: `from agentfront import App` declares docs + tools once into a single registry (SSOT).
@@ -18,8 +17,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Three-surface assembly (`agentfront.serve`) with a cross-surface agreement check proving CLI/MCP/HTTP enumerate the same set.
 - Dogfood gate — agentfront serves its own three surfaces from its own config (`python -m agentfront._dogfood`), wired into CI.
 - Worked-example third package under `examples/quickstart/` (~20-line config).
+- HTTP `/llms.txt` discovery endpoint listing the docs + tool menu from one well-known URL.
 - Dependency on the `mcp` SDK (the first sanctioned outside-org dependency).
-
 
 ### Changed
 
@@ -27,10 +26,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - README and docs/agent-first.md now describe the runtime model as the shipped behavior.
 - Retired the `cli cite` scaffolder and the manifest->three-surfaces generation vision (the `agentfront/cite/` package and the `cli cite` verb were removed). `cli doctor` and the rubric remain.
 
-
 ### Fixed
 
 - `derive_input_schema` now resolves stringized annotations (PEP 563 / `from __future__ import annotations`) via `get_type_hints`, so tool schemas are correctly typed.
+- `run_cli` preserves argparse's exit codes, so `--help` exits 0 instead of being reported as a failure.
+- The three-surface agreement check uses the `mcp` SDK's public in-memory client session instead of private server internals.
 
 ## [0.10.1] - 2026-05-29
 
