@@ -122,6 +122,28 @@ class App:
     def list_tools(self) -> list[ToolEntry]:
         return self._registry.tools()
 
+    # --- surfaces ---------------------------------------------------------
+    # One call each, all derived from this App's single registry. Imports are
+    # lazy so the SSOT core stays decoupled from the surface modules (and from
+    # the mcp SDK) until a surface is actually requested.
+    def http_app(self) -> Any:
+        """Return the WSGI HTTP surface (markdown pages + sitemap)."""
+        from agentfront.http_surface import make_http_app
+
+        return make_http_app(self)
+
+    def mcp_server(self) -> Any:
+        """Return the MCP server exposing this App's tools."""
+        from agentfront.mcp_surface import make_mcp_server
+
+        return make_mcp_server(self)
+
+    def cli(self) -> Any:
+        """Return the argparse CLI (``learn`` / ``doctor``) for this App."""
+        from agentfront.cli_surface import make_cli
+
+        return make_cli(self)
+
 
 def _title_of(markdown_text: str, fallback: str) -> str:
     for line in markdown_text.splitlines():
