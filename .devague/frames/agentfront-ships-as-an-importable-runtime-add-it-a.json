@@ -1,0 +1,334 @@
+{
+  "slug": "agentfront-ships-as-an-importable-runtime-add-it-a",
+  "title": "agentfront ships as an importable runtime: add it as a dependency, point it at your markdown and your functions, and you get an agent-first MCP server and a discoverable markdown HTTP doc-site \u2014 configurable, batteries-included, no hand-rolled surfaces",
+  "schema_version": 1,
+  "status": "exported",
+  "created": "2026-06-22T17:03:40Z",
+  "updated": "2026-06-22T17:18:07Z",
+  "claims": [
+    {
+      "id": "c1",
+      "kind": "announcement",
+      "text": "agentfront ships as an importable runtime: add it as a dependency, point it at your markdown and your functions, and you get an agent-first MCP server and a discoverable markdown HTTP doc-site \u2014 configurable, batteries-included, no hand-rolled surfaces",
+      "origin": "user",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h4",
+          "text": "The shipped library delivers the full round-trip: import -> small config -> both an MCP server and a markdown+sitemap HTTP site go live, demonstrated by agentfront serving its own docs/ and MCP this way",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c2",
+      "kind": "audience",
+      "text": "Two-sided: PRODUCERS are Python tool authors (AgentCulture-org first, anyone second) who want to expose their tool to agents; CONSUMERS are the AI agents that hit the resulting MCP server and markdown HTTP site",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h6",
+          "text": "Both sides are real: a PRODUCER stands up the surfaces from import, AND a CONSUMING agent discovers+uses them with only a fetch tool / MCP client \u2014 neither side needs bespoke glue",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c3",
+      "kind": "after_state",
+      "text": "A tool author adds 'agentfront' as a dependency, writes a small config (which markdown to serve, which functions to expose as MCP tools), and gets a running MCP server + markdown+sitemap HTTP site \u2014 neither surface hand-rolled, both agent-first by construction",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h7",
+          "text": "The 'small config' is genuinely small: agentfront's own setup fits in well under ~30 lines and writes zero server/protocol code",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c4",
+      "kind": "before_state",
+      "text": "Today agentfront is a build-time scaffolder: it emits reference trees into .agentfront/ for the author to own and adapt (cite-don't-import). MCP and HTTP surfaces are 'not implemented yet (planned v0.4/v0.5)'. Authors wanting MCP/HTTP today build them by hand, inconsistently; agent-first discipline is only AUDITED after the fact via cli doctor + rubric",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h8",
+          "text": "The described 'today' is accurate at pivot time: MCP/HTTP are unimplemented and cli cite/doctor are the only shipped surface \u2014 verifiable against the current README and code",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [
+        {
+          "id": "q3",
+          "text": "What is the fate of the SHIPPED surface \u2014 'cli cite' scaffolder, the manifest->three-surfaces vision, and the rubric/doctor? Retired, coexisting, or reframed (e.g. doctor audits the served surfaces instead of emitted code)?",
+          "resolved": true,
+          "blocking": true
+        }
+      ],
+      "links": []
+    },
+    {
+      "id": "c5",
+      "kind": "why_it_matters",
+      "text": "Importable runtime EXECUTES the agent-first discipline instead of only auditing it \u2014 the surfaces cannot drift from best practice because agentfront IS the surface, not a one-time code emission. It also lowers the bar: configure once, don't scaffold-and-maintain forever",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h9",
+          "text": "Drift is structurally impossible, not merely discouraged: there is no code path by which any surface can present a doc/tool the config did not declare",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c6",
+      "kind": "boundary",
+      "text": "Not a general web framework: the HTTP surface serves markdown pages + a sitemap (and maybe a /llms.txt), not arbitrary HTML, templating, or a SPA",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h10",
+          "text": "The HTTP output is markdown + sitemap (+ optional llms.txt) only: no HTML templating engine, no asset pipeline, no client-side JS in what is served",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c7",
+      "kind": "boundary",
+      "text": "Not a maximal MCP exposer: the menu stays opinionated-minimal; growing past a threshold warns, mirroring today's rubric principle",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h11",
+          "text": "Menu minimalism is enforced in code: exceeding the opinionated tool-count threshold raises a doctor warning, not silent acceptance",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c8",
+      "kind": "success_signal",
+      "text": "agentfront dogfoods itself: agentfront's own MCP server + HTTP doc-site are served BY agentfront-the-library from its own docs/. And a third package can 'import agentfront' + write a small config and serve both surfaces with no bespoke server code",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h12",
+          "text": "agentfront serves its OWN three surfaces from its own config in CI, AND a from-scratch third package reproduces it via a documented quickstart \u2014 both are tested",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c9",
+      "kind": "non_goal",
+      "text": "Not authentication/multi-tenant hosting/CDN concerns \u2014 it runs a local/process-level server you can put behind your own proxy; deployment is the host's problem",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c10",
+      "kind": "decision",
+      "text": "agentfront becomes a RUNTIME FRAMEWORK you import (like FastAPI for agent-first surfaces), not a generator you cite. Resolution of the org tension: 'cite, don't import' governs PATTERNS/SKILLS/reference code you own and modify; a runtime framework is a legitimate dependency (you import Flask, you don't cite it)",
+      "origin": "llm",
+      "status": "rejected",
+      "honesty_conditions": [],
+      "hard_questions": [
+        {
+          "id": "q1",
+          "text": "contradiction with Directly contradicts the repo's standing 'cite, don't import' policy (CLAUDE.md, docs/agent-first.md, docs/skill-sources.md). The entire current README + agent-first doc are built on the generator/citation model?",
+          "resolved": true,
+          "blocking": true
+        },
+        {
+          "id": "q2",
+          "text": "Is a runtime framework a SANCTIONED exception to 'cite, don't import', or does this pivot rewrite the org policy itself? Until decided, the foundational framing of the repo is in flux",
+          "resolved": true,
+          "blocking": true
+        }
+      ],
+      "links": []
+    },
+    {
+      "id": "c11",
+      "kind": "decision",
+      "text": "The configuration entry point is a Python API: 'import agentfront; app = agentfront.App(...)' with markdown source(s) and tool functions registered in code \u2014 because the announcement says 'a package imports agentfront'. A declarative file (toml/yaml) is a possible secondary surface, parked",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c12",
+      "kind": "assumption",
+      "text": "The single-source-of-truth idea survives the pivot: one registration of a function/doc drives BOTH its MCP tool exposure AND its HTTP doc page, so the two surfaces can't disagree",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c13",
+      "kind": "assumption",
+      "text": "The CLI surface is no longer agentfront's headline output. agentfront keeps its OWN cli (learn/explain/doctor/serve) but generating a CLI FOR the host tool drops out of the v1 pivot scope (host gets MCP+HTTP from import; CLI-for-host is follow-up or retired)",
+      "origin": "llm",
+      "status": "rejected",
+      "honesty_conditions": [],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c14",
+      "kind": "requirement",
+      "text": "HTTP: importing agentfront and pointing it at a directory of markdown yields an HTTP server that serves each .md as a page plus an auto-generated sitemap, with zero HTTP/server code written by the author",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h1",
+          "text": "An author serves a directory of markdown as a navigable site (pages + sitemap) without writing any HTTP/server code \u2014 proven by agentfront serving its own docs/ this way",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c15",
+      "kind": "requirement",
+      "text": "MCP: registering a plain Python function with agentfront exposes it as an MCP tool (name, description, schema derived from the signature/docstring), with zero MCP-protocol code written by the author",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h2",
+          "text": "A plain Python function becomes a callable MCP tool by registration alone \u2014 proven by an MCP client listing and invoking it, no protocol code in the host",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c16",
+      "kind": "requirement",
+      "text": "SSOT: one code-first config object is the single place a doc-or-tool is declared; the MCP menu and the HTTP pages both DERIVE from it, so the two surfaces cannot list divergent sets; serving both is one call",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h3",
+          "text": "There is exactly one declaration site per doc-or-tool; deleting an entry removes it from BOTH the MCP menu and the HTTP site; no second registry can drift",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c17",
+      "kind": "decision",
+      "text": "agentfront becomes a runtime framework that host packages IMPORT (not a generator they cite). Policy reconciliation: importing agentfront is SANCTIONED within the AgentCulture org; importing dependencies from OUTSIDE the org remains avoided and needs explicit approval as an exception. This constrains agentfront's OWN dependency footprint (favor stdlib; any outside dep needs approval)",
+      "origin": "user",
+      "status": "confirmed",
+      "honesty_conditions": [],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c18",
+      "kind": "decision",
+      "text": "The 'cli cite' scaffolder and the manifest->three-surfaces GENERATION vision are RETIRED. The rubric/doctor discipline is preserved by reframing it onto the runtime: doctor audits the LIVE served surfaces (sitemap present, MCP menu under threshold, learn affordance), not emitted files",
+      "origin": "user",
+      "status": "confirmed",
+      "honesty_conditions": [],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c19",
+      "kind": "requirement",
+      "text": "Host import yields ALL THREE agent-first surfaces \u2014 CLI (argparse with learn+doctor), MCP server, and HTTP markdown+sitemap site \u2014 every one derived from the single code-first config (SSOT)",
+      "origin": "user",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h5",
+          "text": "A single config produces all three surfaces, and they agree: the CLI 'learn', the MCP tool list, and the HTTP sitemap enumerate the SAME set of docs/tools \u2014 proven by agentfront serving its own three surfaces from one config",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c20",
+      "kind": "decision",
+      "text": "MCP surface is built on the official 'mcp' Python SDK \u2014 granted as the FIRST sanctioned outside-org dependency exception under c17. (HTTP impl stays parked but defaults toward stdlib, since no further outside dep was approved.)",
+      "origin": "user",
+      "status": "confirmed",
+      "honesty_conditions": [],
+      "hard_questions": [],
+      "links": []
+    }
+  ],
+  "open_vagueness": [
+    {
+      "id": "v1",
+      "text": "MCP transport: stdio vs streamable-HTTP/SSE (or both). Likely stdio-first, but undecided",
+      "kind": "unknown_nonblocking",
+      "claim_id": null
+    },
+    {
+      "id": "v2",
+      "text": "HTTP server implementation: stdlib http.server (zero-dep, agent-first minimalism) vs starlette/uvicorn (richer, heavier). Dependency weight is itself an agent-first concern",
+      "kind": "unknown_nonblocking",
+      "claim_id": null
+    },
+    {
+      "id": "v3",
+      "text": "Declarative config file (toml/yaml) as a secondary surface alongside the Python API",
+      "kind": "follow_up",
+      "claim_id": null
+    },
+    {
+      "id": "v4",
+      "text": "Whether learn/doctor affordances are themselves served over MCP and HTTP (doctor-on-every-surface pillar applied to the runtime)",
+      "kind": "follow_up",
+      "claim_id": null
+    },
+    {
+      "id": "v5",
+      "text": "Fate of the teken compatibility wrapper and the 'three surfaces from one manifest' generator code already in agentfront/cite/",
+      "kind": "unknown_nonblocking",
+      "claim_id": null
+    }
+  ]
+}

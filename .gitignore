@@ -209,3 +209,6 @@ __marimo__/
 # Claude Code (per-user local permissions — shared team settings go in
 # .claude/settings.json, which is NOT ignored)
 .claude/settings.local.json
+
+# devague working state (not committed by default)
+.devague/reviews/
