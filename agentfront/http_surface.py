@@ -1,0 +1,101 @@
+"""HTTP surface for agentfront — a WSGI app serving docs as markdown.
+
+Builds a navigable markdown site from an :class:`App`'s registry. Uses only
+the Python standard library (``wsgiref`` / ``xml.etree``). No third-party
+dependencies.
+"""
+
+from __future__ import annotations
+
+import io
+import xml.etree.ElementTree as ET  # noqa: S405
+from http.server import HTTPServer
+from typing import Any
+from wsgiref.simple_server import make_server
+
+from agentfront.app import App
+
+__all__ = ["make_http_app", "serve"]
+
+
+def make_http_app(app: App) -> Any:
+    """Return a WSGI application callable built from *app*.
+
+    Routes:
+      - ``GET /<slug>`` → doc body (``text/markdown``), 404 if unknown.
+      - ``GET /sitemap.xml`` → XML ``<urlset>`` with one ``<url>`` per doc.
+      - ``GET /`` → markdown index linking to each ``/<slug>``.
+    """
+
+    def application(environ: dict[str, Any], start_response: Any) -> list[bytes]:
+        path = environ.get("PATH_INFO", "/")
+
+        if path == "/sitemap.xml":
+            status, headers, body = _sitemap(app)
+        elif path == "/":
+            status, headers, body = _index(app)
+        else:
+            status, headers, body = _doc(app, path)
+
+        start_response(status, headers)
+        return [body]
+
+    return application
+
+
+def _doc(app: App, path: str) -> tuple[str, list[tuple[str, str]], bytes]:
+    """Serve a single doc by slug (path without leading ``/``)."""
+    slug = path.lstrip("/")
+    entry = app.get_doc(slug)
+    if entry is None:
+        return (
+            "404 Not Found",
+            [("Content-Type", "text/plain; charset=utf-8")],
+            b"Not found",
+        )
+    body = entry.text.encode("utf-8")
+    return (
+        "200 OK",
+        [("Content-Type", "text/markdown; charset=utf-8")],
+        body,
+    )
+
+
+def _index(app: App) -> tuple[str, list[tuple[str, str]], bytes]:
+    """Render a markdown index page linking to every registered doc."""
+    lines: list[str] = ["# Documentation"]
+    for entry in app.list_docs():
+        lines.append(f"- [{entry.title}](/{entry.slug})")
+    body = "\n".join(lines) + "\n"
+    return (
+        "200 OK",
+        [("Content-Type", "text/markdown; charset=utf-8")],
+        body.encode("utf-8"),
+    )
+
+
+def _sitemap(app: App) -> tuple[str, list[tuple[str, str]], bytes]:
+    """Render a well-formed XML sitemap."""
+    urlset = ET.Element("urlset")
+    for entry in app.list_docs():
+        url = ET.SubElement(urlset, "url")
+        loc = ET.SubElement(url, "loc")
+        loc.text = f"/{entry.slug}"
+    tree = ET.ElementTree(urlset)
+    buf = io.BytesIO()
+    tree.write(buf, xml_declaration=True, encoding="utf-8")
+    return (
+        "200 OK",
+        [("Content-Type", "application/xml")],
+        buf.getvalue(),
+    )
+
+
+def serve(app: App, host: str = "127.0.0.1", port: int = 0) -> HTTPServer:
+    """Start an HTTP server serving *app* (blocking call).
+
+    Returns the :class:`HTTPServer` instance so the caller can shut it down.
+    """
+    wsgi_app = make_http_app(app)
+    server = make_server(host, port, wsgi_app)
+    return server
