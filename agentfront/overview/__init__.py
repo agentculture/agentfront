@@ -97,7 +97,7 @@ def build(subject: str, path: Path | None) -> OverviewReport:
 def to_markdown(report: OverviewReport) -> str:
     """Render ``report`` as markdown. Deterministic, no trailing blank line."""
     lines: list[str] = []
-    target = report.path if report.path is not None else "<agentfront default template>"
+    target = report.path if report.path is not None else "<agentfront runtime model>"
     lines.append(f"# overview: {report.subject} — {target}")
     lines.append("")
     for section in report.sections:

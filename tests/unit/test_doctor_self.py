@@ -141,11 +141,6 @@ def test_surface_coherence_explain_against_live_catalog() -> None:
     assert result.passed, result.evidence
 
 
-def test_reference_tree_present_against_real_install() -> None:
-    result = sc._check_reference_tree_present()
-    assert result.passed, result.evidence
-
-
 def test_rubric_modules_loadable() -> None:
     result = sc._check_rubric_modules_loadable()
     assert result.passed, result.evidence

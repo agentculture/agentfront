@@ -6,12 +6,10 @@ the id up here and invokes the handler. Handlers return a
 :class:`FixOutcome` describing what they did; the caller re-runs the
 originating check to confirm the fix landed.
 
-v0.5 ships with the registry skeleton and no initial handlers — every
-rubric and self-check today emits *explain how to fix* remediations
-because the safe auto-fixes (e.g., re-citing a stale ``.agentfront/reference/``
-tree on a target) live next to ``agentfront cli cite``, not next to the rubric.
-The registry is here so a follow-up can wire fixes without changing the
-doctor verb's contract.
+The registry ships with no initial handlers — every rubric and
+self-check today emits *explain how to fix* remediations rather than an
+auto-fix. The registry is here so a follow-up can wire fixes without
+changing the doctor verb's contract.
 """
 
 from __future__ import annotations
