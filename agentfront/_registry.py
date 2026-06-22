@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import inspect
 from dataclasses import dataclass
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, get_type_hints
 
 __all__ = [
     "DocEntry",
@@ -66,7 +66,16 @@ def derive_input_schema(func: Callable[..., Any]) -> dict[str, Any]:
 
     One derivation, shared by every surface, so an MCP tool's schema and any
     other surface's view of the same function cannot disagree.
+
+    Type hints are resolved with :func:`typing.get_type_hints`, so this works
+    whether the host uses real annotations or stringized ones (``from __future__
+    import annotations`` / PEP 563). Anything that cannot be resolved falls back
+    to ``"string"``.
     """
+    try:
+        hints = get_type_hints(func)
+    except Exception:  # noqa: BLE001 - unresolved annotations just fall back
+        hints = {}
     sig = inspect.signature(func)
     properties: dict[str, Any] = {}
     required: list[str] = []
@@ -75,7 +84,8 @@ def derive_input_schema(func: Callable[..., Any]) -> dict[str, Any]:
             continue
         if param.kind in (param.VAR_POSITIONAL, param.VAR_KEYWORD):
             continue
-        json_type = _PY_TO_JSON.get(param.annotation, "string")
+        annotation = hints.get(pname, param.annotation)
+        json_type = _PY_TO_JSON.get(annotation, "string")
         properties[pname] = {"type": json_type}
         if param.default is inspect.Parameter.empty:
             required.append(pname)

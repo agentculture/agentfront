@@ -98,6 +98,22 @@ def test_derive_input_schema_unannotated_defaults_to_string():
     assert schema["properties"]["x"] == {"type": "string"}
 
 
+def test_derive_input_schema_resolves_stringized_annotations():
+    # PEP 563 / `from __future__ import annotations` makes annotations strings;
+    # get_type_hints must resolve them so the schema is still correctly typed.
+    ns: dict = {}
+    exec(  # noqa: S102 - exercising stringized annotations on purpose
+        "from __future__ import annotations\n"
+        "def fn(a: int, b: str = 'x'):\n"
+        "    return a\n",
+        ns,
+    )
+    schema = derive_input_schema(ns["fn"])
+    assert schema["properties"]["a"] == {"type": "integer"}
+    assert schema["properties"]["b"] == {"type": "string"}
+    assert schema["required"] == ["a"]
+
+
 def test_derive_input_schema_skips_var_args_and_self():
     class C:
         def m(self, a: int, *args, **kwargs):
