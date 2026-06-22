@@ -34,6 +34,11 @@ jobs:
 
       - run: uv run pytest -n auto --cov=agentfront --cov-report=xml:coverage.xml --cov-report=term -v
 
+      # Dogfood gate: agentfront must serve its OWN three surfaces from its own
+      # config and have them agree (fails the build on cross-surface drift).
+      - name: Dogfood — agentfront serves its own three surfaces
+        run: uv run python -m agentfront._dogfood
+
       # Surface the coverage.xml result directly on the PR as a sticky comment.
       # Runs before the Sonar scan so a red quality gate can't skip it.
       - name: Coverage comment
