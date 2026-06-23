@@ -30,9 +30,8 @@ from agentfront.cli._errors import EXIT_USER_ERROR, AfiError
 from agentfront.cli._output import emit_error
 
 # Note: _commands submodules are imported lazily inside :func:`_build_parser`
-# to avoid a circular dependency. agentfront.cite._engine imports agentfront.cli._errors;
-# eagerly loading agentfront.cli._commands.cli (which imports agentfront.cite) at module
-# init would create a cycle when agentfront.cite is the first-touched package.
+# to keep import of :mod:`agentfront.cli` cheap and avoid eagerly pulling in the
+# overview/rubric machinery at module init.
 
 
 class _AgentfrontArgumentParser(argparse.ArgumentParser):
@@ -69,7 +68,7 @@ def _argv_has_json(argv: list[str] | None) -> bool:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    # Deferred imports (see module-level note): avoids agentfront.cite ↔ agentfront.cli cycle.
+    # Deferred imports (see module-level note): keeps `import agentfront.cli` cheap.
     from agentfront.cli._commands import cli as _cli_group
     from agentfront.cli._commands import doctor as _doctor_cmd
     from agentfront.cli._commands import explain as _explain_cmd
@@ -78,7 +77,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     parser = _AgentfrontArgumentParser(
         prog=_brand.PROG,
-        description=f"{_brand.PROG} — Agent First Interface scaffolder",
+        description=f"{_brand.PROG} — Agent First Interface runtime",
     )
     parser.add_argument(
         "--version",

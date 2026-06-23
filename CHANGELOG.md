@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/). This project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2026-06-23
+
+### Added
+
+- Importable runtime: `from agentfront import App` declares docs + tools once into a single registry (SSOT).
+- HTTP surface — `app.http_app()` serves each markdown doc as a page plus an auto-generated `/sitemap.xml` (stdlib only, markdown+sitemap, no SPA).
+- MCP surface — `app.mcp_server()` exposes registered functions as MCP tools via the official `mcp` SDK (name/description/schema from the signature+docstring); zero protocol code in the host. Ships behind the optional `agentfront[mcp]` extra (see Changed).
+- CLI surface — `app.cli()` / `run_cli()` build an argparse CLI (learn/doctor, --json) from the same registry.
+- Runtime doctor (`agentfront.doctor_live`) auditing the live surfaces: sitemap presence, MCP menu-size threshold warning, learn affordance, each with remediation.
+- Three-surface assembly (`agentfront.serve`) with a cross-surface agreement check proving CLI/MCP/HTTP enumerate the same set.
+- Dogfood gate — agentfront serves its own three surfaces from its own config (`python -m agentfront._dogfood`), wired into CI.
+- Worked-example third package under `examples/quickstart/` (~20-line config).
+- HTTP `/llms.txt` discovery endpoint listing the docs + tool menu from one well-known URL.
+
+### Changed
+
+- The `mcp` SDK is now an **optional extra** (`agentfront[mcp]`) rather than a hard runtime dependency. The CLI and HTTP surfaces are pure standard library, so the core install pulls in nothing third-party; install `agentfront[mcp]` only to use the MCP surface. `app.mcp_server()` without the extra raises a `ModuleNotFoundError` that names the extra to add. This keeps the org's first sanctioned outside-org dependency (the `mcp` SDK) opt-in.
+- Pivot from a build-time code scaffolder to an importable runtime library: a host imports agentfront and gets all three agent-first surfaces from one code-first config.
+- README and docs/agent-first.md now describe the runtime model as the shipped behavior.
+- Retired the `cli cite` scaffolder and the manifest->three-surfaces generation vision (the `agentfront/cite/` package and the `cli cite` verb were removed). `cli doctor` and the rubric remain.
+
+### Fixed
+
+- `derive_input_schema` now resolves stringized annotations (PEP 563 / `from __future__ import annotations`) via `get_type_hints`, so tool schemas are correctly typed.
+- `run_cli` preserves argparse's exit codes, so `--help` exits 0 instead of being reported as a failure.
+- The three-surface agreement check uses the `mcp` SDK's public in-memory client session instead of private server internals.
+- MCP surface now awaits `async def` tools before serializing the result, so a host can register coroutine tools without the surface returning a raw coroutine object (Qodo review finding).
+- Internal quality pass on the new runtime surfaces (SonarCloud findings): `run_cli` translates argparse's exit via a private parser exception instead of catching `SystemExit`; HTTP status/content-type literals are named constants; `learn`/`doctor` CLI handlers no longer carry an invariant return value or an unused parameter; `# noqa` rationales moved out of the suppression code list.
+
 ## [0.10.2] - 2026-05-29
 
 ### Changed

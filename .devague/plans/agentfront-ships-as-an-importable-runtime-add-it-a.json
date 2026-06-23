@@ -1,0 +1,348 @@
+{
+  "slug": "agentfront-ships-as-an-importable-runtime-add-it-a",
+  "title": "agentfront ships as an importable runtime: add it as a dependency, point it at your markdown and your functions, and you get an agent-first MCP server and a discoverable markdown HTTP doc-site \u2014 configurable, batteries-included, no hand-rolled surfaces",
+  "frame_slug": "agentfront-ships-as-an-importable-runtime-add-it-a",
+  "schema_version": 1,
+  "status": "exported",
+  "created": "2026-06-22T17:26:11Z",
+  "updated": "2026-06-22T17:30:54Z",
+  "targets": [
+    {
+      "id": "c1",
+      "kind": "announcement",
+      "text": "agentfront ships as an importable runtime: add it as a dependency, point it at your markdown and your functions, and you get an agent-first MCP server and a discoverable markdown HTTP doc-site \u2014 configurable, batteries-included, no hand-rolled surfaces"
+    },
+    {
+      "id": "h4",
+      "kind": "honesty",
+      "text": "The shipped library delivers the full round-trip: import -> small config -> both an MCP server and a markdown+sitemap HTTP site go live, demonstrated by agentfront serving its own docs/ and MCP this way"
+    },
+    {
+      "id": "c2",
+      "kind": "audience",
+      "text": "Two-sided: PRODUCERS are Python tool authors (AgentCulture-org first, anyone second) who want to expose their tool to agents; CONSUMERS are the AI agents that hit the resulting MCP server and markdown HTTP site"
+    },
+    {
+      "id": "h6",
+      "kind": "honesty",
+      "text": "Both sides are real: a PRODUCER stands up the surfaces from import, AND a CONSUMING agent discovers+uses them with only a fetch tool / MCP client \u2014 neither side needs bespoke glue"
+    },
+    {
+      "id": "c3",
+      "kind": "after_state",
+      "text": "A tool author adds 'agentfront' as a dependency, writes a small config (which markdown to serve, which functions to expose as MCP tools), and gets a running MCP server + markdown+sitemap HTTP site \u2014 neither surface hand-rolled, both agent-first by construction"
+    },
+    {
+      "id": "h7",
+      "kind": "honesty",
+      "text": "The 'small config' is genuinely small: agentfront's own setup fits in well under ~30 lines and writes zero server/protocol code"
+    },
+    {
+      "id": "c4",
+      "kind": "before_state",
+      "text": "Today agentfront is a build-time scaffolder: it emits reference trees into .agentfront/ for the author to own and adapt (cite-don't-import). MCP and HTTP surfaces are 'not implemented yet (planned v0.4/v0.5)'. Authors wanting MCP/HTTP today build them by hand, inconsistently; agent-first discipline is only AUDITED after the fact via cli doctor + rubric"
+    },
+    {
+      "id": "h8",
+      "kind": "honesty",
+      "text": "The described 'today' is accurate at pivot time: MCP/HTTP are unimplemented and cli cite/doctor are the only shipped surface \u2014 verifiable against the current README and code"
+    },
+    {
+      "id": "c5",
+      "kind": "why_it_matters",
+      "text": "Importable runtime EXECUTES the agent-first discipline instead of only auditing it \u2014 the surfaces cannot drift from best practice because agentfront IS the surface, not a one-time code emission. It also lowers the bar: configure once, don't scaffold-and-maintain forever"
+    },
+    {
+      "id": "h9",
+      "kind": "honesty",
+      "text": "Drift is structurally impossible, not merely discouraged: there is no code path by which any surface can present a doc/tool the config did not declare"
+    },
+    {
+      "id": "c6",
+      "kind": "boundary",
+      "text": "Not a general web framework: the HTTP surface serves markdown pages + a sitemap (and maybe a /llms.txt), not arbitrary HTML, templating, or a SPA"
+    },
+    {
+      "id": "h10",
+      "kind": "honesty",
+      "text": "The HTTP output is markdown + sitemap (+ optional llms.txt) only: no HTML templating engine, no asset pipeline, no client-side JS in what is served"
+    },
+    {
+      "id": "c7",
+      "kind": "boundary",
+      "text": "Not a maximal MCP exposer: the menu stays opinionated-minimal; growing past a threshold warns, mirroring today's rubric principle"
+    },
+    {
+      "id": "h11",
+      "kind": "honesty",
+      "text": "Menu minimalism is enforced in code: exceeding the opinionated tool-count threshold raises a doctor warning, not silent acceptance"
+    },
+    {
+      "id": "c8",
+      "kind": "success_signal",
+      "text": "agentfront dogfoods itself: agentfront's own MCP server + HTTP doc-site are served BY agentfront-the-library from its own docs/. And a third package can 'import agentfront' + write a small config and serve both surfaces with no bespoke server code"
+    },
+    {
+      "id": "h12",
+      "kind": "honesty",
+      "text": "agentfront serves its OWN three surfaces from its own config in CI, AND a from-scratch third package reproduces it via a documented quickstart \u2014 both are tested"
+    },
+    {
+      "id": "c14",
+      "kind": "requirement",
+      "text": "HTTP: importing agentfront and pointing it at a directory of markdown yields an HTTP server that serves each .md as a page plus an auto-generated sitemap, with zero HTTP/server code written by the author"
+    },
+    {
+      "id": "h1",
+      "kind": "honesty",
+      "text": "An author serves a directory of markdown as a navigable site (pages + sitemap) without writing any HTTP/server code \u2014 proven by agentfront serving its own docs/ this way"
+    },
+    {
+      "id": "c15",
+      "kind": "requirement",
+      "text": "MCP: registering a plain Python function with agentfront exposes it as an MCP tool (name, description, schema derived from the signature/docstring), with zero MCP-protocol code written by the author"
+    },
+    {
+      "id": "h2",
+      "kind": "honesty",
+      "text": "A plain Python function becomes a callable MCP tool by registration alone \u2014 proven by an MCP client listing and invoking it, no protocol code in the host"
+    },
+    {
+      "id": "c16",
+      "kind": "requirement",
+      "text": "SSOT: one code-first config object is the single place a doc-or-tool is declared; the MCP menu and the HTTP pages both DERIVE from it, so the two surfaces cannot list divergent sets; serving both is one call"
+    },
+    {
+      "id": "h3",
+      "kind": "honesty",
+      "text": "There is exactly one declaration site per doc-or-tool; deleting an entry removes it from BOTH the MCP menu and the HTTP site; no second registry can drift"
+    },
+    {
+      "id": "c19",
+      "kind": "requirement",
+      "text": "Host import yields ALL THREE agent-first surfaces \u2014 CLI (argparse with learn+doctor), MCP server, and HTTP markdown+sitemap site \u2014 every one derived from the single code-first config (SSOT)"
+    },
+    {
+      "id": "h5",
+      "kind": "honesty",
+      "text": "A single config produces all three surfaces, and they agree: the CLI 'learn', the MCP tool list, and the HTTP sitemap enumerate the SAME set of docs/tools \u2014 proven by agentfront serving its own three surfaces from one config"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "t1",
+      "summary": "Core App + single-source-of-truth registry: agentfront.App where docs and tools are declared once into one internal registry that every surface reads from",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "agentfront.App registers docs and tools into ONE internal registry; a test asserts no second store exists and every surface reads the same instance",
+        "register-then-remove a doc-or-tool drops it from the registry's single enumeration (add-then-remove test)",
+        "surfaces can only enumerate from the registry; a test confirms no side-channel path lets a surface present an item absent from the registry"
+      ],
+      "deps": [],
+      "covers": [
+        "c16",
+        "h3",
+        "c5"
+      ]
+    },
+    {
+      "id": "t2",
+      "summary": "HTTP surface: App serves each registered markdown doc as a page plus an auto-generated /sitemap.xml, markdown+sitemap only",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "App's http surface serves each registered .md as a GET-able page and /sitemap.xml enumerates EXACTLY the registered docs \u2014 fetched by a test with zero server code in the host config",
+        "served output is markdown + sitemap (+optional llms.txt) only: a test asserts no HTML templating, no asset pipeline, no client-side JS"
+      ],
+      "deps": [
+        "t1"
+      ],
+      "covers": [
+        "c14",
+        "h1",
+        "c6",
+        "h10"
+      ]
+    },
+    {
+      "id": "t3",
+      "summary": "MCP surface: registering a plain Python function exposes it as an MCP tool via the official mcp SDK, name/description/schema derived from signature+docstring",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "an in-process MCP client lists and invokes a registered function as a tool, with zero MCP-protocol code in the host; name/description/input-schema derive from the signature+docstring",
+        "MCP server is built on the official mcp SDK (added to deps) and exposes ONLY registered functions \u2014 listed tool set equals registered set"
+      ],
+      "deps": [
+        "t1"
+      ],
+      "covers": [
+        "c15",
+        "h2",
+        "c7"
+      ]
+    },
+    {
+      "id": "t4",
+      "summary": "CLI surface: App yields an argparse CLI with learn + doctor verbs derived from the same registry (supports the all-three-surfaces assembly)",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "App.cli() produces an argparse CLI whose 'learn' enumerates the registered docs/tools, needing no per-host argparse code \u2014 asserted by invoking learn in a test"
+      ],
+      "deps": [
+        "t1"
+      ],
+      "covers": []
+    },
+    {
+      "id": "t5",
+      "summary": "Retire the cli cite scaffolder + manifest->three-surfaces generation; migrate README and docs/agent-first.md to the runtime model",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "the cli cite scaffolder + manifest-generation code are removed; 'agentfront cli cite' no longer exists and the package builds + imports without it",
+        "README and docs/agent-first.md present import->config->three-surfaces as the shipped model; a doc-check asserts nothing still describes cli cite/manifest-generation as current behavior, and the before-state matches the retired surface"
+      ],
+      "deps": [
+        "t1",
+        "t3"
+      ],
+      "covers": [
+        "c4",
+        "h8"
+      ]
+    },
+    {
+      "id": "t6",
+      "summary": "doctor reframed onto the LIVE surfaces: audits sitemap presence, MCP menu size vs the opinionated threshold, and the learn affordance, each with actionable remediation",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "doctor reports pass on a healthy App, and fails with an actionable remediation when (a) the sitemap is absent, (b) the learn affordance is missing",
+        "exceeding the MCP tool-count threshold yields a doctor WARNING (not silent pass, not hard error) \u2014 asserted by registering > threshold tools"
+      ],
+      "deps": [
+        "t1",
+        "t3"
+      ],
+      "covers": [
+        "h11"
+      ]
+    },
+    {
+      "id": "t7",
+      "summary": "Three-surface assembly: one App instance yields CLI, MCP server, and HTTP app from one call each, with no surface-specific re-declaration",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "a single App produces all three surfaces via one documented call each, no re-declaration of docs/tools per surface",
+        "the three surfaces AGREE: CLI learn listing == MCP tool list == HTTP sitemap for a given App (asserted by a test)"
+      ],
+      "deps": [
+        "t2",
+        "t3",
+        "t4"
+      ],
+      "covers": [
+        "c19",
+        "h5"
+      ]
+    },
+    {
+      "id": "t8",
+      "summary": "Cross-surface anti-drift + producer/consumer integration tests proving both audiences are real",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "anti-drift: no code path makes any surface present an item absent from the registry \u2014 proven by failing to surface an unregistered item on each of the three surfaces",
+        "round-trip: a PRODUCER stands up the surfaces from an App; a CONSUMER uses only an HTTP fetch (sitemap+page) and an MCP client (list+call) with no bespoke glue"
+      ],
+      "deps": [
+        "t7"
+      ],
+      "covers": [
+        "h9",
+        "c2",
+        "h6"
+      ]
+    },
+    {
+      "id": "t9",
+      "summary": "Dogfood: agentfront serves its OWN CLI+MCP+HTTP from its own in-repo App config, gated in CI",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "agentfront serves its own three surfaces from its own App config (its docs/ + a chosen tool set) \u2014 the full import->config->live round-trip",
+        "a CI job asserts all three of agentfront's own surfaces come up and agree (sitemap == MCP tools == CLI learn), failing the build on drift"
+      ],
+      "deps": [
+        "t7",
+        "t6"
+      ],
+      "covers": [
+        "c1",
+        "h4",
+        "c8"
+      ]
+    },
+    {
+      "id": "t10",
+      "summary": "Quickstart + worked-example third package that imports agentfront and serves all three surfaces in a tiny config",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "a worked-example third package under examples/ imports agentfront and serves all three surfaces from a config that is <=30 lines with zero server/protocol code \u2014 measured by a test",
+        "the quickstart is exercised by a test that boots the example's three surfaces and confirms HTTP fetch + MCP list/call + CLI learn all work"
+      ],
+      "deps": [
+        "t7",
+        "t9"
+      ],
+      "covers": [
+        "c3",
+        "h7",
+        "h12"
+      ]
+    }
+  ],
+  "risks": [
+    {
+      "id": "r1",
+      "text": "MCP transport: stdio-first vs streamable-HTTP/SSE (or both) \u2014 undecided",
+      "kind": "unknown_nonblocking",
+      "task_id": "t3"
+    },
+    {
+      "id": "r2",
+      "text": "HTTP server impl: stdlib http.server (leaning, zero outside dep) vs starlette/uvicorn (outside-org, approval-gated)",
+      "kind": "unknown_nonblocking",
+      "task_id": "t2"
+    },
+    {
+      "id": "r3",
+      "text": "Fate of the teken compatibility wrapper + existing agentfront/cite/ code once the scaffolder is retired",
+      "kind": "unknown_nonblocking",
+      "task_id": "t5"
+    },
+    {
+      "id": "r4",
+      "text": "Same-wave file contention on pyproject.toml and agentfront/__init__.py \u2014 operator must verify file-disjointness before fan-out (waves are formally parallel only)",
+      "kind": "unknown_nonblocking",
+      "task_id": null
+    },
+    {
+      "id": "r5",
+      "text": "Declarative config file (toml/yaml) as a secondary config surface",
+      "kind": "follow_up",
+      "task_id": null
+    },
+    {
+      "id": "r6",
+      "text": "Serve learn/doctor over MCP and HTTP too (doctor-on-every-surface applied to the runtime)",
+      "kind": "follow_up",
+      "task_id": null
+    }
+  ]
+}

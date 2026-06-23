@@ -45,7 +45,7 @@ def register(sub: argparse._SubParsersAction) -> None:
         "path",
         nargs="?",
         default=None,
-        help="Target project path. If omitted, describe agentfront's default scaffolded template.",
+        help="Target project path. If omitted, describe agentfront's own runtime model.",
     )
     p.add_argument("--json", action="store_true", help="Emit structured JSON.")
     p.set_defaults(func=cmd_overview)

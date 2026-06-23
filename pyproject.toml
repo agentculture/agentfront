@@ -1,6 +1,6 @@
 [project]
 name = "agentfront"
-version = "0.10.2"
+version = "0.11.0"
 description = "Agent First Interface — scaffold CLI, MCP, and HTTP interfaces for agent-first tools."
 readme = "README.md"
 license = "MIT"
@@ -13,7 +13,19 @@ classifiers = [
     "Topic :: Software Development :: Code Generators",
     "Intended Audience :: Developers",
 ]
+# Core agentfront (the importable runtime + its own CLI + HTTP surface) is
+# pure standard library — no third-party runtime dependency. The MCP surface
+# is the one surface that needs the official `mcp` SDK, so it lives behind an
+# optional extra. `uv tool install agentfront` gives you CLI + HTTP; install
+# `agentfront[mcp]` when you want the MCP server surface as well.
 dependencies = []
+
+[project.optional-dependencies]
+# The MCP surface (`app.mcp_server()` / `serve_stdio`). Keep the version pin in
+# lockstep with the `dev` group below so tests exercise the same SDK floor.
+mcp = [
+    "mcp>=1.28.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/agentculture/agentfront"
@@ -33,6 +45,11 @@ packages = ["agentfront"]
 
 [dependency-groups]
 dev = [
+    # mcp is an optional runtime extra (see [project.optional-dependencies]),
+    # but the test suite exercises the MCP surface, so the dev/CI environment
+    # always installs it. `uv sync` installs dev groups but not extras, hence
+    # the explicit entry here. Keep the pin in lockstep with the mcp extra.
+    "mcp>=1.28.0",
     "pytest>=8.0",
     "pytest-xdist>=3.0",
     "pytest-cov>=4.1",
@@ -71,16 +88,10 @@ exclude_lines = [
 profile = "black"
 line_length = 100
 known_first_party = ["agentfront"]
-extend_skip_glob = ["agentfront/cite/references/**"]
 
 [tool.black]
 line-length = 100
 target-version = ["py312"]
-extend-exclude = '''
-/(
-    agentfront/cite/references
-)/
-'''
 
 [tool.bandit]
 exclude_dirs = ["tests"]

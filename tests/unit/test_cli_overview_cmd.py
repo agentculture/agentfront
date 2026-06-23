@@ -19,9 +19,9 @@ def test_cli_overview_zero_target_renders(capsys: pytest.CaptureFixture[str]) ->
     rc = main(["cli", "overview"])
     out = capsys.readouterr().out
     assert rc == 0
-    assert "agentfront default template" in out
-    # Tokens are surfaced as guidance for integrating agents.
-    assert "{{slug}}" in out
+    assert "agentfront runtime model" in out
+    # Zero-target describes the importable App, not a scaffolded tree.
+    assert "from agentfront import App" in out
 
 
 def test_cli_overview_on_real_target_reports_surface(
@@ -76,4 +76,4 @@ def test_cli_overview_missing_path_graceful(
     out = capsys.readouterr().out
     # Read-only verbs fall back and succeed; they do NOT hard-fail.
     assert rc == 0
-    assert "agentfront default template" in out
+    assert "agentfront runtime model" in out

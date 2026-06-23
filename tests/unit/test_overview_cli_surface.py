@@ -25,8 +25,8 @@ def _write_minimal_cli_project(root: Path, *, with_triple: bool = True) -> None:
         "def register(sub):\n"
         '    p = sub.add_parser("cli")\n'
         "    s = p.add_subparsers()\n"
-        '    s.add_parser("cite")\n'
-        '    s.add_parser("verify")\n'
+        '    s.add_parser("doctor")\n'
+        '    s.add_parser("overview")\n'
     )
     if with_triple:
         (pkg / "learn.py").write_text('def register(sub):\n    sub.add_parser("learn")\n')
@@ -35,14 +35,14 @@ def _write_minimal_cli_project(root: Path, *, with_triple: bool = True) -> None:
         (pkg / "doctor.py").write_text('def register(sub):\n    sub.add_parser("doctor")\n')
 
 
-def test_zero_target_describes_afi_template() -> None:
+def test_zero_target_describes_runtime_model() -> None:
     report = inspect(None)
     assert report.subject == "cli"
     assert report.path is None
-    # Must reference agentfront's bundled template.
+    # Must describe agentfront's importable runtime model.
     flat = to_markdown(report)
-    assert "agentfront default template" in flat
-    assert "{{slug}}" in flat
+    assert "agentfront runtime model" in flat
+    assert "from agentfront import App" in flat
     # JSON is well-formed and stable-keyed.
     payload = to_json_dict(report)
     assert payload["subject"] == "cli"
@@ -55,8 +55,8 @@ def test_missing_path_falls_back_with_warning(tmp_path: Path) -> None:
     report = inspect(missing)
     assert report.path == str(missing)
     assert any("does not exist" in w for w in report.warnings)
-    # Still renders the default template in the sections.
-    assert any(s.heading == "agentfront default template" for s in report.sections)
+    # Still renders the runtime model in the sections.
+    assert any(s.heading == "agentfront runtime model" for s in report.sections)
 
 
 def test_target_mode_enumerates_command_surface(tmp_path: Path) -> None:
@@ -95,38 +95,32 @@ def test_malformed_pyproject_falls_back(tmp_path: Path) -> None:
     (tmp_path / "pyproject.toml").write_text("this is :: not valid toml [[[[")
     report = inspect(tmp_path)
     # Fell back to zero-target because parsing failed.
-    assert any(s.heading == "agentfront default template" for s in report.sections)
+    assert any(s.heading == "agentfront runtime model" for s in report.sections)
     assert report.warnings  # at least one warning emitted
 
 
 def test_pyproject_without_scripts_falls_back(tmp_path: Path) -> None:
     (tmp_path / "pyproject.toml").write_text('[project]\nname = "demo"\nversion = "0.0.1"\n')
     report = inspect(tmp_path)
-    assert any(s.heading == "agentfront default template" for s in report.sections)
+    assert any(s.heading == "agentfront runtime model" for s in report.sections)
 
 
 def _posture_body(report) -> str:
     return next(s.body_md for s in report.sections if s.heading == "Rubric posture")
 
 
-def test_rubric_posture_detects_teken_cited_tree(tmp_path: Path) -> None:
+def test_rubric_posture_points_at_doctor_and_tests_dir(tmp_path: Path) -> None:
     _write_minimal_cli_project(tmp_path)
-    (tmp_path / ".agentfront" / "reference" / "python-cli").mkdir(parents=True)
-    assert "reference tree cited: yes" in _posture_body(inspect(tmp_path))
-
-
-def test_rubric_posture_falls_back_to_legacy_afi_tree(tmp_path: Path) -> None:
-    """A project cited before the rename (under ``.teken/``) is still detected."""
-    _write_minimal_cli_project(tmp_path)
-    (tmp_path / ".teken" / "reference" / "python-cli").mkdir(parents=True)
     body = _posture_body(inspect(tmp_path))
-    assert "reference tree cited: yes" in body
-    assert ".teken" in body  # reports the legacy location it found
+    # Posture points at the rubric grader and reports tests/ presence.
+    assert "agentfront cli doctor" in body
+    assert "Tests dir: missing" in body
 
 
-def test_rubric_posture_reports_uncited_when_no_tree(tmp_path: Path) -> None:
+def test_rubric_posture_detects_tests_dir(tmp_path: Path) -> None:
     _write_minimal_cli_project(tmp_path)
-    assert "reference tree cited: no" in _posture_body(inspect(tmp_path))
+    (tmp_path / "tests").mkdir()
+    assert "Tests dir: present" in _posture_body(inspect(tmp_path))
 
 
 def test_json_shape_is_stable(tmp_path: Path) -> None:

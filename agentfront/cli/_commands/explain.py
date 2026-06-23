@@ -27,7 +27,7 @@ def cmd_explain(args: argparse.Namespace) -> int:
 def register(sub: argparse._SubParsersAction) -> None:
     p = sub.add_parser(
         "explain",
-        help="Print markdown docs for a noun/verb path (e.g. 'agentfront explain cli cite').",
+        help="Print markdown docs for a noun/verb path (e.g. 'agentfront explain cli doctor').",
     )
     p.add_argument(
         "path",
