@@ -54,9 +54,11 @@ jobs:
           BASE=$(uv run python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
           DEV_VERSION="${BASE}.dev${{ github.run_number }}"
           sed -i "s/^version = .*/version = \"${DEV_VERSION}\"/" pyproject.toml
-          # Keep the teken wrapper in lockstep: its own version + the agentfront pin.
+          # Keep the teken wrapper in lockstep: its own version + both pins
+          # (agentfront== and the agentfront[mcp]== extra-parity pin).
           sed -i "s/^version = .*/version = \"${DEV_VERSION}\"/" packaging/teken/pyproject.toml
           sed -i "s/agentfront==${BASE}/agentfront==${DEV_VERSION}/" packaging/teken/pyproject.toml
+          sed -i "s/agentfront\[mcp\]==${BASE}/agentfront[mcp]==${DEV_VERSION}/" packaging/teken/pyproject.toml
           echo "DEV_VERSION=${DEV_VERSION}" >> "$GITHUB_ENV"
           echo "Publishing ${DEV_VERSION} to TestPyPI"
 

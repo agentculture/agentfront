@@ -1,0 +1,169 @@
+{
+  "slug": "agentfront-issue-31-is-resolved-the-teken-wrapper",
+  "title": "agentfront issue #31 is resolved: the teken wrapper gains an mcp extra at full parity with agentfront[mcp] (kept in version-lockstep), and the downstream audit is closed as a no-op.",
+  "frame_slug": "agentfront-issue-31-is-resolved-the-teken-wrapper",
+  "schema_version": 1,
+  "status": "exported",
+  "created": "2026-06-23T04:28:26Z",
+  "updated": "2026-06-23T04:29:56Z",
+  "targets": [
+    {
+      "id": "c1",
+      "kind": "announcement",
+      "text": "agentfront issue #31 is resolved: the teken wrapper gains an mcp extra at full parity with agentfront[mcp] (kept in version-lockstep), and the downstream audit is closed as a no-op."
+    },
+    {
+      "id": "h1",
+      "kind": "honesty",
+      "text": "both issue #31 checkboxes are resolved (parity added; audit done) and the issue can be closed"
+    },
+    {
+      "id": "c2",
+      "kind": "audience",
+      "text": "agentfront maintainers, plus anyone installing the teken wrapper who wants agentfront's MCP server surface"
+    },
+    {
+      "id": "h2",
+      "kind": "honesty",
+      "text": "the audience can install the MCP surface via either agentfront[mcp] or teken[mcp], both documented"
+    },
+    {
+      "id": "c3",
+      "kind": "before_state",
+      "text": "issue #31 left two follow-ups after PR #30 made mcp optional: an undecided teken[mcp] parity question and an un-run downstream audit"
+    },
+    {
+      "id": "h3",
+      "kind": "honesty",
+      "text": "the two follow-ups named in issue #31 (teken[mcp] parity; downstream audit) are exactly the two this work resolves"
+    },
+    {
+      "id": "c4",
+      "kind": "after_state",
+      "text": "uv tool install 'teken[mcp]' pulls agentfront[mcp]==VER; the new extra pin is kept in lockstep by bump.py, the tests.yml CI guard, publish.yml, and a pytest regression; issue #31 closed"
+    },
+    {
+      "id": "h4",
+      "kind": "honesty",
+      "text": "packaging/teken/pyproject.toml has a [project.optional-dependencies] mcp = ['agentfront[mcp]==VER'], and bump.py/tests.yml/publish.yml + a pytest all keep that pin in lockstep"
+    },
+    {
+      "id": "c5",
+      "kind": "why_it_matters",
+      "text": "teken stays at full feature parity with agentfront so the rename is transparent \u2014 anything installable on agentfront is installable on teken (including the mcp extra)"
+    },
+    {
+      "id": "h5",
+      "kind": "honesty",
+      "text": "the README documents teken[mcp] as parity (no MCP-specific deprecation message), and the teken wheel METADATA carries Provides-Extra: mcp"
+    },
+    {
+      "id": "c6",
+      "kind": "boundary",
+      "text": "non-goal: changing whether mcp is optional on agentfront itself; remediating sibling repos (the audit found none affected); or removing teken's deprecation framing for the rename"
+    },
+    {
+      "id": "h6",
+      "kind": "honesty",
+      "text": "git diff does not change agentfront's own [project.optional-dependencies] mcp, modifies no sibling repo, and leaves the rename-deprecation framing intact"
+    },
+    {
+      "id": "c7",
+      "kind": "success_signal",
+      "text": "teken wheel METADATA shows Provides-Extra: mcp and Requires-Dist agentfront[mcp]==VER; the CI lockstep guard checks all three pins; uv build still yields a metadata-only wheel; issue #31 closed"
+    },
+    {
+      "id": "h7",
+      "kind": "honesty",
+      "text": "after the change: uv build packaging/teken yields a metadata-only wheel whose METADATA shows Requires-Dist agentfront[mcp]==VER; extra=='mcp', and the lockstep guard checks all three pins"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "t1",
+      "summary": "Add a [project.optional-dependencies] mcp = ['agentfront[mcp]==VER'] extra to packaging/teken/pyproject.toml",
+      "origin": "user",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "uv tool install 'teken[mcp]' resolves agentfront[mcp]; the teken wheel METADATA shows Provides-Extra: mcp and Requires-Dist agentfront[mcp]==VER; extra=='mcp'"
+      ],
+      "deps": [],
+      "covers": [
+        "c2",
+        "c4",
+        "h2"
+      ]
+    },
+    {
+      "id": "t2",
+      "summary": "Extend the version-lockstep machinery for the new extra pin: bump.py 3rd replace, tests.yml guard, publish.yml dev-version sed",
+      "origin": "user",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "bump.py updates agentfront[mcp]==OLD -> NEW; tests.yml lockstep step asserts the mcp pin == agentfront[mcp]==ROOT; publish.yml seds the mcp pin to the dev version"
+      ],
+      "deps": [
+        "t1"
+      ],
+      "covers": [
+        "h4"
+      ]
+    },
+    {
+      "id": "t3",
+      "summary": "Add tests/unit/test_wrapper_lockstep.py asserting version + both pins track root and the wheel stays metadata-only",
+      "origin": "user",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "pytest asserts wrapper version == root, agentfront== pin, agentfront[mcp]== pin, and bypass-selection is True; full suite green"
+      ],
+      "deps": [
+        "t1"
+      ],
+      "covers": [
+        "c7",
+        "h7"
+      ]
+    },
+    {
+      "id": "t4",
+      "summary": "Document teken[mcp] parity in packaging/teken/README.md (no MCP-specific deprecation message) and update the CHANGELOG entry",
+      "origin": "user",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "README shows both 'agentfront[mcp]' and 'teken[mcp]' installs as parity with no MCP deprecation note; CHANGELOG [0.11.1] describes the added extra; agentfront's own mcp extra and the rename-deprecation framing are unchanged; no sibling repo modified"
+      ],
+      "deps": [
+        "t1"
+      ],
+      "covers": [
+        "c5",
+        "c6",
+        "h5",
+        "h6"
+      ]
+    },
+    {
+      "id": "t5",
+      "summary": "Close issue #31: comment recording the parity decision + downstream-audit result, check both boxes",
+      "origin": "user",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "issue #31 closing comment records the parity decision and the zero-affected-consumers audit; both checkboxes checked; PR Closes #31"
+      ],
+      "deps": [
+        "t1",
+        "t2",
+        "t3",
+        "t4"
+      ],
+      "covers": [
+        "c1",
+        "c3",
+        "h1",
+        "h3"
+      ]
+    }
+  ],
+  "risks": []
+}
