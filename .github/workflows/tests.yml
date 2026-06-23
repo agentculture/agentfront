@@ -116,7 +116,10 @@ jobs:
           ROOT=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
           WRAP=$(python3 -c "import tomllib; print(tomllib.load(open('packaging/teken/pyproject.toml','rb'))['project']['version'])")
           PIN=$(python3 -c "import tomllib; print(tomllib.load(open('packaging/teken/pyproject.toml','rb'))['project']['dependencies'][0])")
-          MCP_PIN=$(python3 -c "import tomllib; print(tomllib.load(open('packaging/teken/pyproject.toml','rb'))['project']['optional-dependencies']['mcp'][0])")
+          # Guard the extraction so a removed mcp extra fails with a clear
+          # message instead of a raw KeyError traceback.
+          MCP_PIN=$(python3 -c "import tomllib; print(tomllib.load(open('packaging/teken/pyproject.toml','rb'))['project']['optional-dependencies']['mcp'][0])" 2>/dev/null) \
+            || { echo "::error::teken wrapper missing the [project.optional-dependencies] mcp extra (expected agentfront[mcp]==$ROOT)."; exit 1; }
           if [ "$WRAP" != "$ROOT" ] || [ "$PIN" != "agentfront==$ROOT" ] || [ "$MCP_PIN" != "agentfront[mcp]==$ROOT" ]; then
             echo "::error::teken wrapper drift — root=$ROOT wrapper=$WRAP pin=$PIN mcp_pin=$MCP_PIN (expected agentfront==$ROOT and agentfront[mcp]==$ROOT). Re-run the version-bump skill."
             exit 1
