@@ -55,25 +55,24 @@ def _learn_handler(app: App, args: argparse.Namespace) -> None:
             "tools": tools,
         }
         print(json.dumps(payload, ensure_ascii=False))
-        return
+    else:
+        lines: list[str] = []
+        lines.append(f"# {app.name} v{app.version}")
+        if app.description:
+            lines.append(app.description)
+        lines.append("")
 
-    lines: list[str] = []
-    lines.append(f"# {app.name} v{app.version}")
-    if app.description:
-        lines.append(app.description)
-    lines.append("")
+        lines.append("## Docs")
+        for d in docs:
+            lines.append(f"  - {d['slug']}: {d['title']}")
+        lines.append("")
 
-    lines.append("## Docs")
-    for d in docs:
-        lines.append(f"  - {d['slug']}: {d['title']}")
-    lines.append("")
+        lines.append("## Tools")
+        for t in tools:
+            lines.append(f"  - {t['name']}: {t['description']}")
+        lines.append("")
 
-    lines.append("## Tools")
-    for t in tools:
-        lines.append(f"  - {t['name']}: {t['description']}")
-    lines.append("")
-
-    print("\n".join(lines))
+        print("\n".join(lines))
 
 
 def _doctor_handler(app: App) -> None:
