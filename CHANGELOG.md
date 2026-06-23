@@ -7,9 +7,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.11.1] - 2026-06-23
 
-### Changed
+### Added
 
-- packaging/teken: document the MCP migration path (install "agentfront[mcp]") and that the wrapper intentionally exposes no teken[mcp] extra — resolves issue #31 by formally declining wrapper parity; downstream audit found no sibling consuming agentfront or its MCP surface, so no remediation needed
+- packaging/teken: `teken[mcp]` extra at full parity with `agentfront[mcp]` — `uv tool install "teken[mcp]"` now pulls `agentfront[mcp]`. The new `agentfront[mcp]==<ver>` pin is kept in version-lockstep with the root project by the version-bump skill, the CI guard (`tests.yml`), and the TestPyPI dev-version step (`publish.yml`); a `tests/unit/test_wrapper_lockstep.py` regression covers all three pins. Resolves issue #31. (Downstream audit found no sibling consuming agentfront or its MCP surface, so the change is purely additive — no remediation needed.)
 
 ## [0.11.0] - 2026-06-23
 

@@ -1,0 +1,123 @@
+{
+  "slug": "agentfront-issue-31-is-resolved-the-teken-wrapper",
+  "title": "agentfront issue #31 is resolved: the teken wrapper gains an mcp extra at full parity with agentfront[mcp] (kept in version-lockstep), and the downstream audit is closed as a no-op.",
+  "schema_version": 1,
+  "status": "exported",
+  "created": "2026-06-23T04:27:35Z",
+  "updated": "2026-06-23T04:29:47Z",
+  "claims": [
+    {
+      "id": "c1",
+      "kind": "announcement",
+      "text": "agentfront issue #31 is resolved: the teken wrapper gains an mcp extra at full parity with agentfront[mcp] (kept in version-lockstep), and the downstream audit is closed as a no-op.",
+      "origin": "user",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h1",
+          "text": "both issue #31 checkboxes are resolved (parity added; audit done) and the issue can be closed",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c2",
+      "kind": "audience",
+      "text": "agentfront maintainers, plus anyone installing the teken wrapper who wants agentfront's MCP server surface",
+      "origin": "user",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h2",
+          "text": "the audience can install the MCP surface via either agentfront[mcp] or teken[mcp], both documented",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c3",
+      "kind": "before_state",
+      "text": "issue #31 left two follow-ups after PR #30 made mcp optional: an undecided teken[mcp] parity question and an un-run downstream audit",
+      "origin": "user",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h3",
+          "text": "the two follow-ups named in issue #31 (teken[mcp] parity; downstream audit) are exactly the two this work resolves",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c4",
+      "kind": "after_state",
+      "text": "uv tool install 'teken[mcp]' pulls agentfront[mcp]==VER; the new extra pin is kept in lockstep by bump.py, the tests.yml CI guard, publish.yml, and a pytest regression; issue #31 closed",
+      "origin": "user",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h4",
+          "text": "packaging/teken/pyproject.toml has a [project.optional-dependencies] mcp = ['agentfront[mcp]==VER'], and bump.py/tests.yml/publish.yml + a pytest all keep that pin in lockstep",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c5",
+      "kind": "why_it_matters",
+      "text": "teken stays at full feature parity with agentfront so the rename is transparent \u2014 anything installable on agentfront is installable on teken (including the mcp extra)",
+      "origin": "user",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h5",
+          "text": "the README documents teken[mcp] as parity (no MCP-specific deprecation message), and the teken wheel METADATA carries Provides-Extra: mcp",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c6",
+      "kind": "boundary",
+      "text": "non-goal: changing whether mcp is optional on agentfront itself; remediating sibling repos (the audit found none affected); or removing teken's deprecation framing for the rename",
+      "origin": "user",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h6",
+          "text": "git diff does not change agentfront's own [project.optional-dependencies] mcp, modifies no sibling repo, and leaves the rename-deprecation framing intact",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c7",
+      "kind": "success_signal",
+      "text": "teken wheel METADATA shows Provides-Extra: mcp and Requires-Dist agentfront[mcp]==VER; the CI lockstep guard checks all three pins; uv build still yields a metadata-only wheel; issue #31 closed",
+      "origin": "user",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h7",
+          "text": "after the change: uv build packaging/teken yields a metadata-only wheel whose METADATA shows Requires-Dist agentfront[mcp]==VER; extra=='mcp', and the lockstep guard checks all three pins",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    }
+  ],
+  "open_vagueness": []
+}

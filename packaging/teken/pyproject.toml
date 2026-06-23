@@ -3,8 +3,11 @@
 # `teken` was renamed to `agentfront`. This metadata-only distribution ships NO
 # importable modules — it exists so that `uv tool install teken` keeps working
 # by pulling in `agentfront` (which provides both the `agentfront` command and
-# the deprecated `teken` alias). The version and the `agentfront==` pin are kept
-# in lockstep with the root project by the version-bump skill and a CI guard.
+# the deprecated `teken` alias). The wrapper is kept at full feature parity with
+# `agentfront`: it mirrors the `mcp` extra, so `uv tool install "teken[mcp]"`
+# pulls `agentfront[mcp]`. The version and BOTH pins (`agentfront==` and
+# `agentfront[mcp]==`) are kept in lockstep with the root project by the
+# version-bump skill and a CI guard.
 [project]
 name = "teken"
 version = "0.11.1"
@@ -19,6 +22,13 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
 ]
 dependencies = ["agentfront==0.11.1"]
+
+[project.optional-dependencies]
+# Parity with agentfront's `mcp` extra: `uv tool install "teken[mcp]"` pulls
+# `agentfront[mcp]`, so the wrapper exposes the MCP server surface too. This pin
+# is kept in lockstep with the root version by the version-bump skill and the CI
+# guard, exactly like the base `agentfront==` pin above.
+mcp = ["agentfront[mcp]==0.11.1"]
 
 [project.urls]
 Homepage = "https://github.com/agentculture/agentfront"

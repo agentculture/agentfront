@@ -113,10 +113,11 @@ def update_wrapper(project_root: Path, old: str, new: str) -> None:
     """Keep the teken compatibility wrapper in lockstep with the root version.
 
     The wrapper (``packaging/teken/pyproject.toml``) is a metadata-only
-    distribution that depends on ``agentfront==<version>``. Both its own
-    ``version`` and the pinned ``agentfront==`` dependency must track the
-    canonical version so ``uv tool install teken`` always resolves the matching
-    ``agentfront``.
+    distribution that depends on ``agentfront==<version>`` and mirrors
+    agentfront's ``mcp`` extra via ``agentfront[mcp]==<version>``. Its own
+    ``version`` and BOTH pins must track the canonical version so
+    ``uv tool install teken`` / ``uv tool install "teken[mcp]"`` always resolve
+    the matching ``agentfront`` / ``agentfront[mcp]``.
     """
     wrapper = project_root / "packaging" / "teken" / "pyproject.toml"
     if not wrapper.exists():
@@ -124,9 +125,13 @@ def update_wrapper(project_root: Path, old: str, new: str) -> None:
     text = wrapper.read_text()
     updated = text.replace(f'version = "{old}"', f'version = "{new}"', 1)
     updated = updated.replace(f"agentfront=={old}", f"agentfront=={new}")
+    # The mcp-extra pin: `agentfront[mcp]==X` is NOT a substring of
+    # `agentfront==X`, so this is an independent replace (order-insensitive).
+    updated = updated.replace(f"agentfront[mcp]=={old}", f"agentfront[mcp]=={new}")
     if updated != text:
         wrapper.write_text(updated)
-        print(f"Updated {wrapper.relative_to(project_root)} (version + agentfront pin)")
+        rel = wrapper.relative_to(project_root)
+        print(f"Updated {rel} (version + agentfront/agentfront[mcp] pins)")
 
 
 def update_changelog(project_root: Path, new: str, entries: dict) -> None:
