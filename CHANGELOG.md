@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/). This project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.1] - 2026-06-23
+
+### Changed
+
+- packaging/teken: document the MCP migration path (install "agentfront[mcp]") and that the wrapper intentionally exposes no teken[mcp] extra — resolves issue #31 by formally declining wrapper parity; downstream audit found no sibling consuming agentfront or its MCP surface, so no remediation needed
+
 ## [0.11.0] - 2026-06-23
 
 ### Added
