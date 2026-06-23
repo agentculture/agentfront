@@ -13,7 +13,9 @@ from __future__ import annotations
 
 import io
 import json
-import xml.etree.ElementTree as ET  # noqa: S405 - parsing our own generated sitemap
+
+# We only parse our own generated sitemap here, never untrusted input.
+import xml.etree.ElementTree as ET  # noqa: S405
 from contextlib import redirect_stdout
 from dataclasses import dataclass
 from typing import Any
@@ -42,7 +44,8 @@ def _http_doc_slugs(app: App) -> set[str]:
     wsgi = app.http_app()
     environ = {"REQUEST_METHOD": "GET", "PATH_INFO": "/sitemap.xml"}
     body = b"".join(wsgi(environ, lambda status, headers: None))
-    root = ET.fromstring(body)  # noqa: S314 - our own sitemap, not untrusted input
+    # ``body`` is our own generated sitemap, never untrusted input.
+    root = ET.fromstring(body)  # noqa: S314
     return {(el.text or "").lstrip("/") for el in root.iter("loc")}
 
 

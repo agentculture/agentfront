@@ -22,6 +22,14 @@ uv tool install agentfront
 
 Then `agentfront --version` should work on your PATH. `uv tool install` is the supported path — not `pip install`.
 
+The CLI and HTTP surfaces are pure standard library and have **no third-party dependency**. The MCP surface is the one surface that needs the official [`mcp`](https://pypi.org/project/mcp/) SDK, so it ships behind an optional extra — install it only when you want `app.mcp_server()`:
+
+```bash
+uv tool install 'agentfront[mcp]'   # CLI + HTTP + MCP
+```
+
+Calling `app.mcp_server()` without the extra installed raises a `ModuleNotFoundError` that names the extra to add.
+
 ```bash
 uv tool install teken   # still works: a thin wrapper that installs agentfront
 ```

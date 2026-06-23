@@ -7,6 +7,7 @@ host writes zero MCP-protocol code.  The single entry point is
 
 from __future__ import annotations
 
+import inspect
 from typing import Any
 
 from mcp import Tool
@@ -47,7 +48,13 @@ def make_mcp_server(app: App) -> Server:
         entry = app.get_tool(tool_name)
         if entry is None:
             raise ValueError(f"unknown tool: {tool_name!r}")
-        return {"result": entry.func(**arguments)}
+        result = entry.func(**arguments)
+        # A host may register an ``async def`` tool; calling it returns a
+        # coroutine that must be awaited before it can be serialized back to
+        # the MCP client. Sync tools return their value directly.
+        if inspect.isawaitable(result):
+            result = await result
+        return {"result": result}
 
     return server
 

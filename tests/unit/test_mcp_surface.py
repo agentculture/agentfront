@@ -70,6 +70,20 @@ def test_call_tool_string_result(app: App):
     assert result == "hello world"
 
 
+def test_call_tool_awaits_async_func():
+    """An ``async def`` tool is awaited, not returned as a raw coroutine."""
+    a = App(name="async-app")
+
+    @a.tool
+    async def fetch(url: str) -> str:
+        """Pretend to fetch a URL."""
+        return f"fetched {url}"
+
+    server = make_mcp_server(a)
+    result = anyio.run(_call_tool, server, "fetch", {"url": "x"})
+    assert result == "fetched x"
+
+
 # --- schema from typed signature ----------------------------------------
 
 
@@ -101,6 +115,27 @@ def test_empty_app_has_no_tools():
     server = make_mcp_server(a)
     tools = anyio.run(_list_tools, server)
     assert tools == []
+
+
+# --- optional mcp extra --------------------------------------------------
+
+
+def test_mcp_server_without_mcp_extra_raises_friendly_error(monkeypatch):
+    """``app.mcp_server()`` names the optional extra when mcp isn't installed.
+
+    The MCP SDK is an optional extra (``agentfront[mcp]``); the CLI and HTTP
+    surfaces don't need it. We simulate the missing install by evicting ``mcp``
+    from ``sys.modules`` (so the lazy ``from mcp import ...`` re-runs and fails)
+    and dropping the cached surface module so the import is actually retried.
+    """
+    import sys
+
+    monkeypatch.setitem(sys.modules, "mcp", None)
+    monkeypatch.delitem(sys.modules, "agentfront.mcp_surface", raising=False)
+
+    app = App(name="t")
+    with pytest.raises(ModuleNotFoundError, match=r"agentfront\[mcp\]"):
+        app.mcp_server()
 
 
 # --- helpers ----------------------------------------------------------------

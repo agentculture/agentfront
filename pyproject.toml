@@ -13,7 +13,17 @@ classifiers = [
     "Topic :: Software Development :: Code Generators",
     "Intended Audience :: Developers",
 ]
-dependencies = [
+# Core agentfront (the importable runtime + its own CLI + HTTP surface) is
+# pure standard library — no third-party runtime dependency. The MCP surface
+# is the one surface that needs the official `mcp` SDK, so it lives behind an
+# optional extra. `uv tool install agentfront` gives you CLI + HTTP; install
+# `agentfront[mcp]` when you want the MCP server surface as well.
+dependencies = []
+
+[project.optional-dependencies]
+# The MCP surface (`app.mcp_server()` / `serve_stdio`). Keep the version pin in
+# lockstep with the `dev` group below so tests exercise the same SDK floor.
+mcp = [
     "mcp>=1.28.0",
 ]
 
@@ -35,6 +45,11 @@ packages = ["agentfront"]
 
 [dependency-groups]
 dev = [
+    # mcp is an optional runtime extra (see [project.optional-dependencies]),
+    # but the test suite exercises the MCP surface, so the dev/CI environment
+    # always installs it. `uv sync` installs dev groups but not extras, hence
+    # the explicit entry here. Keep the pin in lockstep with the mcp extra.
+    "mcp>=1.28.0",
     "pytest>=8.0",
     "pytest-xdist>=3.0",
     "pytest-cov>=4.1",

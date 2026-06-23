@@ -17,6 +17,14 @@ from agentfront.app import App
 
 __all__ = ["make_http_app", "serve"]
 
+# Status lines and content types, named once so the routes below read from a
+# single source instead of repeating the literals (SonarCloud S1192).
+_STATUS_OK = "200 OK"
+_STATUS_NOT_FOUND = "404 Not Found"
+_CT_MARKDOWN = "text/markdown; charset=utf-8"
+_CT_PLAIN = "text/plain; charset=utf-8"
+_CT_XML = "application/xml"
+
 
 def make_http_app(app: App) -> Any:
     """Return a WSGI application callable built from *app*.
@@ -51,14 +59,14 @@ def _doc(app: App, path: str) -> tuple[str, list[tuple[str, str]], bytes]:
     entry = app.get_doc(slug)
     if entry is None:
         return (
-            "404 Not Found",
-            [("Content-Type", "text/plain; charset=utf-8")],
+            _STATUS_NOT_FOUND,
+            [("Content-Type", _CT_PLAIN)],
             b"Not found",
         )
     body = entry.text.encode("utf-8")
     return (
-        "200 OK",
-        [("Content-Type", "text/markdown; charset=utf-8")],
+        _STATUS_OK,
+        [("Content-Type", _CT_MARKDOWN)],
         body,
     )
 
@@ -70,8 +78,8 @@ def _index(app: App) -> tuple[str, list[tuple[str, str]], bytes]:
         lines.append(f"- [{entry.title}](/{entry.slug})")
     body = "\n".join(lines) + "\n"
     return (
-        "200 OK",
-        [("Content-Type", "text/markdown; charset=utf-8")],
+        _STATUS_OK,
+        [("Content-Type", _CT_MARKDOWN)],
         body.encode("utf-8"),
     )
 
@@ -93,8 +101,8 @@ def _llms_txt(app: App) -> tuple[str, list[tuple[str, str]], bytes]:
         lines.append(f"- {tool.name}: {tool.description}")
     body = "\n".join(lines) + "\n"
     return (
-        "200 OK",
-        [("Content-Type", "text/markdown; charset=utf-8")],
+        _STATUS_OK,
+        [("Content-Type", _CT_MARKDOWN)],
         body.encode("utf-8"),
     )
 
@@ -110,8 +118,8 @@ def _sitemap(app: App) -> tuple[str, list[tuple[str, str]], bytes]:
     buf = io.BytesIO()
     tree.write(buf, xml_declaration=True, encoding="utf-8")
     return (
-        "200 OK",
-        [("Content-Type", "application/xml")],
+        _STATUS_OK,
+        [("Content-Type", _CT_XML)],
         buf.getvalue(),
     )
 

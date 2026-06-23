@@ -12,7 +12,9 @@ resolution-markers = [
 name = "agentfront"
 version = "0.11.0"
 source = { editable = "." }
-dependencies = [
+
+[package.optional-dependencies]
+mcp = [
     { name = "mcp" },
 ]
 
@@ -25,6 +27,7 @@ dev = [
     { name = "flake8-bandit" },
     { name = "flake8-bugbear" },
     { name = "isort" },
+    { name = "mcp" },
     { name = "pre-commit" },
     { name = "pylint" },
     { name = "pytest" },
@@ -33,7 +36,8 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "mcp", specifier = ">=1.28.0" }]
+requires-dist = [{ name = "mcp", marker = "extra == 'mcp'", specifier = ">=1.28.0" }]
+provides-extras = ["mcp"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -44,6 +48,7 @@ dev = [
     { name = "flake8-bandit", specifier = ">=4.1.1" },
     { name = "flake8-bugbear", specifier = ">=23.7.10" },
     { name = "isort", specifier = ">=5.12.0" },
+    { name = "mcp", specifier = ">=1.28.0" },
     { name = "pre-commit", specifier = ">=3.5.0" },
     { name = "pylint", specifier = ">=2.17.0" },
     { name = "pytest", specifier = ">=8.0" },

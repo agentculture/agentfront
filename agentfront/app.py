@@ -133,8 +133,31 @@ class App:
         return make_http_app(self)
 
     def mcp_server(self) -> Any:
-        """Return the MCP server exposing this App's tools."""
-        from agentfront.mcp_surface import make_mcp_server
+        """Return the MCP server exposing this App's tools.
+
+        The MCP surface is the one surface that needs the official ``mcp`` SDK,
+        which ships as an optional extra. If it is not installed, raise a
+        :class:`ModuleNotFoundError` that names the extra to install rather than
+        letting a bare ``No module named 'mcp'`` surface from deep in the lazy
+        import. The CLI and HTTP surfaces have no such dependency.
+        """
+        try:
+            from agentfront.mcp_surface import make_mcp_server
+        except ImportError as exc:
+            # Only translate the *mcp* import failure; an ImportError for
+            # anything else is a real bug and must not be masked. (A missing
+            # install raises ModuleNotFoundError; an evicted module raises a
+            # plain ImportError — both carry ``name == "mcp"``.)
+            if (getattr(exc, "name", "") or "").split(".", 1)[0] != "mcp":
+                raise
+            raise ModuleNotFoundError(
+                "agentfront's MCP surface needs the optional 'mcp' dependency, "
+                "which is not installed. Install it with:\n"
+                "    uv tool install 'agentfront[mcp]'\n"
+                "    # or, in a project:  uv add 'agentfront[mcp]'\n"
+                "    # or, with pip:      pip install 'agentfront[mcp]'\n"
+                "The CLI and HTTP surfaces work without it."
+            ) from exc
 
         return make_mcp_server(self)
 
