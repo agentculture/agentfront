@@ -37,6 +37,7 @@ class ToolEntry:
     input_schema: dict[str, Any]
     func: Callable[..., Any]
     group: tuple[str, ...] = ()
+    doc: str = ""
 
 
 # Minimal Python-annotation → JSON-Schema type mapping. Anything unrecognised
@@ -139,6 +140,7 @@ class Registry:
         name: Optional[str] = None,
         description: Optional[str] = None,
         group: tuple[str, ...] = (),
+        doc: Optional[str] = None,
     ) -> ToolEntry:
         tool_name = name or getattr(func, "__name__", None)
         if not tool_name or tool_name == "<lambda>":
@@ -147,12 +149,14 @@ class Registry:
         if full_path in self._tools:
             raise DuplicateError(f"tool path already registered: {full_path!r}")
         desc = description if description is not None else _first_line(func.__doc__)
+        full_doc = doc if doc is not None else (inspect.getdoc(func) or "")
         entry = ToolEntry(
             name=tool_name,
             description=desc,
             input_schema=derive_input_schema(func),
             func=func,
             group=group,
+            doc=full_doc,
         )
         self._tools[full_path] = entry
         return entry
