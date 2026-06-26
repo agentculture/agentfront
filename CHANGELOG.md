@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/). This project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.1] - 2026-06-26
+
+
+### Added
+
+- Converged design spec for the public consumer CLI API (issue #35) at docs/specs/2026-06-26-agentfront-ships-a-public-consumer-cli-api-a-host.md — app.cli() renders a host's full nested noun/verb CLI from the App registry; MCP ships as a single-dispatch "CLI on MCP" tool; app.add_command() for host verbs; a public `AgentfrontError` (the structured error type, renamed from its legacy internal name — completing the deferred PR #22 rename). Authored via /think with sonnet-subagent and ask-colleague exploration.
+
 ## [0.13.0] - 2026-06-24
 
 ### Added
