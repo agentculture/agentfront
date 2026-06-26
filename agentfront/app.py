@@ -156,6 +156,8 @@ class App:
         return _GroupRegistrar(self, tuple(prefix))
 
     # --- host commands --------------------------------------------------
+    _RESERVED_META_VERBS: set[str] = {"learn", "explain", "overview", "doctor"}
+
     def add_command(
         self,
         name: str,
@@ -167,13 +169,55 @@ class App:
     ) -> HostCommand:
         """Register a host-written CLI command.
 
-        Raises :class:`DuplicateError` if *name* already exists.
+        Raises :class:`DuplicateError` if *name* or any *alias* collides with:
+
+        * A reserved meta-verb (``learn``, ``explain``, ``overview``, ``doctor``)
+        * An existing host command name or alias
+        * A top-level (ungrouped) tool name or alias
+
+        The error message includes remediation guidance.
         """
+        # Collect all names/aliases to check
+        all_names: list[str] = [name] + list(aliases)
+
+        # 1. Check against reserved meta-verbs
+        for n in all_names:
+            if n in self._RESERVED_META_VERBS:
+                raise DuplicateError(
+                    f"command name/alias {n!r} is a reserved meta-verb; "
+                    f"cannot register host command with that name. "
+                    f"Use a different name that does not conflict with "
+                    f"{sorted(self._RESERVED_META_VERBS)}."
+                )
+
+        # 2. Check against existing host commands (names + aliases)
+        occupied: set[str] = set()
+        for cmd in self._commands.values():
+            occupied.add(cmd.name)
+            occupied.update(cmd.aliases)
+        for n in all_names:
+            if n in occupied:
+                raise DuplicateError(
+                    f"command name/alias {n!r} already registered; "
+                    f"choose a different name or alias."
+                )
+
+        # 3. Check against top-level (ungrouped) tool names + aliases
+        for entry in self._registry.tools():
+            if entry.group:
+                continue  # Only top-level tools collide at the CLI root
+            occupied.add(entry.name)
+            occupied.update(entry.aliases)
+        for n in all_names:
+            if n in occupied:
+                raise DuplicateError(
+                    f"command name/alias {n!r} already registered as a tool; "
+                    f"choose a different name or alias."
+                )
+
         cmd = HostCommand(
             name=name, handler=handler, help=help, configure=configure, aliases=aliases
         )
-        if name in self._commands:
-            raise DuplicateError(f"command already registered: {name!r}")
         self._commands[name] = cmd
         return cmd
 
