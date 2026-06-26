@@ -20,7 +20,7 @@ import subprocess  # noqa: S404 — the whole point of this module
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from agentfront.cli._errors import EXIT_ENV_ERROR, AfiError
+from agentfront.cli._errors import EXIT_ENV_ERROR, AgentfrontError
 from agentfront.rubric._types import RunOutput
 
 _UV_RUN_TIMEOUT = 30.0
@@ -75,7 +75,7 @@ class SubprocessRunner:
         except (FileNotFoundError, subprocess.TimeoutExpired):
             pass
 
-        raise AfiError(
+        raise AgentfrontError(
             code=EXIT_ENV_ERROR,
             message=f"cannot invoke '{self.tool_name}' in {self.cwd}",
             remediation=(
