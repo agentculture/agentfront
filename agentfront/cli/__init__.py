@@ -7,9 +7,9 @@ functions following the same pattern.
 
 Error propagation contract
 --------------------------
-Every handler raises :class:`agentfront.cli._errors.AfiError` on failure; the
+Every handler raises :class:`agentfront.errors.AgentfrontError` on failure; the
 top-level ``main()`` catches it via :func:`_dispatch` and routes through
-:mod:`agentfront.cli._output`. Unknown exceptions are wrapped into an ``AfiError``
+:mod:`agentfront.cli._output`. Unknown exceptions are wrapped into an ``AgentfrontError``
 so no Python traceback leaks to stderr.
 
 Argparse errors (unknown verb, missing required arg) also route through our
@@ -26,7 +26,7 @@ import argparse
 import sys
 
 from agentfront import __version__, _brand
-from agentfront.cli._errors import EXIT_USER_ERROR, AfiError
+from agentfront.errors import EXIT_USER_ERROR, AgentfrontError
 from agentfront.cli._output import emit_error
 
 # Note: _commands submodules are imported lazily inside :func:`_build_parser`
@@ -38,7 +38,7 @@ class _AgentfrontArgumentParser(argparse.ArgumentParser):
     """ArgumentParser that routes errors through :func:`emit_error`.
 
     Argparse's default error handler writes ``prog: error: <msg>`` to stderr
-    and exits with code 2. That skips our AfiError plumbing and — crucially —
+    and exits with code 2. That skips our AgentfrontError plumbing and — crucially —
     produces no ``hint:`` line, which would make agentfront itself fail the rubric's
     error-propagation bundle. This subclass emits our structured error format
     instead and exits with :attr:`EXIT_USER_ERROR`.
@@ -53,7 +53,7 @@ class _AgentfrontArgumentParser(argparse.ArgumentParser):
     _json_hint: bool = False
 
     def error(self, message: str) -> None:  # type: ignore[override]
-        err = AfiError(
+        err = AgentfrontError(
             code=EXIT_USER_ERROR,
             message=message,
             remediation=f"run '{self.prog} --help' to see valid arguments",
@@ -107,17 +107,17 @@ def _dispatch(args: argparse.Namespace) -> int:
 
     Handler protocol: a handler may return ``None`` (treated as success,
     exit 0) or an ``int`` (used directly as the exit code). Failures MUST
-    raise :class:`AfiError`; any other exception is wrapped into one so no
+    raise :class:`AgentfrontError`; any other exception is wrapped into one so no
     Python traceback leaks.
     """
     json_mode = bool(getattr(args, "json", False))
     try:
         rc = args.func(args)
-    except AfiError as err:
+    except AgentfrontError as err:
         emit_error(err, json_mode=json_mode)
         return err.code
     except Exception as err:  # noqa: BLE001 - last-resort; wrap and route cleanly
-        wrapped = AfiError(
+        wrapped = AgentfrontError(
             code=EXIT_USER_ERROR,
             message=f"unexpected: {err.__class__.__name__}: {err}",
             remediation=f"file a bug at {_brand.ISSUES_URL}",

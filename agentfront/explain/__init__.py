@@ -7,16 +7,16 @@ every noun/verb in the CLI has a catalog entry.
 
 from __future__ import annotations
 
-from agentfront.cli._errors import EXIT_USER_ERROR, AfiError
+from agentfront.errors import EXIT_USER_ERROR, AgentfrontError
 from agentfront.explain.catalog import ENTRIES
 
 
 def resolve(path: tuple[str, ...]) -> str:
-    """Return the markdown body for ``path`` or raise :class:`AfiError`."""
+    """Return the markdown body for ``path`` or raise :class:`AgentfrontError`."""
     if path in ENTRIES:
         return ENTRIES[path]
     display = " ".join(path) if path else "<root>"
-    raise AfiError(
+    raise AgentfrontError(
         code=EXIT_USER_ERROR,
         message=f"no explain entry for: {display}",
         remediation="list known entries with: agentfront explain agentfront",
