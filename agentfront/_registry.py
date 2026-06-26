@@ -15,6 +15,7 @@ from typing import Any, Callable, Optional, get_type_hints
 __all__ = [
     "DocEntry",
     "Flag",
+    "HostCommand",
     "ToolEntry",
     "Registry",
     "apply_flags",
@@ -56,6 +57,17 @@ class ToolEntry:
     group: tuple[str, ...] = ()
     doc: str = ""
     flags: tuple[Flag, ...] = ()
+    aliases: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class HostCommand:
+    """A host-written CLI command, registered via :meth:`App.add_command`."""
+
+    name: str
+    handler: Callable[..., Any]
+    help: str = ""
+    configure: Optional[Callable[[argparse.ArgumentParser], None]] = None
     aliases: tuple[str, ...] = ()
 
 

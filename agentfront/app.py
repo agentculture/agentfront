@@ -20,10 +20,11 @@ source of truth the whole runtime is built on.
 
 from __future__ import annotations
 
+import argparse
 from pathlib import Path
 from typing import Any, Callable, Optional
 
-from agentfront._registry import DocEntry, Flag, Registry, ToolEntry
+from agentfront._registry import DocEntry, DuplicateError, Flag, HostCommand, Registry, ToolEntry
 
 __all__ = ["App"]
 
@@ -42,6 +43,8 @@ class App:
         self.version = version
         self.description = description
         self._registry = Registry()
+        self._commands: dict[str, HostCommand] = {}
+        self._no_command_handler: Optional[Callable[..., Any]] = None
 
     @property
     def registry(self) -> Registry:
@@ -151,6 +154,46 @@ class App:
             app.group("a").group("b").tool  # registers under ("a", "b")
         """
         return _GroupRegistrar(self, tuple(prefix))
+
+    # --- host commands --------------------------------------------------
+    def add_command(
+        self,
+        name: str,
+        handler: Callable[..., Any],
+        *,
+        help: str = "",
+        configure: Optional[Callable[[argparse.ArgumentParser], None]] = None,
+        aliases: tuple[str, ...] = (),
+    ) -> HostCommand:
+        """Register a host-written CLI command.
+
+        Raises :class:`DuplicateError` if *name* already exists.
+        """
+        cmd = HostCommand(
+            name=name, handler=handler, help=help, configure=configure, aliases=aliases
+        )
+        if name in self._commands:
+            raise DuplicateError(f"command already registered: {name!r}")
+        self._commands[name] = cmd
+        return cmd
+
+    def get_command(self, name: str) -> Optional[HostCommand]:
+        """Return the registered host command, or ``None``."""
+        return self._commands.get(name)
+
+    def list_commands(self) -> list[HostCommand]:
+        """Return all registered host commands."""
+        return list(self._commands.values())
+
+    # --- no-command handler -----------------------------------------------
+    def set_no_command_handler(self, handler: Callable[..., Any]) -> None:
+        """Set the handler invoked when the CLI is called without a sub-command."""
+        self._no_command_handler = handler
+
+    @property
+    def no_command_handler(self) -> Optional[Callable[..., Any]]:
+        """The current no-command handler, or ``None``."""
+        return self._no_command_handler
 
     # --- surfaces ---------------------------------------------------------
     # One call each, all derived from this App's single registry. Imports are
