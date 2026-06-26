@@ -97,7 +97,7 @@ def _propagate_raw_argv(parser: _CliParser, argv: list[str] | None) -> None:
         return
     for action in parser._subparsers._actions:
         if isinstance(action, argparse._SubParsersAction):
-            for name, sub in action._name_parser_map.items():
+            for sub in action._name_parser_map.values():
                 if isinstance(sub, _CliParser):
                     _propagate_raw_argv(sub, argv)
 
