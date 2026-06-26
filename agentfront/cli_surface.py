@@ -151,10 +151,115 @@ def _group_overview_handler(
     return handler
 
 
+def _explain_handler(app: App, args: argparse.Namespace) -> int:
+    """Dispatch for the ``explain`` verb — prints an op's doc or group listing."""
+    from agentfront.errors import EXIT_USER_ERROR, AgentfrontError
+
+    path = tuple(args.path) if args.path else ()
+    if not path:
+        # No path given — show root overview
+        print(f"# {app.name} v{app.version}")
+        if app.description:
+            print(app.description)
+        return 0
+
+    entry = app.get_by_path(path)
+    if entry is not None:
+        # Leaf op found — print its doc
+        doc = entry.doc or entry.description or ""
+        if args.json:
+            payload: dict[str, Any] = {"path": list(path), "doc": doc}
+            print(json.dumps(payload, ensure_ascii=False))
+        else:
+            print(doc if doc.endswith("\n") else doc + "\n")
+        return 0
+
+    # Path is a group prefix — list child verbs
+    children: list[tuple[str, str]] = []
+    for tool in app.list_tools():
+        full = tool.group + (tool.name,)
+        if full[: len(path)] == path and len(full) > len(path):
+            child_name = full[len(path)]
+            children.append((child_name, tool.description or ""))
+
+    if children:
+        if args.json:
+            payload = {
+                "path": list(path),
+                "children": [{"name": n, "description": d} for n, d in children],
+            }
+            print(json.dumps(payload, ensure_ascii=False))
+        else:
+            lines: list[str] = []
+            lines.append(f"Available commands in {' '.join(path)}:")
+            for name, desc in children:
+                lines.append(f"  {name}: {desc}")
+            print("\n".join(lines))
+        return 0
+
+    # Unknown path
+    raise AgentfrontError(
+        code=EXIT_USER_ERROR,
+        message=f"no such path: {' '.join(path)}",
+        remediation=f"check available paths with '{app.name} overview'",
+    )
+
+
+def _overview_handler(app: App, args: argparse.Namespace) -> int:
+    """Dispatch for the ``overview`` verb — lists registry nouns."""
+    # Collect top-level nouns: groups (first element) and top-level ops
+    seen: dict[str, str] = {}  # name -> description
+    for tool in app.list_tools():
+        if tool.group:
+            noun = tool.group[0]
+            if noun not in seen:
+                count = len([t for t in app.list_tools() if t.group and t.group[0] == noun])
+                seen[noun] = f"group with {count} commands"
+        else:
+            if tool.name not in seen:
+                seen[tool.name] = tool.description or ""
+
+    if args.scope:
+        # Scoped to a specific noun
+        noun = args.scope
+        children: list[tuple[str, str]] = []
+        for tool in app.list_tools():
+            if tool.group and tool.group[0] == noun:
+                children.append((tool.name, tool.description or ""))
+            elif not tool.group and tool.name == noun:
+                children.append((tool.name, tool.description or ""))
+
+        if args.json:
+            payload = {"noun": noun, "verbs": [{"name": n, "description": d} for n, d in children]}
+            print(json.dumps(payload, ensure_ascii=False))
+        else:
+            lines: list[str] = []
+            lines.append(f"Commands in {noun}:")
+            for name, desc in children:
+                lines.append(f"  {name}: {desc}")
+            print("\n".join(lines))
+        return 0
+
+    # Full overview
+    if args.json:
+        payload = [{"name": name, "description": desc} for name, desc in seen.items()]
+        print(json.dumps(payload, ensure_ascii=False))
+    else:
+        lines: list[str] = []
+        lines.append(f"{app.name} — available commands")
+        for name, desc in seen.items():
+            lines.append(f"  {name}: {desc}")
+        print("\n".join(lines))
+    return 0
+
+
 def _learn_handler(app: App, args: argparse.Namespace) -> int:
     """Dispatch for the ``learn`` verb — prints the agent-facing summary."""
     docs = [{"slug": d.slug, "title": d.title} for d in app.list_docs()]
-    tools = [{"name": t.name, "description": t.description} for t in app.list_tools()]
+    tools: list[dict[str, Any]] = []
+    for t in app.list_tools():
+        path_parts = list(t.group) + [t.name]
+        tools.append({"path": path_parts, "name": t.name, "description": t.description})
 
     if args.json:
         payload: dict[str, Any] = {
@@ -178,7 +283,8 @@ def _learn_handler(app: App, args: argparse.Namespace) -> int:
 
         lines.append("## Tools")
         for t in tools:
-            lines.append(f"  - {t['name']}: {t['description']}")
+            path_str = " ".join(t["path"])
+            lines.append(f"  - {path_str}: {t['description']}")
         lines.append("")
 
         print("\n".join(lines))
@@ -246,10 +352,20 @@ def make_cli(app: App) -> argparse.ArgumentParser:
 
     sub = parser.add_subparsers(dest="command")
 
-    # --- learn and doctor meta-verbs ------------------------------------
+    # --- learn, explain, overview, and doctor meta-verbs ------------------
     learn_parser = sub.add_parser("learn", help="agent-facing summary")
     learn_parser.add_argument("--json", action="store_true", help="emit JSON")
     learn_parser.set_defaults(func=lambda a: _learn_handler(app, a))
+
+    explain_parser = sub.add_parser("explain", help="explain a command or group")
+    explain_parser.add_argument("path", nargs="*", help="command path (e.g. feedback record)")
+    explain_parser.add_argument("--json", action="store_true", help="emit JSON")
+    explain_parser.set_defaults(func=lambda a: _explain_handler(app, a))
+
+    overview_parser = sub.add_parser("overview", help="list available commands")
+    overview_parser.add_argument("scope", nargs="?", help="optional noun to scope to")
+    overview_parser.add_argument("--json", action="store_true", help="emit JSON")
+    overview_parser.set_defaults(func=lambda a: _overview_handler(app, a))
 
     doctor_parser = sub.add_parser("doctor", help="readiness check")
     doctor_parser.set_defaults(func=lambda a: _doctor_handler(app, a))
