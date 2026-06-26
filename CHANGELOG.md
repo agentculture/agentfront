@@ -44,6 +44,24 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   in `$HOME/.eidetic/memory` instead of in-repo. Propagated by rollout-cli's
   `eidetic-memory` recipe.
 
+### Fixed
+
+- **teken wrapper bumped in lockstep to `0.13.0`** — the rollout-cli version
+  bump did not carry `packaging/teken/pyproject.toml`, so the version,
+  `agentfront==` pin, and `agentfront[mcp]==` pin lagged at `0.11.1`. That
+  tripped the teken-lockstep CI guard and `tests/unit/test_wrapper_lockstep.py`.
+  All three are now realigned to `0.13.0`.
+- **Corrected the public-default docs in the `remember`/`recall` wrappers** —
+  the recipe POLICY OVERRIDE flips the injected default visibility to `public`,
+  but the `remember.sh` usage text and the `remember.sh`/`recall.sh` header
+  comments still described eidetic's upstream `private` default. The docstrings
+  and comments now state the `public` default (pass `--visibility private` to
+  route a record to `$HOME`), matching behavior. Also hardened the
+  `remember.sh` interactive-stdin guard to fire on a flags-only invocation that
+  carries no JSON record (not just on zero args), so it can't hang on a TTY.
+  These doc/guard fixes are filed upstream against the rollout-cli
+  `eidetic-memory` recipe + eidetic-cli to be re-propagated.
+
 ## [0.12.0] - 2026-06-23
 
 ### Added

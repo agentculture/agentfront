@@ -79,7 +79,7 @@ esac
 
 resolve_eidetic || exit 2
 
-# ── default to this agent's PERSONAL, PRIVATE scope (culture.yaml `suffix`) ──
+# ── default to this agent's PERSONAL scope, PUBLIC visibility (culture.yaml `suffix`) ──
 # Query this agent's OWN personal scope by default, matching where /remember
 # writes, instead of the global `default` scope shared by every project on this
 # host. We read the `suffix` from the nearest culture.yaml (walking up from this
@@ -88,14 +88,15 @@ resolve_eidetic || exit 2
 # backend (running in a worktree of this same repo) resolves the same suffix,
 # keeping the Claude↔colleague shared-memory story intact.
 #
-# The personal scope is PRIVATE by default to match /remember: in eidetic's model
-# a private record is served only to a recall in the SAME scope (`can_serve`), so
-# querying with --scope <suffix> --visibility private is what retrieves those
-# isolated records (a public/default recall can't see them). Scope and visibility
-# are paired — the private default applies only when we inject the resolved scope,
-# and only if the caller didn't pass --visibility (so an explicit
-# `--visibility public` still wins). An explicit --scope on the command line takes
-# over steering entirely; a wheel install with no culture.yaml falls back to the
+# Visibility defaults to PUBLIC here to match /remember (the rollout-cli
+# eidetic-memory recipe POLICY OVERRIDE applied at the injection site below —
+# NOT eidetic's upstream private default): a plain `/recall` queries the in-repo
+# public pool this repo writes to. Scope and visibility are paired — both are
+# injected only when we resolve a suffix, and only if the caller didn't pass
+# --visibility (so an explicit `--visibility private` still wins and also
+# surfaces this agent's isolated $HOME records). The two-store read model reads
+# both dirs regardless. An explicit --scope on the command line takes over
+# steering entirely; a wheel install with no culture.yaml falls back to the
 # plain CLI default (`default`/`public`).
 resolve_scope() {
     local dir suffix=""

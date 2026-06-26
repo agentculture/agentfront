@@ -59,9 +59,11 @@ Usage:
 
 A record needs `id`, `text`, and `type`; `hash` and `metadata` are recommended
 (hash is derived from text when omitted). Upsert is idempotent by id.
-Records default to this agent's PRIVATE personal scope (--scope from the
-culture.yaml suffix); pass --visibility public to contribute to the shared
-public pool. Every flag is forwarded verbatim to `eidetic remember`.
+Records default to PUBLIC visibility in this agent's personal scope (--scope
+from the culture.yaml suffix) — on eidetic >= 0.10.0 inside a git repo they land
+in <repo-root>/.eidetic/memory (committed, team- and mesh-shared); pass
+--visibility private to keep a record in $HOME (uncommitted). Every flag is
+forwarded verbatim to `eidetic remember`.
 See `eidetic explain remember`.
 EOF
 }
@@ -73,11 +75,20 @@ case "${1:-}" in
         ;;
 esac
 
-# No record argument AND stdin is an interactive terminal → `eidetic remember`
-# would block forever waiting for NDJSON. Show usage instead of hanging. A piped
-# or redirected stdin (`cat records.ndjson | remember.sh`) is not a TTY and
-# proceeds to the batch path normally.
-if [ "$#" -eq 0 ] && [ -t 0 ]; then
+# No JSON-record positional AND stdin is an interactive terminal → `eidetic
+# remember` would block forever waiting for NDJSON. Show usage instead of
+# hanging. A record argument is a JSON object (starts with `{`); checking for
+# that — not just `$# -eq 0` — also catches a flags-only invocation (e.g.
+# `remember.sh --visibility public`) that carries no record. A piped or
+# redirected stdin (`cat records.ndjson | remember.sh`) is not a TTY and
+# proceeds to the batch path normally regardless.
+has_record=0
+for arg in "$@"; do
+    case "$arg" in
+        '{'*) has_record=1; break ;;
+    esac
+done
+if [ "$has_record" -eq 0 ] && [ -t 0 ]; then
     usage >&2
     printf 'hint: pass a JSON record as an argument, or pipe NDJSON on stdin.\n' >&2
     exit 1
@@ -85,7 +96,7 @@ fi
 
 resolve_eidetic || exit 2
 
-# ── default to this agent's PERSONAL, PRIVATE scope (culture.yaml `suffix`) ──
+# ── default to this agent's PERSONAL scope, PUBLIC visibility (culture.yaml `suffix`) ──
 # A record this agent remembers should land in its OWN personal scope, not the
 # global `default` scope shared by every project on this host. We read the
 # `suffix` from the nearest culture.yaml (walking up from this script), so the
@@ -94,14 +105,15 @@ resolve_eidetic || exit 2
 # (running in a worktree of this same repo) resolves the same suffix, keeping
 # the Claude↔colleague shared-memory story intact.
 #
-# The personal scope is PRIVATE by default: in eidetic's model only a private
-# record is isolated to its scope (`can_serve`), so private is what actually
-# keeps these records from leaking to a default/other-scope recall. Scope and
-# visibility are paired — the private default applies only when we inject the
-# resolved scope, and only if the caller didn't pass --visibility (so an
-# explicit `--visibility public` still wins). An explicit --scope on the command
-# line takes over steering entirely; a wheel install with no culture.yaml falls
-# back to the plain CLI default (`default`/`public`).
+# Visibility defaults to PUBLIC here (the rollout-cli eidetic-memory recipe
+# POLICY OVERRIDE applied at the injection site below — NOT eidetic's upstream
+# private default): a plain `/remember` lands in the in-repo, committed,
+# team-/mesh-shared pool (<repo-root>/.eidetic/memory on eidetic >= 0.10.0).
+# Scope and visibility are paired — both are injected only when we resolve a
+# suffix, and only if the caller didn't pass --visibility (so an explicit
+# `--visibility private` still wins and routes the record to $HOME). An explicit
+# --scope on the command line takes over steering entirely; a wheel install with
+# no culture.yaml falls back to the plain CLI default (`default`/`public`).
 resolve_scope() {
     local dir suffix=""
     dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
