@@ -86,7 +86,7 @@ def _read_dependencies(pyproject: Path) -> dict[str, list[str]]:
         if current_section is not None and current_list is not None:
             if stripped.startswith('"') or stripped.startswith("'"):
                 # Inline table entry (e.g. "mcp>=1.28.0",)
-                dep = stripped.strip(',').strip('"').strip("'")
+                dep = stripped.strip(",").strip('"').strip("'")
                 if dep:
                     current_list.append(dep)
             elif stripped.startswith("#"):
@@ -132,7 +132,7 @@ def _parse_deps_simple(pyproject: Path) -> tuple[list[str], dict[str, list[str]]
                 # Could be inline: dependencies = []
                 eq_idx = stripped.index("=") if "=" in stripped else -1
                 if eq_idx >= 0:
-                    value = stripped[eq_idx + 1:].strip()
+                    value = stripped[eq_idx + 1 :].strip()
                     if value.startswith("[") and value.endswith("]"):
                         # Inline list
                         inner = value[1:-1].strip()
@@ -147,7 +147,7 @@ def _parse_deps_simple(pyproject: Path) -> tuple[list[str], dict[str, list[str]]
                 continue
             # Collect multi-line list items under [project]
             if stripped.startswith('"') or stripped.startswith("'"):
-                dep = stripped.strip(',').strip('"').strip("'")
+                dep = stripped.strip(",").strip('"').strip("'")
                 if dep:
                     runtime_deps.append(dep)
 
@@ -156,7 +156,7 @@ def _parse_deps_simple(pyproject: Path) -> tuple[list[str], dict[str, list[str]]
             if "=" in stripped and not stripped.startswith('"'):
                 eq_idx = stripped.index("=")
                 left = stripped[:eq_idx].strip()
-                right = stripped[eq_idx + 1:].strip()
+                right = stripped[eq_idx + 1 :].strip()
                 if right.startswith("["):
                     extra_name = left
                     extras.setdefault(extra_name, [])
@@ -169,7 +169,7 @@ def _parse_deps_simple(pyproject: Path) -> tuple[list[str], dict[str, list[str]]
                 continue
             if extra_name is not None:
                 if stripped.startswith('"') or stripped.startswith("'"):
-                    dep = stripped.strip(',').strip('"').strip("'")
+                    dep = stripped.strip(",").strip('"').strip("'")
                     if dep:
                         extras[extra_name].append(dep)
                 elif stripped == "]":
@@ -202,9 +202,9 @@ class TestConsumerCliStdlib:
         new_top_level = {m.split(".")[0] for m in new_modules}
 
         violations = new_top_level & _THIRD_PARTY_PACKAGES
-        assert not violations, (
-            f"Consumer CLI path imported third-party packages: {sorted(violations)}"
-        )
+        assert (
+            not violations
+        ), f"Consumer CLI path imported third-party packages: {sorted(violations)}"
 
     def test_mcp_not_in_sys_modules_after_cli_usage(self) -> None:
         """Building an App and calling cli()/run_cli must not import 'mcp'."""
@@ -234,17 +234,16 @@ class TestConsumerCliStdlib:
         new_modules = after - before
         new_top_level = {m.split(".")[0] for m in new_modules}
 
-        assert "mcp" not in new_top_level, (
-            "mcp was imported during CLI usage — it should only load via mcp_server()"
-        )
+        assert (
+            "mcp" not in new_top_level
+        ), "mcp was imported during CLI usage — it should only load via mcp_server()"
 
     def test_runtime_dependencies_are_empty(self) -> None:
         """agentfront's [project].dependencies must be empty."""
         pyproject = _get_pyproject()
         runtime_deps, _ = _parse_deps_simple(pyproject)
         assert runtime_deps == [], (
-            f"agentfront has runtime dependencies: {runtime_deps}; "
-            "core must be pure stdlib"
+            f"agentfront has runtime dependencies: {runtime_deps}; " "core must be pure stdlib"
         )
 
     def test_mcp_only_in_optional_extra(self) -> None:
@@ -253,23 +252,17 @@ class TestConsumerCliStdlib:
         runtime_deps, extras = _parse_deps_simple(pyproject)
 
         # Runtime deps must not contain mcp
-        runtime_names = {d.split(">")[0].split("<")[0].split("=")[0].split("[")[0]
-                         for d in runtime_deps}
-        assert "mcp" not in runtime_names, (
-            "mcp must not be a runtime dependency"
-        )
+        runtime_names = {
+            d.split(">")[0].split("<")[0].split("=")[0].split("[")[0] for d in runtime_deps
+        }
+        assert "mcp" not in runtime_names, "mcp must not be a runtime dependency"
 
         # mcp must be in the optional extras
-        assert "mcp" in extras, (
-            "mcp must be declared under [project.optional-dependencies]"
-        )
+        assert "mcp" in extras, "mcp must be declared under [project.optional-dependencies]"
 
         # The mcp extra must contain the mcp SDK
         mcp_extra = extras["mcp"]
         mcp_sdk_names = {
-            d.split(">")[0].split("<")[0].split("=")[0].split("[")[0]
-            for d in mcp_extra
+            d.split(">")[0].split("<")[0].split("=")[0].split("[")[0] for d in mcp_extra
         }
-        assert "mcp" in mcp_sdk_names, (
-            f"[mcp] extra must contain the mcp SDK; got {mcp_extra}"
-        )
+        assert "mcp" in mcp_sdk_names, f"[mcp] extra must contain the mcp SDK; got {mcp_extra}"
