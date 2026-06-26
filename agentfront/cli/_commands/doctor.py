@@ -34,7 +34,7 @@ from typing import Iterable
 from urllib.parse import unquote, urlparse
 
 from agentfront import _brand
-from agentfront.cli._errors import EXIT_USER_ERROR, AfiError
+from agentfront.errors import EXIT_USER_ERROR, AgentfrontError
 from agentfront.cli._output import emit_diagnostic, emit_result
 from agentfront.doctor import is_healthy, run_self_diagnosis
 from agentfront.doctor.fixes import apply_fix

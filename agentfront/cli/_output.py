@@ -11,7 +11,7 @@ import json
 import sys
 from typing import Any, TextIO
 
-from agentfront.cli._errors import AfiError
+from agentfront.errors import AgentfrontError
 
 
 def emit_result(data: Any, *, json_mode: bool, stream: TextIO | None = None) -> None:
@@ -32,8 +32,8 @@ def emit_result(data: Any, *, json_mode: bool, stream: TextIO | None = None) -> 
         s.write("\n")
 
 
-def emit_error(err: AfiError, *, json_mode: bool, stream: TextIO | None = None) -> None:
-    """Write an :class:`AfiError` to stderr.
+def emit_error(err: AgentfrontError, *, json_mode: bool, stream: TextIO | None = None) -> None:
+    """Write an :class:`AgentfrontError` to stderr.
 
     Text mode renders as two lines when a remediation is present::
 
