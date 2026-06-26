@@ -164,7 +164,7 @@ def test_doctor_path_and_package_mutually_exclusive() -> None:
 
     Argparse alone can't reject this (path positional + optional flag
     can't share a mutually-exclusive group cleanly), so the handler
-    raises ``AfiError``. The contract is still: non-zero exit, no
+    raises ``AgentfrontError``. The contract is still: non-zero exit, no
     traceback, named in the diagnostic.
     """
     result = _run_agentfront("doctor", ".", "--package", "agentfront", cwd=REPO_ROOT)

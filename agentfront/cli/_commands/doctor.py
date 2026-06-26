@@ -34,10 +34,10 @@ from typing import Iterable
 from urllib.parse import unquote, urlparse
 
 from agentfront import _brand
-from agentfront.cli._errors import EXIT_USER_ERROR, AfiError
 from agentfront.cli._output import emit_diagnostic, emit_result
 from agentfront.doctor import is_healthy, run_self_diagnosis
 from agentfront.doctor.fixes import apply_fix
+from agentfront.errors import EXIT_USER_ERROR, AgentfrontError
 from agentfront.rubric import run_rubric
 from agentfront.rubric._runner import SubprocessRunner
 from agentfront.rubric._types import CheckResult, VerifyContext
@@ -189,7 +189,7 @@ def _resolve_tool_name(target_path: Path, *, command: str = _DEFAULT_DOCTOR_COMM
 
     pp = target_path / "pyproject.toml"
     if not pp.is_file():
-        raise AfiError(
+        raise AgentfrontError(
             code=EXIT_USER_ERROR,
             message=f"'{target_path}' is not a project root (no pyproject.toml at {pp})",
             remediation=(
@@ -202,14 +202,14 @@ def _resolve_tool_name(target_path: Path, *, command: str = _DEFAULT_DOCTOR_COMM
     try:
         data = tomllib.loads(pp.read_text())
     except tomllib.TOMLDecodeError as err:
-        raise AfiError(
+        raise AgentfrontError(
             code=EXIT_USER_ERROR,
             message=f"invalid TOML in {pp}: {err}",
             remediation="fix the TOML syntax error in pyproject.toml",
         ) from err
     project = data.get("project") if isinstance(data, dict) else None
     if project is not None and not isinstance(project, dict):
-        raise AfiError(
+        raise AgentfrontError(
             code=EXIT_USER_ERROR,
             message=f"invalid {pp}: [project] must be a TOML table",
             remediation=(
@@ -219,13 +219,13 @@ def _resolve_tool_name(target_path: Path, *, command: str = _DEFAULT_DOCTOR_COMM
         )
     scripts = project.get("scripts") if isinstance(project, dict) else None
     if scripts is not None and not isinstance(scripts, dict):
-        raise AfiError(
+        raise AgentfrontError(
             code=EXIT_USER_ERROR,
             message=f"invalid {pp}: [project.scripts] must be a TOML table",
             remediation='rewrite [project.scripts] as a table of name = "module:func" entries',
         )
     if not scripts:
-        raise AfiError(
+        raise AgentfrontError(
             code=EXIT_USER_ERROR,
             message=f"no [project.scripts] in {pp}",
             remediation=(
@@ -241,7 +241,7 @@ def _resolve_package_source_root(name: str, *, command: str = _DEFAULT_DOCTOR_CO
     Reads PEP 610 ``direct_url.json`` from the installed distribution and
     returns the recorded source path when it points at a real *editable*
     project root (``file://`` URL with ``dir_info.editable == true`` and a
-    ``pyproject.toml`` on disk). Raises :class:`AfiError` on every other
+    ``pyproject.toml`` on disk). Raises :class:`AgentfrontError` on every other
     branch with a remediation that names the next step (install editable,
     or pass a path).
 
@@ -251,7 +251,7 @@ def _resolve_package_source_root(name: str, *, command: str = _DEFAULT_DOCTOR_CO
     try:
         dist = _metadata.distribution(name)
     except _metadata.PackageNotFoundError as err:
-        raise AfiError(
+        raise AgentfrontError(
             code=EXIT_USER_ERROR,
             message=f"no installed distribution named '{name}'",
             remediation=(
@@ -263,7 +263,7 @@ def _resolve_package_source_root(name: str, *, command: str = _DEFAULT_DOCTOR_CO
 
     raw = dist.read_text("direct_url.json")
     if not raw:
-        raise AfiError(
+        raise AgentfrontError(
             code=EXIT_USER_ERROR,
             message=f"'{name}' is installed but not as an editable file:// install",
             remediation=(
@@ -275,7 +275,7 @@ def _resolve_package_source_root(name: str, *, command: str = _DEFAULT_DOCTOR_CO
     try:
         info = _json.loads(raw)
     except _json.JSONDecodeError as err:
-        raise AfiError(
+        raise AgentfrontError(
             code=EXIT_USER_ERROR,
             message=f"'{name}': direct_url.json is not valid JSON ({err})",
             remediation=f"reinstall '{name}' to refresh its install metadata",
@@ -284,7 +284,7 @@ def _resolve_package_source_root(name: str, *, command: str = _DEFAULT_DOCTOR_CO
     url = info.get("url", "") if isinstance(info, dict) else ""
     parsed = urlparse(url)
     if parsed.scheme != "file":
-        raise AfiError(
+        raise AgentfrontError(
             code=EXIT_USER_ERROR,
             message=(
                 f"'{name}' was installed from a non-file source ({url!r}); "
@@ -305,7 +305,7 @@ def _resolve_package_source_root(name: str, *, command: str = _DEFAULT_DOCTOR_CO
     # diagnostic names the real cause instead of a downstream symptom.
     dir_info = info.get("dir_info") if isinstance(info, dict) else None
     if not (isinstance(dir_info, dict) and dir_info.get("editable") is True):
-        raise AfiError(
+        raise AgentfrontError(
             code=EXIT_USER_ERROR,
             message=(
                 f"'{name}' is installed from a local source but not editable; "
@@ -319,7 +319,7 @@ def _resolve_package_source_root(name: str, *, command: str = _DEFAULT_DOCTOR_CO
 
     src = Path(unquote(parsed.path)).resolve()
     if not (src / "pyproject.toml").is_file():
-        raise AfiError(
+        raise AgentfrontError(
             code=EXIT_USER_ERROR,
             message=(f"'{name}' resolves to '{src}' but no pyproject.toml is there"),
             remediation=(
@@ -398,7 +398,7 @@ def _resolve_target_or_raise(
     the runnable command they typed.
     """
     if package is not None and raw_path is not None:
-        raise AfiError(
+        raise AgentfrontError(
             code=EXIT_USER_ERROR,
             message="--package and a path argument are mutually exclusive",
             remediation=(
@@ -412,7 +412,7 @@ def _resolve_target_or_raise(
     if raw_path is None:
         # Defensive: callers gate the "neither set" branch themselves.
         # If we ever land here it means a new caller forgot to do so.
-        raise AfiError(
+        raise AgentfrontError(
             code=EXIT_USER_ERROR,
             message="no audit target supplied",
             remediation=f"pass a path or `{command} --package <name>`",

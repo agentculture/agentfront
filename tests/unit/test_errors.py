@@ -8,31 +8,31 @@ from agentfront.cli._errors import (
     EXIT_ENV_ERROR,
     EXIT_SUCCESS,
     EXIT_USER_ERROR,
-    AfiError,
+    AgentfrontError,
 )
 
 
 def test_afi_error_carries_fields() -> None:
-    err = AfiError(code=1, message="bad input", remediation="try again")
+    err = AgentfrontError(code=1, message="bad input", remediation="try again")
     assert err.code == 1
     assert err.message == "bad input"
     assert err.remediation == "try again"
 
 
 def test_afi_error_is_raisable() -> None:
-    with pytest.raises(AfiError) as exc:
-        raise AfiError(code=2, message="env broken", remediation="run uv sync")
+    with pytest.raises(AgentfrontError) as exc:
+        raise AgentfrontError(code=2, message="env broken", remediation="run uv sync")
     assert exc.value.code == 2
     assert "env broken" in str(exc.value)
 
 
 def test_afi_error_default_remediation_empty() -> None:
-    err = AfiError(code=1, message="m")
+    err = AgentfrontError(code=1, message="m")
     assert err.remediation == ""
 
 
 def test_afi_error_to_dict_shape() -> None:
-    err = AfiError(code=1, message="m", remediation="r")
+    err = AgentfrontError(code=1, message="m", remediation="r")
     assert err.to_dict() == {"code": 1, "message": "m", "remediation": "r"}
 
 

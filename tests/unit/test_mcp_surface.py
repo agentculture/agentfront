@@ -1,4 +1,4 @@
-"""Unit tests for agentfront.mcp_surface — the MCP surface (t1).
+"""Unit tests for agentfront.mcp_surface — single-dispatch MCP tool (t1).
 
 Drive ``make_mcp_server`` via the SDK's in-memory client/session so no
 subprocess is needed.
@@ -32,45 +32,97 @@ def app() -> App:
 # --- listing tools -------------------------------------------------------
 
 
-def test_list_tools_yields_registered_names(app: App):
+def test_list_tools_yields_single_run_tool(app: App):
     server = make_mcp_server(app)
     tools = anyio.run(_list_tools, server)
-    names = [t.name for t in tools]
-    assert names == ["add", "greet"]
+    assert len(tools) == 1
+    assert tools[0].name == "run"
 
 
-def test_list_tools_includes_description_and_schema(app: App):
+def test_run_tool_description_embeds_catalog(app: App):
     server = make_mcp_server(app)
     tools = anyio.run(_list_tools, server)
-    by_name = {t.name: t for t in tools}
+    tool = tools[0]
+    assert tool.name == "run"
+    # The description must contain the catalog with command paths
+    assert "add" in tool.description
+    assert "greet" in tool.description
+    # Verify the catalog is valid JSON embedded in the description
+    import json
 
-    add_tool = by_name["add"]
-    assert add_tool.description == "Add two numbers."
-    assert add_tool.inputSchema["type"] == "object"
-    assert "x" in add_tool.inputSchema["properties"]
-    assert "y" in add_tool.inputSchema["properties"]
+    # Extract the JSON catalog from the description (after "Available commands:")
+    desc = tool.description
+    marker = "Available commands:\n"
+    catalog_start = desc.index(marker) + len(marker)
+    catalog_text = desc[catalog_start:]
+    catalog = json.loads(catalog_text)
+    assert isinstance(catalog, list)
+    paths = {tuple(c["path"]) for c in catalog}
+    assert ("add",) in paths
+    assert ("greet",) in paths
 
-    greet_tool = by_name["greet"]
-    assert greet_tool.description == "Say hello"
-    assert "name" in greet_tool.inputSchema["properties"]
+
+def test_run_tool_input_schema_has_command_and_args(app: App):
+    server = make_mcp_server(app)
+    tools = anyio.run(_list_tools, server)
+    schema = tools[0].inputSchema
+    assert schema["type"] == "object"
+    assert "command" in schema["properties"]
+    assert "args" in schema["properties"]
+    assert schema["properties"]["command"]["type"] == "array"
+    assert schema["properties"]["args"]["type"] == "object"
+    assert "command" in schema["required"]
+    assert "args" in schema["required"]
 
 
 # --- calling tools -------------------------------------------------------
 
 
-def test_call_tool_routes_to_func(app: App):
+def test_call_run_dispatches_by_command_path(app: App):
     server = make_mcp_server(app)
-    result = anyio.run(_call_tool, server, "add", {"x": 3, "y": 4})
+    result = anyio.run(_call_tool, server, "run", {"command": ["add"], "args": {"x": 3, "y": 4}})
     assert result == 7
 
 
-def test_call_tool_string_result(app: App):
+def test_call_run_string_result(app: App):
     server = make_mcp_server(app)
-    result = anyio.run(_call_tool, server, "greet", {"name": "world"})
+    result = anyio.run(_call_tool, server, "run", {"command": ["greet"], "args": {"name": "world"}})
     assert result == "hello world"
 
 
-def test_call_tool_awaits_async_func():
+def test_call_run_unknown_command_returns_error():
+    a = App(name="t")
+
+    @a.tool
+    def search(query: str) -> str:
+        """Search."""
+        return query
+
+    server = make_mcp_server(a)
+    result = anyio.run(_call_tool, server, "run", {"command": ["nonexistent"], "args": {}})
+    assert "error" in result
+    err = result["error"]
+    assert "code" in err
+    assert "message" in err
+    assert "remediation" in err
+    assert "nonexistent" in err["message"]
+
+
+def test_call_run_bad_args_returns_error():
+    a = App(name="t")
+
+    @a.tool
+    def add(x: int, y: int) -> int:
+        """Add."""
+        return x + y
+
+    server = make_mcp_server(a)
+    # Missing required args
+    result = anyio.run(_call_tool, server, "run", {"command": ["add"], "args": {}})
+    assert "error" in result
+
+
+def test_call_run_awaits_async_func():
     """An ``async def`` tool is awaited, not returned as a raw coroutine."""
     a = App(name="async-app")
 
@@ -80,41 +132,84 @@ def test_call_tool_awaits_async_func():
         return f"fetched {url}"
 
     server = make_mcp_server(a)
-    result = anyio.run(_call_tool, server, "fetch", {"url": "x"})
+    result = anyio.run(_call_tool, server, "run", {"command": ["fetch"], "args": {"url": "x"}})
     assert result == "fetched x"
 
 
-# --- schema from typed signature ----------------------------------------
-
-
-def test_typed_signature_surfaces_schema():
-    a = App(name="typed")
+def test_call_run_command_items_must_be_strings():
+    """Non-string command items return a structured error, not a TypeError."""
+    a = App(name="t")
 
     @a.tool
-    def search(query: str, limit: int = 10) -> str:
-        """Search things."""
-        return query
+    def add(x: int, y: int) -> int:
+        """Add."""
+        return x + y
+
+    server = make_mcp_server(a)
+    result = anyio.run(_call_tool, server, "run", {"command": [123], "args": {}})
+    assert "error" in result
+    err = result["error"]
+    assert "code" in err
+    assert "message" in err
+    assert "remediation" in err
+
+
+def test_call_run_unknown_tool_name_returns_error():
+    a = App(name="t")
+    server = make_mcp_server(a)
+    result = anyio.run(_call_tool, server, "not-run", {})
+    assert "error" in result
+    err = result["error"]
+    assert "not-run" in err["message"]
+
+
+# --- grouped tools -------------------------------------------------------
+
+
+def test_grouped_tool_dispatch():
+    a = App(name="grouped")
+
+    @a.tool(group="feedback")
+    def record(text: str) -> str:
+        """Record feedback."""
+        return text
+
+    server = make_mcp_server(a)
+    result = anyio.run(
+        _call_tool, server, "run", {"command": ["feedback", "record"], "args": {"text": "hello"}}
+    )
+    assert result == "hello"
+
+
+def test_grouped_tool_in_catalog():
+    a = App(name="grouped")
+
+    @a.tool(group="feedback")
+    def record(text: str) -> str:
+        """Record feedback."""
+        return text
 
     server = make_mcp_server(a)
     tools = anyio.run(_list_tools, server)
-    assert len(tools) == 1
-    schema = tools[0].inputSchema
-    assert schema["type"] == "object"
-    assert schema["properties"]["query"]["type"] == "string"
-    assert schema["properties"]["limit"]["type"] == "integer"
-    # "query" is required (no default), "limit" is not
-    assert "query" in schema["required"]
-    assert "limit" not in schema["required"]
+    import json
+
+    desc = tools[0].description
+    marker = "Available commands:\n"
+    catalog_text = desc[desc.index(marker) + len(marker) :]
+    catalog = json.loads(catalog_text)
+    paths = {tuple(c["path"]) for c in catalog}
+    assert ("feedback", "record") in paths
 
 
 # --- empty app ----------------------------------------------------------
 
 
-def test_empty_app_has_no_tools():
+def test_empty_app_has_one_tool():
     a = App(name="empty")
     server = make_mcp_server(a)
     tools = anyio.run(_list_tools, server)
-    assert tools == []
+    assert len(tools) == 1
+    assert tools[0].name == "run"
 
 
 # --- optional mcp extra --------------------------------------------------
@@ -153,7 +248,11 @@ async def _list_tools(server) -> list:
 
 
 async def _call_tool(server, tool_name: str, arguments: dict) -> object:
-    """Invoke the call_tool handler and extract the raw return value."""
+    """Invoke the call_tool handler and extract the raw return value.
+
+    Returns the unwrapped result (the actual function return value) on success,
+    or the full structuredContent dict (which contains 'error' key) on failure.
+    """
     from mcp import types
 
     req = types.CallToolRequest(
@@ -163,13 +262,19 @@ async def _call_tool(server, tool_name: str, arguments: dict) -> object:
     assert handler is not None, "call_tool handler not registered"
     result = await handler(req)
     call_result = result.root
-    # The server returns {"result": <func_return>} as structuredContent
     if call_result.structuredContent is not None:
-        return call_result.structuredContent["result"]
+        sc = call_result.structuredContent
+        # Unwrap {"result": value} to just value; pass through {"error": ...}
+        if "result" in sc:
+            return sc["result"]
+        return sc
     # Fallback: parse from text content
     for content in call_result.content:
         if hasattr(content, "text"):
             import json
 
-            return json.loads(content.text)["result"]
+            parsed = json.loads(content.text)
+            if "result" in parsed:
+                return parsed["result"]
+            return parsed
     return call_result

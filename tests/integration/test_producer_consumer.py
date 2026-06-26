@@ -64,7 +64,7 @@ def test_consumer_browses_docs_over_http_with_only_a_fetch():
         thread.join(timeout=2)
 
 
-def _call_tool(app: App, name: str, arguments: dict) -> object:
+def _call_tool(app: App, command: list[str], arguments: dict) -> object:
     """A consumer calling a tool through the MCP server's request handler."""
     server = app.mcp_server()
 
@@ -72,17 +72,19 @@ def _call_tool(app: App, name: str, arguments: dict) -> object:
         handler = server.request_handlers[types.CallToolRequest]
         req = types.CallToolRequest(
             method="tools/call",
-            params=types.CallToolRequestParams(name=name, arguments=arguments),
+            params=types.CallToolRequestParams(
+                name="run", arguments={"command": command, "args": arguments}
+            ),
         )
         result = await handler(req)
         root = result.root
         if root.structuredContent is not None:
-            return root.structuredContent["result"]
+            return root.structuredContent
         import json
 
         for content in root.content:
             if hasattr(content, "text"):
-                return json.loads(content.text)["result"]
+                return json.loads(content.text)
         return root
 
     return anyio.run(_call)
@@ -101,6 +103,7 @@ def test_consumer_invokes_a_tool_over_mcp():
         result = await handler(req)
         return {t.name for t in result.root.tools}
 
-    assert anyio.run(_list) == {"add"}
+    # Single-dispatch: exactly one tool named 'run'
+    assert anyio.run(_list) == {"run"}
     # the call actually executes the registered function end-to-end
-    assert _call_tool(app, "add", {"x": 2, "y": 3}) == 5
+    assert _call_tool(app, ["add"], {"x": 2, "y": 3}) == {"result": 5}

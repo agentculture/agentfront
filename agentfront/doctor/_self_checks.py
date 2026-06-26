@@ -216,7 +216,7 @@ def _check_surface_coherence_explain() -> CheckResult:
     for path in leaves:
         try:
             explain_resolve(path)
-        except Exception:  # noqa: BLE001 - resolve raises AfiError; treat any miss the same
+        except Exception:  # noqa: BLE001 - resolve raises AgentfrontError; treat any miss the same
             missing.append(" ".join(path))
     if not missing:
         return CheckResult(

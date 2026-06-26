@@ -2,7 +2,7 @@
 
 ``explain`` is global (not nested under a noun). It takes zero or more path
 tokens and resolves them via :mod:`agentfront.explain`. Unknown paths raise
-:class:`AfiError` with a remediation pointing at ``agentfront explain agentfront``.
+:class:`AgentfrontError` with a remediation pointing at ``agentfront explain agentfront``.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from agentfront.explain import resolve
 
 def cmd_explain(args: argparse.Namespace) -> int:
     path = tuple(args.path) if args.path else ()
-    markdown = resolve(path)  # raises AfiError on miss → caught in _dispatch
+    markdown = resolve(path)  # raises AgentfrontError on miss → caught in _dispatch
     json_mode = bool(getattr(args, "json", False))
     if json_mode:
         emit_result({"path": list(path), "markdown": markdown}, json_mode=True)

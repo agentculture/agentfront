@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/). This project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] - 2026-06-26
+
+
+### Added
+
+- Public consumer CLI API for issue #35: App.cli()/run_cli render a host's full nested noun/verb CLI from the App registry (signature-derived args + tool dispatch, n-level groups via group=/app.group(), per-verb --json, structured AgentfrontError {code,message,remediation} to stderr, registry-derived explain/overview/learn, bare-noun->overview, rich per-verb flags, native aliases, app.add_command() host launcher verbs + no-command handler).
+- Single-dispatch 'CLI on MCP' tool: app.mcp_server() now exposes ONE run tool taking {command,args} with the command catalog embedded, replacing N-tools.
+- Public agentfront.errors.AgentfrontError; agentfront/_cli_core.py shared dispatch/error machinery; cross-surface invariant harness (serve.surfaces_agree) compares CLI == single MCP catalog == learn.
+- docs/consumer-cli.md documenting the versioned public API.
+
+
+### Changed
+
+- agentfront.cli._errors.AfiError renamed to the public AgentfrontError (completes the deferred PR #22 rename).
+- Maintainability cleanup of the new CLI surface (no behaviour change, all 442 tests green): split the explain/overview handlers and the signature/flag derivation into focused helpers to clear SonarCloud cognitive-complexity (S3776) and invariant-return (S3516) findings, merged a duplicated overview branch (S1871), hoisted the repeated `--json` help literal into a constant (S1192), and dropped the unused `doctor` handler arg (S1172).
+
 ## [0.13.1] - 2026-06-26
 
 

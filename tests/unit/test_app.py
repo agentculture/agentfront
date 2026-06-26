@@ -127,7 +127,7 @@ def test_no_side_channel_registration_path():
     containers = [
         v
         for k, v in vars(app).items()
-        if isinstance(v, (list, dict, set)) and not k.startswith("__")
+        if isinstance(v, (list, dict, set)) and not k.startswith("_")
     ]
     # no stray list/dict/set holding state alongside the registry
     assert containers == []

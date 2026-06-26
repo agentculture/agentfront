@@ -7,7 +7,7 @@ import json
 import pytest
 
 from agentfront.cli import main
-from agentfront.cli._errors import AfiError
+from agentfront.cli._errors import AgentfrontError
 from agentfront.explain import known_paths, resolve
 
 
@@ -31,7 +31,7 @@ def test_resolve_known_verbs() -> None:
 
 
 def test_resolve_unknown_path_raises_afi_error() -> None:
-    with pytest.raises(AfiError) as exc:
+    with pytest.raises(AgentfrontError) as exc:
         resolve(("nope",))
     assert exc.value.code == 1
     assert "no explain entry" in exc.value.message

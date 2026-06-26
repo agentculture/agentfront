@@ -17,7 +17,7 @@ from urllib.parse import quote
 import pytest
 
 from agentfront.cli._commands.doctor import _resolve_package_source_root
-from agentfront.cli._errors import AfiError
+from agentfront.cli._errors import AgentfrontError
 
 
 class _FakeDist:
@@ -64,7 +64,7 @@ def test_missing_dist_raises_with_install_remediation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_distribution(monkeypatch, _metadata.PackageNotFoundError)
-    with pytest.raises(AfiError) as exc_info:
+    with pytest.raises(AgentfrontError) as exc_info:
         _resolve_package_source_root("ghost-package")
     assert "no installed distribution named 'ghost-package'" in exc_info.value.message
     assert "uv pip install -e" in exc_info.value.remediation
@@ -74,7 +74,7 @@ def test_missing_direct_url_signals_non_editable_install(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_distribution(monkeypatch, None)
-    with pytest.raises(AfiError) as exc_info:
+    with pytest.raises(AgentfrontError) as exc_info:
         _resolve_package_source_root("wheel-only")
     assert "not as an editable file:// install" in exc_info.value.message
 
@@ -83,7 +83,7 @@ def test_invalid_direct_url_json_is_rejected(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_distribution(monkeypatch, "{ not valid json")
-    with pytest.raises(AfiError) as exc_info:
+    with pytest.raises(AgentfrontError) as exc_info:
         _resolve_package_source_root("corrupt-meta")
     assert "direct_url.json is not valid JSON" in exc_info.value.message
 
@@ -91,7 +91,7 @@ def test_invalid_direct_url_json_is_rejected(
 def test_non_file_url_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
     payload = json.dumps({"url": "https://github.com/owner/repo.git"})
     _patch_distribution(monkeypatch, payload)
-    with pytest.raises(AfiError) as exc_info:
+    with pytest.raises(AgentfrontError) as exc_info:
         _resolve_package_source_root("vcs-only")
     assert "non-file source" in exc_info.value.message
 
@@ -103,7 +103,7 @@ def test_file_url_without_pyproject_is_rejected(
     # editable record pointing at a deleted/moved repo.
     payload = json.dumps({"url": f"file://{quote(str(tmp_path))}", "dir_info": {"editable": True}})
     _patch_distribution(monkeypatch, payload)
-    with pytest.raises(AfiError) as exc_info:
+    with pytest.raises(AgentfrontError) as exc_info:
         _resolve_package_source_root("stale")
     assert "no pyproject.toml is there" in exc_info.value.message
 
@@ -121,7 +121,7 @@ def test_non_editable_file_install_is_rejected(
     (tmp_path / "pyproject.toml").write_text('[project]\nname = "demo"\n')
     payload = json.dumps({"url": f"file://{quote(str(tmp_path))}", "dir_info": {"editable": False}})
     _patch_distribution(monkeypatch, payload)
-    with pytest.raises(AfiError) as exc_info:
+    with pytest.raises(AgentfrontError) as exc_info:
         _resolve_package_source_root("not-editable")
     assert "not editable" in exc_info.value.message
     assert "uv pip install -e" in exc_info.value.remediation
@@ -138,7 +138,7 @@ def test_file_install_without_dir_info_is_rejected(
     (tmp_path / "pyproject.toml").write_text('[project]\nname = "demo"\n')
     payload = json.dumps({"url": f"file://{quote(str(tmp_path))}"})
     _patch_distribution(monkeypatch, payload)
-    with pytest.raises(AfiError) as exc_info:
+    with pytest.raises(AgentfrontError) as exc_info:
         _resolve_package_source_root("no-dir-info")
     assert "not editable" in exc_info.value.message
 

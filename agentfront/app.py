@@ -20,10 +20,11 @@ source of truth the whole runtime is built on.
 
 from __future__ import annotations
 
+import argparse
 from pathlib import Path
 from typing import Any, Callable, Optional
 
-from agentfront._registry import DocEntry, Registry, ToolEntry
+from agentfront._registry import DocEntry, DuplicateError, Flag, HostCommand, Registry, ToolEntry
 
 __all__ = ["App"]
 
@@ -42,6 +43,8 @@ class App:
         self.version = version
         self.description = description
         self._registry = Registry()
+        self._commands: dict[str, HostCommand] = {}
+        self._no_command_handler: Optional[Callable[..., Any]] = None
 
     @property
     def registry(self) -> Registry:
@@ -98,15 +101,33 @@ class App:
         *,
         name: Optional[str] = None,
         description: Optional[str] = None,
+        group: Optional[str | tuple[str, ...]] = None,
+        doc: Optional[str] = None,
+        flags: tuple[Flag, ...] = (),
+        aliases: tuple[str, ...] = (),
     ) -> Any:
         """Register a function as a tool.
 
         Usable as ``@app.tool``, ``@app.tool(name=...)``, or ``app.tool(fn)``.
+        ``group`` accepts a single noun string or a tuple of nouns for nested
+        paths; the registered op's full path is ``group + (name,)``.
         Returns the original function so it stays callable in the host.
         """
+        if isinstance(group, str):
+            group = (group,)
+        elif group is None:
+            group = ()
 
         def register(f: Callable[..., Any]) -> Callable[..., Any]:
-            self._registry.add_tool(f, name=name, description=description)
+            self._registry.add_tool(
+                f,
+                name=name,
+                description=description,
+                group=group,
+                doc=doc,
+                flags=flags,
+                aliases=aliases,
+            )
             return f
 
         if func is not None:
@@ -119,8 +140,104 @@ class App:
     def get_tool(self, name: str) -> Optional[ToolEntry]:
         return self._registry.get_tool(name)
 
+    def get_by_path(self, path: tuple[str, ...]) -> Optional[ToolEntry]:
+        return self._registry.get_by_path(path)
+
     def list_tools(self) -> list[ToolEntry]:
         return self._registry.tools()
+
+    def group(self, *prefix: str) -> "_GroupRegistrar":
+        """Return a sub-registrar that nests tools under *prefix*.
+
+        Chaining is supported::
+
+            app.group("a").group("b").tool  # registers under ("a", "b")
+        """
+        return _GroupRegistrar(self, tuple(prefix))
+
+    # --- host commands --------------------------------------------------
+    _RESERVED_META_VERBS: set[str] = {"learn", "explain", "overview", "doctor"}
+
+    def add_command(
+        self,
+        name: str,
+        handler: Callable[..., Any],
+        *,
+        help: str = "",
+        configure: Optional[Callable[[argparse.ArgumentParser], None]] = None,
+        aliases: tuple[str, ...] = (),
+    ) -> HostCommand:
+        """Register a host-written CLI command.
+
+        Raises :class:`DuplicateError` if *name* or any *alias* collides with:
+
+        * A reserved meta-verb (``learn``, ``explain``, ``overview``, ``doctor``)
+        * An existing host command name or alias
+        * A top-level (ungrouped) tool name or alias
+
+        The error message includes remediation guidance.
+        """
+        # Collect all names/aliases to check
+        all_names: list[str] = [name] + list(aliases)
+
+        # 1. Check against reserved meta-verbs
+        for n in all_names:
+            if n in self._RESERVED_META_VERBS:
+                raise DuplicateError(
+                    f"command name/alias {n!r} is a reserved meta-verb; "
+                    f"cannot register host command with that name. "
+                    f"Use a different name that does not conflict with "
+                    f"{sorted(self._RESERVED_META_VERBS)}."
+                )
+
+        # 2. Check against existing host commands (names + aliases)
+        occupied: set[str] = set()
+        for cmd in self._commands.values():
+            occupied.add(cmd.name)
+            occupied.update(cmd.aliases)
+        for n in all_names:
+            if n in occupied:
+                raise DuplicateError(
+                    f"command name/alias {n!r} already registered; "
+                    f"choose a different name or alias."
+                )
+
+        # 3. Check against top-level (ungrouped) tool names + aliases
+        for entry in self._registry.tools():
+            if entry.group:
+                continue  # Only top-level tools collide at the CLI root
+            occupied.add(entry.name)
+            occupied.update(entry.aliases)
+        for n in all_names:
+            if n in occupied:
+                raise DuplicateError(
+                    f"command name/alias {n!r} already registered as a tool; "
+                    f"choose a different name or alias."
+                )
+
+        cmd = HostCommand(
+            name=name, handler=handler, help=help, configure=configure, aliases=aliases
+        )
+        self._commands[name] = cmd
+        return cmd
+
+    def get_command(self, name: str) -> Optional[HostCommand]:
+        """Return the registered host command, or ``None``."""
+        return self._commands.get(name)
+
+    def list_commands(self) -> list[HostCommand]:
+        """Return all registered host commands."""
+        return list(self._commands.values())
+
+    # --- no-command handler -----------------------------------------------
+    def set_no_command_handler(self, handler: Callable[..., Any]) -> None:
+        """Set the handler invoked when the CLI is called without a sub-command."""
+        self._no_command_handler = handler
+
+    @property
+    def no_command_handler(self) -> Optional[Callable[..., Any]]:
+        """The current no-command handler, or ``None``."""
+        return self._no_command_handler
 
     # --- surfaces ---------------------------------------------------------
     # One call each, all derived from this App's single registry. Imports are
@@ -166,6 +283,49 @@ class App:
         from agentfront.cli_surface import make_cli
 
         return make_cli(self)
+
+
+class _GroupRegistrar:
+    """Sub-registrar that prefixes tool registrations with a group path.
+
+    Returned by :meth:`App.group`; supports chaining via :meth:`group`.
+    """
+
+    def __init__(self, app: App, prefix: tuple[str, ...]) -> None:
+        self._app = app
+        self._prefix = prefix
+
+    def group(self, *more: str) -> "_GroupRegistrar":
+        """Extend the group prefix and return a new sub-registrar."""
+        return _GroupRegistrar(self._app, self._prefix + more)
+
+    def tool(
+        self,
+        func: Optional[Callable[..., Any]] = None,
+        *,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        doc: Optional[str] = None,
+        flags: tuple[Flag, ...] = (),
+        aliases: tuple[str, ...] = (),
+    ) -> Any:
+        """Register a function as a tool under this registrar's group prefix."""
+
+        def register(f: Callable[..., Any]) -> Callable[..., Any]:
+            self._app._registry.add_tool(
+                f,
+                name=name,
+                description=description,
+                group=self._prefix,
+                doc=doc,
+                flags=flags,
+                aliases=aliases,
+            )
+            return f
+
+        if func is not None:
+            return register(func)
+        return register
 
 
 def _title_of(markdown_text: str, fallback: str) -> str:

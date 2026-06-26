@@ -5,7 +5,7 @@ from __future__ import annotations
 import io
 import json
 
-from agentfront.cli._errors import AfiError
+from agentfront.cli._errors import AgentfrontError
 from agentfront.cli._output import emit_diagnostic, emit_error, emit_result
 
 
@@ -29,7 +29,7 @@ def test_emit_result_json_emits_parseable_json() -> None:
 
 def test_emit_error_text_includes_error_and_hint_lines() -> None:
     buf = io.StringIO()
-    emit_error(AfiError(1, "bad", "try fixing"), json_mode=False, stream=buf)
+    emit_error(AgentfrontError(1, "bad", "try fixing"), json_mode=False, stream=buf)
     out = buf.getvalue()
     assert "error: bad" in out
     assert "hint: try fixing" in out
@@ -37,7 +37,7 @@ def test_emit_error_text_includes_error_and_hint_lines() -> None:
 
 def test_emit_error_text_without_remediation_has_no_hint_line() -> None:
     buf = io.StringIO()
-    emit_error(AfiError(2, "env"), json_mode=False, stream=buf)
+    emit_error(AgentfrontError(2, "env"), json_mode=False, stream=buf)
     out = buf.getvalue()
     assert "error: env" in out
     assert "hint:" not in out
@@ -45,7 +45,7 @@ def test_emit_error_text_without_remediation_has_no_hint_line() -> None:
 
 def test_emit_error_json_is_structured() -> None:
     buf = io.StringIO()
-    emit_error(AfiError(1, "bad", "fix"), json_mode=True, stream=buf)
+    emit_error(AgentfrontError(1, "bad", "fix"), json_mode=True, stream=buf)
     parsed = json.loads(buf.getvalue().strip())
     assert parsed == {"code": 1, "message": "bad", "remediation": "fix"}
 

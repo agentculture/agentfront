@@ -24,7 +24,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
 def test_doctor_path_without_pyproject_is_user_error(tmp_path: Path) -> None:
     rc = main(["doctor", str(tmp_path)])
-    assert rc == 1  # _resolve_tool_name raises AfiError → EXIT_USER_ERROR
+    assert rc == 1  # _resolve_tool_name raises AgentfrontError → EXIT_USER_ERROR
 
 
 def test_doctor_package_and_path_mutually_exclusive(tmp_path: Path) -> None:

@@ -119,3 +119,33 @@ def test_derive_input_schema_skips_var_args_and_self():
 
     schema = derive_input_schema(C.m)
     assert list(schema["properties"]) == ["a"]
+
+
+def test_duplicate_alias_same_group_raises():
+    """Two tools in the same group cannot share an alias."""
+
+    def backends_fn():
+        return "ok"
+
+    def other_fn():
+        return "ok"
+
+    reg = Registry()
+    reg.add_tool(backends_fn, name="backends", aliases=("wheels",))
+    with pytest.raises(DuplicateError):
+        reg.add_tool(other_fn, name="other", aliases=("wheels",))
+
+
+def test_alias_colliding_with_existing_tool_name_raises():
+    """An alias that matches an already-registered tool name raises DuplicateError."""
+
+    def search_fn():
+        return "ok"
+
+    def backends_fn():
+        return "ok"
+
+    reg = Registry()
+    reg.add_tool(search_fn, name="search")
+    with pytest.raises(DuplicateError):
+        reg.add_tool(backends_fn, name="backends", aliases=("search",))

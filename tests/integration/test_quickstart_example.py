@@ -103,7 +103,7 @@ def test_http_sitemap_lists_docs(app: App) -> None:
 # --- MCP surface -------------------------------------------------------------
 
 
-def test_mcp_lists_tools(app: App) -> None:
+def test_mcp_lists_single_run_tool(app: App) -> None:
     server = app.mcp_server()
 
     async def _list() -> list[str]:
@@ -116,7 +116,7 @@ def test_mcp_lists_tools(app: App) -> None:
         return [t.name for t in result.root.tools]
 
     names = anyio.run(_list)
-    assert sorted(names) == ["add", "greet"]
+    assert names == ["run"]
 
 
 # --- CLI surface -------------------------------------------------------------

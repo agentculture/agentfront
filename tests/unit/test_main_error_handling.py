@@ -7,7 +7,7 @@ import argparse
 import pytest
 
 from agentfront.cli import _dispatch
-from agentfront.cli._errors import AfiError
+from agentfront.cli._errors import AgentfrontError
 
 
 def _raising(err: Exception):
@@ -20,7 +20,7 @@ def _raising(err: Exception):
 def test_dispatch_catches_afi_error_and_returns_its_code(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    err = AfiError(code=2, message="env broken", remediation="run uv sync")
+    err = AgentfrontError(code=2, message="env broken", remediation="run uv sync")
     args = argparse.Namespace(command="fake", func=_raising(err), json=False)
 
     rc = _dispatch(args)
@@ -52,7 +52,7 @@ def test_dispatch_json_mode_emits_structured_error(
 ) -> None:
     import json
 
-    err = AfiError(code=1, message="bad", remediation="fix")
+    err = AgentfrontError(code=1, message="bad", remediation="fix")
     args = argparse.Namespace(command="fake", func=_raising(err), json=True)
 
     rc = _dispatch(args)

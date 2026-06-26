@@ -21,7 +21,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from agentfront.cli._errors import EXIT_USER_ERROR, AfiError
+from agentfront.errors import EXIT_USER_ERROR, AgentfrontError
 
 __all__ = [
     "OverviewReport",
@@ -70,7 +70,7 @@ def build(subject: str, path: Path | None) -> OverviewReport:
     """Build a report for ``subject`` at ``path`` (``None`` → zero-target).
 
     ``subject`` must be in :data:`SUBJECTS`. Unknown subjects raise
-    :class:`AfiError` with a remediation pointing at the accepted set.
+    :class:`AgentfrontError` with a remediation pointing at the accepted set.
     """
     if subject == "cli":
         # Local import to avoid cycles at module init.
@@ -87,7 +87,7 @@ def build(subject: str, path: Path | None) -> OverviewReport:
             "`agentfront overview` currently reports only the cli surface."
         )
         return cli_report
-    raise AfiError(
+    raise AgentfrontError(
         code=EXIT_USER_ERROR,
         message=f"unknown overview subject: {subject}",
         remediation=f"valid subjects: {', '.join(SUBJECTS)}",

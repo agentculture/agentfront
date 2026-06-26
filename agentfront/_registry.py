@@ -7,14 +7,18 @@ to drift out of sync. This module is the keystone the three surfaces build on.
 
 from __future__ import annotations
 
+import argparse
 import inspect
 from dataclasses import dataclass
 from typing import Any, Callable, Optional, get_type_hints
 
 __all__ = [
     "DocEntry",
+    "Flag",
+    "HostCommand",
     "ToolEntry",
     "Registry",
+    "apply_flags",
     "derive_input_schema",
 ]
 
@@ -29,6 +33,20 @@ class DocEntry:
 
 
 @dataclass(frozen=True)
+class Flag:
+    """A per-verb CLI flag declaration."""
+
+    names: tuple[str, ...]
+    type: Optional[Callable[[str], Any]] = None
+    action: Optional[str] = None
+    nargs: Optional[str | int] = None
+    dest: Optional[str] = None
+    default: Any = None
+    help: str = ""
+    required: bool = False
+
+
+@dataclass(frozen=True)
 class ToolEntry:
     """A callable exposed as a tool, with an agent-facing description + schema."""
 
@@ -36,6 +54,21 @@ class ToolEntry:
     description: str
     input_schema: dict[str, Any]
     func: Callable[..., Any]
+    group: tuple[str, ...] = ()
+    doc: str = ""
+    flags: tuple[Flag, ...] = ()
+    aliases: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class HostCommand:
+    """A host-written CLI command, registered via :meth:`App.add_command`."""
+
+    name: str
+    handler: Callable[..., Any]
+    help: str = ""
+    configure: Optional[Callable[[argparse.ArgumentParser], None]] = None
+    aliases: tuple[str, ...] = ()
 
 
 # Minimal Python-annotation → JSON-Schema type mapping. Anything unrecognised
@@ -100,6 +133,34 @@ def derive_input_schema(func: Callable[..., Any]) -> dict[str, Any]:
     return schema
 
 
+def _flag_kwargs(flag: Flag) -> dict[str, Any]:
+    """Translate a :class:`Flag` into argparse ``add_argument`` kwargs."""
+    kwargs: dict[str, Any] = {}
+    if flag.type is not None:
+        kwargs["type"] = flag.type
+    if flag.action is not None:
+        kwargs["action"] = (
+            argparse.BooleanOptionalAction if flag.action == "boolean_optional" else flag.action
+        )
+    if flag.nargs is not None:
+        kwargs["nargs"] = flag.nargs
+    if flag.dest is not None:
+        kwargs["dest"] = flag.dest
+    if flag.default is not None:
+        kwargs["default"] = flag.default
+    if flag.help:
+        kwargs["help"] = flag.help
+    if flag.required:
+        kwargs["required"] = flag.required
+    return kwargs
+
+
+def apply_flags(parser: argparse.ArgumentParser, entry: ToolEntry) -> None:
+    """Add each :class:`Flag` in *entry* to *parser*."""
+    for flag in entry.flags:
+        parser.add_argument(*flag.names, **_flag_kwargs(flag))
+
+
 class DuplicateError(ValueError):
     """Raised when registering a slug/name that is already taken."""
 
@@ -109,7 +170,8 @@ class Registry:
 
     def __init__(self) -> None:
         self._docs: dict[str, DocEntry] = {}
-        self._tools: dict[str, ToolEntry] = {}
+        self._tools: dict[tuple[str, ...], ToolEntry] = {}
+        self._aliases: dict[tuple[str, ...], tuple[str, ...]] = {}
 
     # --- docs -------------------------------------------------------------
     def add_doc(self, *, slug: str, title: str, text: str) -> DocEntry:
@@ -137,29 +199,61 @@ class Registry:
         *,
         name: Optional[str] = None,
         description: Optional[str] = None,
+        group: tuple[str, ...] = (),
+        doc: Optional[str] = None,
+        flags: tuple[Flag, ...] = (),
+        aliases: tuple[str, ...] = (),
     ) -> ToolEntry:
         tool_name = name or getattr(func, "__name__", None)
         if not tool_name or tool_name == "<lambda>":
             raise ValueError("tool needs a name (pass name= for a lambda/partial)")
-        if tool_name in self._tools:
-            raise DuplicateError(f"tool name already registered: {tool_name!r}")
+        full_path: tuple[str, ...] = group + (tool_name,)
+        if full_path in self._tools:
+            raise DuplicateError(f"tool path already registered: {full_path!r}")
         desc = description if description is not None else _first_line(func.__doc__)
+        full_doc = doc if doc is not None else (inspect.getdoc(func) or "")
         entry = ToolEntry(
             name=tool_name,
             description=desc,
             input_schema=derive_input_schema(func),
             func=func,
+            group=group,
+            doc=full_doc,
+            flags=flags,
+            aliases=aliases,
         )
-        self._tools[tool_name] = entry
+        self._tools[full_path] = entry
+        for alias in aliases:
+            alias_path: tuple[str, ...] = group + (alias,)
+            if alias_path in self._tools or alias_path in self._aliases:
+                raise DuplicateError(f"tool path already registered: {alias_path!r}")
+            self._aliases[alias_path] = full_path
         return entry
 
-    def remove_tool(self, name: str) -> None:
-        if name not in self._tools:
-            raise KeyError(f"no such tool: {name!r}")
-        del self._tools[name]
+    def remove_tool(self, path: tuple[str, ...] | str) -> None:
+        if isinstance(path, str):
+            path = (path,)
+        if path not in self._tools:
+            raise KeyError(f"no such tool: {path!r}")
+        entry = self._tools[path]
+        for alias in entry.aliases:
+            alias_path: tuple[str, ...] = entry.group + (alias,)
+            self._aliases.pop(alias_path, None)
+        del self._tools[path]
 
     def get_tool(self, name: str) -> Optional[ToolEntry]:
-        return self._tools.get(name)
+        """Look up a top-level (ungrouped) tool by bare name."""
+        return self.get_by_path((name,))
+
+    def get_by_path(self, path: tuple[str, ...]) -> Optional[ToolEntry]:
+        """Resolve a tool by its full path (group + name)."""
+        entry = self._tools.get(path)
+        if entry is not None:
+            return entry
+        real_path = self._aliases.get(path)
+        if real_path is not None:
+            return self._tools[real_path]
+        return None
 
     def tools(self) -> list[ToolEntry]:
         return list(self._tools.values())
