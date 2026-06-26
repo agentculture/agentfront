@@ -7,14 +7,17 @@ to drift out of sync. This module is the keystone the three surfaces build on.
 
 from __future__ import annotations
 
+import argparse
 import inspect
 from dataclasses import dataclass
 from typing import Any, Callable, Optional, get_type_hints
 
 __all__ = [
     "DocEntry",
+    "Flag",
     "ToolEntry",
     "Registry",
+    "apply_flags",
     "derive_input_schema",
 ]
 
@@ -29,6 +32,20 @@ class DocEntry:
 
 
 @dataclass(frozen=True)
+class Flag:
+    """A per-verb CLI flag declaration."""
+
+    names: tuple[str, ...]
+    type: Optional[Callable[[str], Any]] = None
+    action: Optional[str] = None
+    nargs: Optional[str | int] = None
+    dest: Optional[str] = None
+    default: Any = None
+    help: str = ""
+    required: bool = False
+
+
+@dataclass(frozen=True)
 class ToolEntry:
     """A callable exposed as a tool, with an agent-facing description + schema."""
 
@@ -38,6 +55,7 @@ class ToolEntry:
     func: Callable[..., Any]
     group: tuple[str, ...] = ()
     doc: str = ""
+    flags: tuple[Flag, ...] = ()
 
 
 # Minimal Python-annotation → JSON-Schema type mapping. Anything unrecognised
@@ -102,6 +120,30 @@ def derive_input_schema(func: Callable[..., Any]) -> dict[str, Any]:
     return schema
 
 
+def apply_flags(parser: argparse.ArgumentParser, entry: ToolEntry) -> None:
+    """Add each :class:`Flag` in *entry* to *parser*."""
+    for flag in entry.flags:
+        kwargs: dict[str, Any] = {}
+        if flag.type is not None:
+            kwargs["type"] = flag.type
+        if flag.action is not None:
+            if flag.action == "boolean_optional":
+                kwargs["action"] = argparse.BooleanOptionalAction
+            else:
+                kwargs["action"] = flag.action
+        if flag.nargs is not None:
+            kwargs["nargs"] = flag.nargs
+        if flag.dest is not None:
+            kwargs["dest"] = flag.dest
+        if flag.default is not None:
+            kwargs["default"] = flag.default
+        if flag.help:
+            kwargs["help"] = flag.help
+        if flag.required:
+            kwargs["required"] = flag.required
+        parser.add_argument(*flag.names, **kwargs)
+
+
 class DuplicateError(ValueError):
     """Raised when registering a slug/name that is already taken."""
 
@@ -141,6 +183,7 @@ class Registry:
         description: Optional[str] = None,
         group: tuple[str, ...] = (),
         doc: Optional[str] = None,
+        flags: tuple[Flag, ...] = (),
     ) -> ToolEntry:
         tool_name = name or getattr(func, "__name__", None)
         if not tool_name or tool_name == "<lambda>":
@@ -157,6 +200,7 @@ class Registry:
             func=func,
             group=group,
             doc=full_doc,
+            flags=flags,
         )
         self._tools[full_path] = entry
         return entry
