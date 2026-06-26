@@ -79,7 +79,17 @@ def test_raising_tool_surfaces_as_mcp_error():
     async def go() -> bool:
         async with connect(app.mcp_server()) as client:
             await client.initialize()
-            result = await client.call_tool("boom", {"x": 1})
-            return bool(result.isError)
+            result = await client.call_tool("run", {"command": ["boom"], "args": {"x": 1}})
+            # Single-dispatch returns structured error in structuredContent
+            if result.structuredContent is not None:
+                return "error" in result.structuredContent
+            # Fallback: check text content for error
+            for content in result.content:
+                if hasattr(content, "text"):
+                    import json
+
+                    parsed = json.loads(content.text)
+                    return "error" in parsed
+            return False
 
     assert anyio.run(go) is True

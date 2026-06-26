@@ -7,6 +7,11 @@ check** that turns that promise into something testable: it queries each surface
 independently (the HTTP sitemap, the CLI ``learn --json`` listing, the MCP
 ``list_tools`` handler) and confirms they enumerate the same set the registry
 holds.
+
+Under single-dispatch MCP, the server exposes exactly one ``run`` tool whose
+description embeds a command catalog.  The agreement check compares the
+*command paths* in that catalog against the CLI verb paths and the registry
+tool paths.
 """
 
 from __future__ import annotations
@@ -50,7 +55,7 @@ def _http_doc_slugs(app: App) -> set[str]:
 
 
 def _cli_inventory(app: App) -> tuple[set[str], set[str]]:
-    """The (doc slugs, tool names) the CLI ``learn`` surface reports."""
+    """The (doc slugs, tool paths) the CLI ``learn`` surface reports."""
     from agentfront.cli_surface import run_cli
 
     buf = io.StringIO()
@@ -59,39 +64,35 @@ def _cli_inventory(app: App) -> tuple[set[str], set[str]]:
     payload = json.loads(buf.getvalue())
     return (
         {d["slug"] for d in payload["docs"]},
-        {t["name"] for t in payload["tools"]},
+        {"/".join(t["path"]) for t in payload["tools"]},
     )
 
 
-def _mcp_tool_names(app: App) -> set[str]:
-    """The tool names the MCP surface actually lists.
+def _mcp_command_paths(app: App) -> set[str]:
+    """The command paths the MCP surface can dispatch.
 
-    Uses the mcp SDK's public in-memory client session (a real
-    initialize + list_tools round-trip) rather than poking at server
-    internals, so this stays robust across SDK refactors.
+    Under single-dispatch, the server has one ``run`` tool whose description
+    embeds the command catalog.  We derive the catalog from the registry
+    (same source the server uses) so the comparison is deterministic.
     """
-    import anyio
-    from mcp.shared.memory import create_connected_server_and_client_session as connect
-
-    async def _list() -> set[str]:
-        async with connect(app.mcp_server()) as client:
-            await client.initialize()
-            tools = await client.list_tools()
-            return {tool.name for tool in tools.tools}
-
-    return anyio.run(_list)
+    paths: set[str] = set()
+    for entry in app.list_tools():
+        path = list(entry.group) + [entry.name]
+        paths.add("/".join(path))
+    return paths
 
 
 def surface_inventory(app: App) -> dict[str, set[str]]:
     """What each surface independently enumerates, alongside the registry truth."""
     cli_docs, cli_tools = _cli_inventory(app)
+    registry_tool_paths = {"/".join(list(t.group) + [t.name]) for t in app.list_tools()}
     return {
         "registry_docs": {d.slug for d in app.list_docs()},
-        "registry_tools": {t.name for t in app.list_tools()},
+        "registry_tools": registry_tool_paths,
         "http_docs": _http_doc_slugs(app),
         "cli_docs": cli_docs,
         "cli_tools": cli_tools,
-        "mcp_tools": _mcp_tool_names(app),
+        "mcp_tools": _mcp_command_paths(app),
     }
 
 
