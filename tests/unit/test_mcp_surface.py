@@ -136,6 +136,24 @@ def test_call_run_awaits_async_func():
     assert result == "fetched x"
 
 
+def test_call_run_command_items_must_be_strings():
+    """Non-string command items return a structured error, not a TypeError."""
+    a = App(name="t")
+
+    @a.tool
+    def add(x: int, y: int) -> int:
+        """Add."""
+        return x + y
+
+    server = make_mcp_server(a)
+    result = anyio.run(_call_tool, server, "run", {"command": [123], "args": {}})
+    assert "error" in result
+    err = result["error"]
+    assert "code" in err
+    assert "message" in err
+    assert "remediation" in err
+
+
 def test_call_run_unknown_tool_name_returns_error():
     a = App(name="t")
     server = make_mcp_server(a)
