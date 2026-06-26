@@ -101,6 +101,7 @@ class App:
         group: Optional[str | tuple[str, ...]] = None,
         doc: Optional[str] = None,
         flags: tuple[Flag, ...] = (),
+        aliases: tuple[str, ...] = (),
     ) -> Any:
         """Register a function as a tool.
 
@@ -116,7 +117,13 @@ class App:
 
         def register(f: Callable[..., Any]) -> Callable[..., Any]:
             self._registry.add_tool(
-                f, name=name, description=description, group=group, doc=doc, flags=flags
+                f,
+                name=name,
+                description=description,
+                group=group,
+                doc=doc,
+                flags=flags,
+                aliases=aliases,
             )
             return f
 
@@ -213,12 +220,19 @@ class _GroupRegistrar:
         description: Optional[str] = None,
         doc: Optional[str] = None,
         flags: tuple[Flag, ...] = (),
+        aliases: tuple[str, ...] = (),
     ) -> Any:
         """Register a function as a tool under this registrar's group prefix."""
 
         def register(f: Callable[..., Any]) -> Callable[..., Any]:
             self._app._registry.add_tool(
-                f, name=name, description=description, group=self._prefix, doc=doc, flags=flags
+                f,
+                name=name,
+                description=description,
+                group=self._prefix,
+                doc=doc,
+                flags=flags,
+                aliases=aliases,
             )
             return f
 
