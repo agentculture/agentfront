@@ -49,26 +49,21 @@ def _http_status(app: App, path: str) -> str:
     return captured[0]
 
 
-def _mcp_tool_names(app: App) -> set[str]:
-    server = app.mcp_server()
-
-    async def _list() -> set[str]:
-        handler = server.request_handlers[types.ListToolsRequest]
-        req = types.ListToolsRequest(
-            method="tools/list", params=types.PaginatedRequestParams(cursor=None)
-        )
-        result = await handler(req)
-        return {t.name for t in result.root.tools}
-
-    return anyio.run(_list)
+def _mcp_command_paths(app: App) -> set[str]:
+    """Derive command paths from the registry (same source the MCP server uses)."""
+    paths: set[str] = set()
+    for entry in app.list_tools():
+        path = list(entry.group) + [entry.name]
+        paths.add("/".join(path))
+    return paths
 
 
 def test_unregistered_item_absent_from_every_surface():
     app = _app()
     # HTTP: an unregistered slug 404s
     assert _http_status(app, "/never-registered").startswith("404")
-    # MCP: an unregistered tool name is not in the listed menu
-    assert "never_registered" not in _mcp_tool_names(app)
+    # MCP: an unregistered command path is not in the catalog
+    assert "never_registered" not in _mcp_command_paths(app)
     # CLI: an unregistered name is not in the learn listing
     import io
     from contextlib import redirect_stdout
