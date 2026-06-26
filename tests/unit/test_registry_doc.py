@@ -1,7 +1,5 @@
 """Unit tests for the ToolEntry.doc metadata field (t4)."""
 
-import pytest
-
 from agentfront._registry import Registry, ToolEntry
 
 

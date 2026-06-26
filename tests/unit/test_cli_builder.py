@@ -12,8 +12,6 @@ Asserts:
 from __future__ import annotations
 
 import json
-import sys
-from typing import Optional
 
 import pytest
 

@@ -8,10 +8,10 @@ to work.
 from __future__ import annotations
 
 from agentfront.errors import (
-    AgentfrontError,
     EXIT_ENV_ERROR,
     EXIT_SUCCESS,
     EXIT_USER_ERROR,
+    AgentfrontError,
 )
 
 __all__ = [

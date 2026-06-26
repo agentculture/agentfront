@@ -10,8 +10,6 @@ from __future__ import annotations
 import argparse
 from typing import Optional
 
-import pytest
-
 from agentfront import App
 from agentfront.cli_surface import make_cli, run_cli
 

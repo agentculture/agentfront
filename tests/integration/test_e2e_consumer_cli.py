@@ -18,8 +18,6 @@ from __future__ import annotations
 import json
 from typing import Any
 
-import pytest
-
 from agentfront import App
 from agentfront._registry import Flag
 from agentfront.cli_surface import run_cli

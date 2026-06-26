@@ -13,8 +13,6 @@ import importlib
 import sys
 from pathlib import Path
 
-import pytest
-
 # Third-party top-level packages that must NOT be imported by the consumer CLI
 # path.  We check a representative set — any well-known third-party name.
 _THIRD_PARTY_PACKAGES = frozenset(

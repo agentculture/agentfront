@@ -11,9 +11,12 @@ import argparse
 import inspect
 import json
 import sys
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 from agentfront.app import App
+
+if TYPE_CHECKING:
+    from agentfront._registry import ToolEntry
 
 __all__ = ["make_cli", "run_cli"]
 

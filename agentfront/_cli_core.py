@@ -11,10 +11,9 @@ from __future__ import annotations
 
 import argparse
 import sys
-from typing import Any
 
-from agentfront.errors import EXIT_USER_ERROR, AgentfrontError
 from agentfront.cli._output import emit_error
+from agentfront.errors import EXIT_USER_ERROR, AgentfrontError
 
 
 def argv_has_json(argv: list[str] | None) -> bool:

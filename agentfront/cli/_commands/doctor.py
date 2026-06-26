@@ -34,10 +34,10 @@ from typing import Iterable
 from urllib.parse import unquote, urlparse
 
 from agentfront import _brand
-from agentfront.errors import EXIT_USER_ERROR, AgentfrontError
 from agentfront.cli._output import emit_diagnostic, emit_result
 from agentfront.doctor import is_healthy, run_self_diagnosis
 from agentfront.doctor.fixes import apply_fix
+from agentfront.errors import EXIT_USER_ERROR, AgentfrontError
 from agentfront.rubric import run_rubric
 from agentfront.rubric._runner import SubprocessRunner
 from agentfront.rubric._types import CheckResult, VerifyContext

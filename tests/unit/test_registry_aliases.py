@@ -1,8 +1,6 @@
 """Unit tests for tool alias resolution (t6)."""
 
-import pytest
-
-from agentfront._registry import Registry, ToolEntry
+from agentfront._registry import Registry
 
 
 def test_top_level_op_alias_resolves_to_same_entry():

@@ -10,9 +10,6 @@ from __future__ import annotations
 
 import xml.etree.ElementTree as ET  # noqa: S405 - parsing our own sitemap
 
-import anyio
-from mcp import types
-
 from agentfront import App
 from agentfront.cli_surface import run_cli
 from agentfront.serve import surface_inventory

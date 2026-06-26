@@ -5,7 +5,7 @@ Asserts:
   - app.group('feedback') sub-registrar yields path ('feedback', <name>)
   - nested app.group('a').group('b') yields ('a', 'b', <name>)
   - leaf ops resolve by full path via get_by_path
-  - existing top-level ops (no group) still enumerate via list_tools() and resolve via get_tool(name)
+  - existing top-level ops (no group) still enumerate and resolve via get_tool(name)
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from __future__ import annotations
 import pytest
 
 from agentfront import App
-from agentfront._registry import Registry, ToolEntry
+from agentfront._registry import DuplicateError, Registry, ToolEntry
 
 # --- ToolEntry group field -----------------------------------------------
 
@@ -144,7 +144,7 @@ def test_registry_duplicate_path_rejected():
         return 2
 
     reg.add_tool(f1, name="ping", group=("feedback",))
-    with pytest.raises(Exception):  # DuplicateError
+    with pytest.raises(DuplicateError):
         reg.add_tool(f2, name="ping", group=("feedback",))
 
 

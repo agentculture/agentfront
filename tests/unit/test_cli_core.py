@@ -5,11 +5,9 @@ from __future__ import annotations
 import argparse
 import importlib
 import json
-import sys
 
 import pytest
 
-from agentfront import _cli_core
 from agentfront._cli_core import (
     StructuredArgumentParser,
     argv_has_json,
