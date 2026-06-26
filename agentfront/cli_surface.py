@@ -39,6 +39,9 @@ class _CliParser(argparse.ArgumentParser):
     silently swallow a genuine ``sys.exit`` raised by a tool handler. Overriding
     :meth:`exit` to raise a private exception keeps the translation local and
     precise: only argparse's own exits are intercepted.
+
+    Parse-time errors (unknown verbs, missing required args) are emitted as
+    structured :class:`AgentfrontError` messages honouring ``--json``.
     """
 
     class _Exit(Exception):
@@ -48,10 +51,55 @@ class _CliParser(argparse.ArgumentParser):
             super().__init__(code)
             self.code = code
 
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._raw_argv: list[str] | None = None
+
+    def _set_raw_argv(self, argv: list[str] | None) -> None:
+        """Store raw argv so ``error()`` can peek for ``--json``."""
+        self._raw_argv = argv
+
+    @staticmethod
+    def _has_json_flag(argv: list[str] | None) -> bool:
+        """Pre-parse peek: does *argv* contain ``--json``?"""
+        if argv is None:
+            return False
+        return "--json" in argv
+
+    def error(self, message: str) -> Any:  # type: ignore[override]
+        """Emit a structured parse-time error and exit with code 1.
+
+        Honours a pre-parse ``--json`` peek on the raw argv.
+        """
+        from agentfront.cli._output import emit_error
+        from agentfront.errors import EXIT_USER_ERROR, AgentfrontError
+
+        json_mode = self._has_json_flag(self._raw_argv)
+        err = AgentfrontError(
+            code=EXIT_USER_ERROR,
+            message=message,
+            remediation="check usage with --help",
+        )
+        emit_error(err, json_mode=json_mode)
+        raise self._Exit(EXIT_USER_ERROR)
+
     def exit(self, status: int = 0, message: str | None = None) -> Any:  # type: ignore[override]
         if message:
             self._print_message(message, sys.stderr)
         raise self._Exit(status)
+
+
+def _propagate_raw_argv(parser: _CliParser, argv: list[str] | None) -> None:
+    """Set ``_raw_argv`` on *parser* and all its descendant ``_CliParser`` subparsers."""
+    parser._set_raw_argv(argv)
+    # Walk subparsers created via add_subparsers(parser_class=_CliParser)
+    if parser._subparsers is None:
+        return
+    for action in parser._subparsers._actions:
+        if isinstance(action, argparse._SubParsersAction):
+            for name, sub in action._name_parser_map.items():
+                if isinstance(sub, _CliParser):
+                    _propagate_raw_argv(sub, argv)
 
 
 # ---------------------------------------------------------------------------
@@ -95,14 +143,8 @@ def _derive_args_from_sig(
             if annotation is bool:
                 parser.add_argument(
                     f"--{pname}",
-                    action="store_true",
+                    action=argparse.BooleanOptionalAction,
                     default=param.default,
-                    dest=pname,
-                )
-                parser.add_argument(
-                    f"--no-{pname}",
-                    action="store_false",
-                    default=not param.default,
                     dest=pname,
                 )
             else:
@@ -353,7 +395,7 @@ def make_cli(app: App) -> argparse.ArgumentParser:
         description=f"{app.name} v{app.version}",
     )
 
-    sub = parser.add_subparsers(dest="command")
+    sub = parser.add_subparsers(dest="command", parser_class=_CliParser)
 
     # --- learn, explain, overview, and doctor meta-verbs ------------------
     learn_parser = sub.add_parser("learn", help="agent-facing summary")
@@ -415,6 +457,7 @@ def make_cli(app: App) -> argparse.ArgumentParser:
                 # Create sub-subparsers for the next level
                 next_sub = group_parser.add_subparsers(
                     dest=f"command_{i}",
+                    parser_class=_CliParser,
                 )
                 group_subparsers[prefix] = next_sub
                 current_sub = next_sub
@@ -468,10 +511,14 @@ def run_cli(app: App, argv: list[str] | None = None) -> int:
     """
     parser = make_cli(app)
 
+    # Store raw argv so _CliParser.error() can peek for --json
+    if isinstance(parser, _CliParser):
+        _propagate_raw_argv(parser, argv)
+
     try:
         args = parser.parse_args(argv)
     except _CliParser._Exit as exc:
-        # argparse exits 0 for --help and 2 for a parse error
+        # argparse exits 0 for --help and 1 for a parse error
         return exc.code
 
     # No subcommand given

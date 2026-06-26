@@ -110,6 +110,15 @@ def make_mcp_server(app: App) -> Server:
                 }
             }
 
+        if not all(isinstance(x, str) for x in command):
+            return {
+                "error": {
+                    "code": 1,
+                    "message": "'command' items must be strings",
+                    "remediation": "pass command as ['noun', 'verb']",
+                }
+            }
+
         path = tuple(command)
         entry = app.get_by_path(path)
         if entry is None:
