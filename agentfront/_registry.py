@@ -56,6 +56,7 @@ class ToolEntry:
     group: tuple[str, ...] = ()
     doc: str = ""
     flags: tuple[Flag, ...] = ()
+    aliases: tuple[str, ...] = ()
 
 
 # Minimal Python-annotation → JSON-Schema type mapping. Anything unrecognised
@@ -153,7 +154,8 @@ class Registry:
 
     def __init__(self) -> None:
         self._docs: dict[str, DocEntry] = {}
-        self._tools: dict[str, ToolEntry] = {}
+        self._tools: dict[tuple[str, ...], ToolEntry] = {}
+        self._aliases: dict[tuple[str, ...], tuple[str, ...]] = {}
 
     # --- docs -------------------------------------------------------------
     def add_doc(self, *, slug: str, title: str, text: str) -> DocEntry:
@@ -184,6 +186,7 @@ class Registry:
         group: tuple[str, ...] = (),
         doc: Optional[str] = None,
         flags: tuple[Flag, ...] = (),
+        aliases: tuple[str, ...] = (),
     ) -> ToolEntry:
         tool_name = name or getattr(func, "__name__", None)
         if not tool_name or tool_name == "<lambda>":
@@ -201,8 +204,14 @@ class Registry:
             group=group,
             doc=full_doc,
             flags=flags,
+            aliases=aliases,
         )
         self._tools[full_path] = entry
+        for alias in aliases:
+            alias_path: tuple[str, ...] = group + (alias,)
+            if alias_path in self._tools:
+                raise DuplicateError(f"tool path already registered: {alias_path!r}")
+            self._aliases[alias_path] = full_path
         return entry
 
     def remove_tool(self, path: tuple[str, ...] | str) -> None:
@@ -210,15 +219,25 @@ class Registry:
             path = (path,)
         if path not in self._tools:
             raise KeyError(f"no such tool: {path!r}")
+        entry = self._tools[path]
+        for alias in entry.aliases:
+            alias_path: tuple[str, ...] = entry.group + (alias,)
+            self._aliases.pop(alias_path, None)
         del self._tools[path]
 
     def get_tool(self, name: str) -> Optional[ToolEntry]:
         """Look up a top-level (ungrouped) tool by bare name."""
-        return self._tools.get((name,))
+        return self.get_by_path((name,))
 
     def get_by_path(self, path: tuple[str, ...]) -> Optional[ToolEntry]:
         """Resolve a tool by its full path (group + name)."""
-        return self._tools.get(path)
+        entry = self._tools.get(path)
+        if entry is not None:
+            return entry
+        real_path = self._aliases.get(path)
+        if real_path is not None:
+            return self._tools[real_path]
+        return None
 
     def tools(self) -> list[ToolEntry]:
         return list(self._tools.values())
