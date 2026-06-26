@@ -92,17 +92,19 @@ def make_mcp_server(app: App) -> Server:
     """
     server = Server(app.name)
 
-    # The single ``run`` tool, built once from the registry and exposed as a
-    # public attribute so a consumer can introspect/round-trip it (its name +
-    # inputSchema) without importing the private ``_build_run_tool``. The same
-    # object is what ``list_tools`` yields, so ``server.run_tool`` is identical
-    # to the tool an MCP client sees in the listing.
+    # The single ``run`` tool, exposed as a public ``server.run_tool`` attribute
+    # so a consumer can introspect/round-trip it (its name + inputSchema) without
+    # importing the private ``_build_run_tool``. It is (re)built from the *live*
+    # registry — seeded here for pre-listing introspection and refreshed on every
+    # ``list_tools`` — so the embedded command catalog never goes stale and
+    # ``server.run_tool`` always matches what the server most recently listed.
     server.run_tool = _build_run_tool(app)
 
     # --- list_tools -------------------------------------------------------
 
     @server.list_tools()
     async def list_tools() -> list[Tool]:
+        server.run_tool = _build_run_tool(app)
         return [server.run_tool]
 
     # --- call_tool --------------------------------------------------------

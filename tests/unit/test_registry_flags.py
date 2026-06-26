@@ -146,3 +146,14 @@ def test_flag_without_choices_is_unchanged():
         "sha256",
         "md5",
     )
+
+
+def test_choices_is_keyword_only():
+    """``choices`` is kw-only, so it does not shift the positional ``__init__`` order."""
+    # The 5th positional still binds to ``dest`` (not ``choices``).
+    f = Flag(("--x",), None, None, None, "mydest")
+    assert f.dest == "mydest"
+    assert f.choices is None
+    # ``choices`` cannot be passed positionally.
+    with pytest.raises(TypeError):
+        Flag(("--x",), None, None, None, "mydest", None, "", False, ("a", "b"))

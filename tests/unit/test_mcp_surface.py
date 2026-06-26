@@ -107,6 +107,22 @@ def test_run_tool_public_round_trip_matches_cli(app: App, capsys):
     assert mcp_result == cli_result == 7
 
 
+def test_list_tools_reflects_late_registered_tool(app: App):
+    """``list_tools`` rebuilds from the live registry — a tool registered after
+    server creation appears in the catalog (no stale snapshot), and the public
+    ``run_tool`` handle is refreshed to match the latest listing."""
+    server = make_mcp_server(app)
+
+    @app.tool
+    def subtract(x: int, y: int) -> int:
+        """Subtract two numbers."""
+        return x - y
+
+    tools = anyio.run(_list_tools, server)
+    assert "subtract" in tools[0].description
+    assert server.run_tool is tools[0]
+
+
 # --- calling tools -------------------------------------------------------
 
 
