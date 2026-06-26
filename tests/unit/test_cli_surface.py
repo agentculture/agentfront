@@ -151,3 +151,68 @@ def test_make_cli_returns_parser(app: App):
     assert parser is not None
     # It should have a parse_args method (argparse.ArgumentParser)
     assert hasattr(parser, "parse_args")
+
+
+# --- structured parse-time errors ----------------------------------------
+
+
+def test_unknown_verb_json_error(app: App, capsys: pytest.CaptureFixture[str]) -> None:
+    """Unknown verb with --json emits structured JSON on stderr, clean stdout, exit 1."""
+    rc = run_cli(app, ["nosuchverb", "--json"])
+    assert rc == 1
+    stdout, stderr = capsys.readouterr()
+    assert stdout == "", f"stdout should be clean, got: {stdout!r}"
+    assert stderr != "", "stderr should have content"
+    payload = json.loads(stderr)
+    assert "code" in payload
+    assert "message" in payload
+    assert "remediation" in payload
+    assert payload["code"] == 1
+
+
+def test_unknown_verb_text_error(app: App, capsys: pytest.CaptureFixture[str]) -> None:
+    """Unknown verb without --json emits 'error:'/'hint:' lines on stderr."""
+    rc = run_cli(app, ["nosuchverb"])
+    assert rc == 1
+    stdout, stderr = capsys.readouterr()
+    assert stdout == "", f"stdout should be clean, got: {stdout!r}"
+    assert "error:" in stderr, f"stderr should contain 'error:', got: {stderr!r}"
+    assert "hint:" in stderr, f"stderr should contain 'hint:', got: {stderr!r}"
+
+
+def test_missing_required_positional_json_error(capsys: pytest.CaptureFixture[str]) -> None:
+    """Missing required positional with --json emits structured JSON on stderr."""
+
+    a = App(name="t", version="1.0")
+
+    @a.tool
+    def needs_arg(path: str) -> str:
+        return path
+
+    rc = run_cli(a, ["needs_arg", "--json"])
+    assert rc == 1
+    stdout, stderr = capsys.readouterr()
+    assert stdout == "", f"stdout should be clean, got: {stdout!r}"
+    assert stderr != "", "stderr should have content"
+    payload = json.loads(stderr)
+    assert "code" in payload
+    assert "message" in payload
+    assert "remediation" in payload
+    assert payload["code"] == 1
+
+
+def test_missing_required_positional_text_error(capsys: pytest.CaptureFixture[str]) -> None:
+    """Missing required positional without --json emits 'error:'/'hint:' lines."""
+
+    a = App(name="t", version="1.0")
+
+    @a.tool
+    def needs_arg(path: str) -> str:
+        return path
+
+    rc = run_cli(a, ["needs_arg"])
+    assert rc == 1
+    stdout, stderr = capsys.readouterr()
+    assert stdout == "", f"stdout should be clean, got: {stdout!r}"
+    assert "error:" in stderr, f"stderr should contain 'error:', got: {stderr!r}"
+    assert "hint:" in stderr, f"stderr should contain 'hint:', got: {stderr!r}"
