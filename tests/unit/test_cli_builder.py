@@ -279,7 +279,7 @@ def test_tool_alias_works(capsys) -> None:
 
 
 def test_bool_param_becomes_boolean_optional(capsys) -> None:
-    """A bool-annotated param becomes --flag/--no-flag."""
+    """A bool-annotated param uses BooleanOptionalAction (--flag/--no-flag)."""
     app = App(name="t", version="1.0")
 
     @app.tool(group="ops")
@@ -287,13 +287,23 @@ def test_bool_param_becomes_boolean_optional(capsys) -> None:
         """Toggle."""
         return str(enabled)
 
+    # --enabled sets to True
     rc = run_cli(app, ["ops", "toggle", "--enabled"])
     assert rc == 0
-    assert "True" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "True" in out
 
+    # --no-enabled sets to False
     rc2 = run_cli(app, ["ops", "toggle", "--no-enabled"])
     assert rc2 == 0
-    assert "False" in capsys.readouterr().out
+    out2 = capsys.readouterr().out
+    assert "False" in out2
+
+    # No flag keeps default False
+    rc3 = run_cli(app, ["ops", "toggle"])
+    assert rc3 == 0
+    out3 = capsys.readouterr().out
+    assert "False" in out3
 
 
 # --- make_cli returns parser -------------------------------------------
