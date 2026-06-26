@@ -161,7 +161,7 @@
     {
       "id": "c12",
       "kind": "decision",
-      "text": "Reuse, don't fork: promote the existing internal machinery (AfiError {code,message,remediation}, emit_result/emit_error stdout/stderr split, the _AgentfrontArgumentParser register(sub) pattern, explain catalog, overview) into a shared internal module the consumer surface builds on, so agentfront's own CLI and a consumer's CLI share one implementation",
+      "text": "Reuse, don't fork: promote the existing internal machinery (AgentfrontError {code,message,remediation}, emit_result/emit_error stdout/stderr split, the _AgentfrontArgumentParser register(sub) pattern, explain catalog, overview) into a shared internal module the consumer surface builds on, so agentfront's own CLI and a consumer's CLI share one implementation",
       "origin": "llm",
       "status": "confirmed",
       "honesty_conditions": [],
@@ -374,7 +374,7 @@
     {
       "id": "c26",
       "kind": "decision",
-      "text": "Reuse surface is clean (per machinery audit): _output.py is fully generic; _errors.py is generic except an ISSUES_URL in the bug-wrap; _AgentfrontArgumentParser + _dispatch are generic except _brand refs. Promotion = parameterize prog/version/issues_url (supplied by App), move AfiError to a shared package-level module (e.g. agentfront._errors) so non-CLI consumers import it without argparse, and keep the register(sub) convention as-is (zero coupling)",
+      "text": "Reuse surface is clean (per machinery audit): _output.py is fully generic; _errors.py is generic except an ISSUES_URL in the bug-wrap; _AgentfrontArgumentParser + _dispatch are generic except _brand refs. Promotion = parameterize prog/version/issues_url (supplied by App), move AgentfrontError to a shared package-level module (e.g. agentfront._errors) so non-CLI consumers import it without argparse, and keep the register(sub) convention as-is (zero coupling)",
       "origin": "llm",
       "status": "confirmed",
       "honesty_conditions": [],
@@ -542,7 +542,7 @@
     {
       "id": "c38",
       "kind": "decision",
-      "text": "Promote the structured error type to a PUBLIC importable symbol (e.g. agentfront.errors.AfiError or re-exported from agentfront) so consumers stop reaching into the private agentfront.cli._errors; agentfront's own CLI and consumer CLIs share one public type. Move it to a shared module that does not import argparse so non-CLI consumers can import it too",
+      "text": "Promote the structured error type to a PUBLIC importable symbol (e.g. agentfront.errors.AgentfrontError or re-exported from agentfront) so consumers stop reaching into the private agentfront.cli._errors; agentfront's own CLI and consumer CLIs share one public type. Move it to a shared module that does not import argparse so non-CLI consumers can import it too",
       "origin": "llm",
       "status": "confirmed",
       "honesty_conditions": [

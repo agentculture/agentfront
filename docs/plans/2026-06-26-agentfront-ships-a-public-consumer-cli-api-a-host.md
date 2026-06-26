@@ -6,10 +6,11 @@ slug: `agentfront-ships-a-public-consumer-cli-api-a-host` · status: `exported` 
 
 ## Tasks
 
-### t1 — Public errors module: promote AfiError {code,message,remediation} + exit-code constants to a public, argparse-free module (agentfront/errors.py), re-exported from agentfront; agentfront.cli._errors becomes a thin re-export
+### t1 — Public errors module: promote AND rename the internal structured-error type (currently in agentfront/cli/_errors.py) to a public `AgentfrontError` {code,message,remediation} + exit-code constants in a public, argparse-free module (agentfront/errors.py), re-exported from agentfront; agentfront.cli._errors becomes a thin re-export. This completes the deferred PR #22 rename — the legacy retired-prefix class name is removed everywhere (cli/__init__.py, overview/__init__.py, explain/catalog.py, doctor, …)
 
 - acceptance:
-  - agentfront.errors.AfiError imports without importing argparse; to_dict() yields {code,message,remediation}; agentfront.cli._errors re-exports the same type; a test imports it from the public path
+  - agentfront.errors.AgentfrontError imports without importing argparse; to_dict() yields {code,message,remediation}; agentfront.cli._errors re-exports the same type; a test imports it from the public path
+  - a grep/CI guard asserts no occurrence of the retired-prefix error-class identifier remains in the codebase (the rename is complete, not aliased)
 
 ### t2 — Shared CLI core machinery: extract emit_result/emit_error/emit_diagnostic + a structured-error ArgumentParser (parser_class override routing parse errors to {code,message,remediation}, pre-parse raw-argv --json peek) + a dispatch loop (KeyboardInterrupt->130, wrap unexpected exceptions, no traceback) into a shared internal module parameterized by prog/version/issues_url out of _brand
 

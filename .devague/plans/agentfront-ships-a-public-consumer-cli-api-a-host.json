@@ -231,11 +231,11 @@
   "tasks": [
     {
       "id": "t1",
-      "summary": "Public errors module: promote AfiError {code,message,remediation} + exit-code constants to a public, argparse-free module (agentfront/errors.py), re-exported from agentfront; agentfront.cli._errors becomes a thin re-export",
+      "summary": "Public errors module: promote AgentfrontError {code,message,remediation} + exit-code constants to a public, argparse-free module (agentfront/errors.py), re-exported from agentfront; agentfront.cli._errors becomes a thin re-export",
       "origin": "llm",
       "status": "confirmed",
       "acceptance_criteria": [
-        "agentfront.errors.AfiError imports without importing argparse; to_dict() yields {code,message,remediation}; agentfront.cli._errors re-exports the same type; a test imports it from the public path"
+        "agentfront.errors.AgentfrontError imports without importing argparse; to_dict() yields {code,message,remediation}; agentfront.cli._errors re-exports the same type; a test imports it from the public path"
       ],
       "deps": [],
       "covers": []
