@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import argparse
 import inspect
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Callable, Optional, get_type_hints
 
 __all__ = [
@@ -44,6 +44,11 @@ class Flag:
     default: Any = None
     help: str = ""
     required: bool = False
+    # Keyword-only: ``Flag`` is a documented public dataclass, so ``choices`` is
+    # appended as kw-only to leave the positional ``__init__`` order of every
+    # existing field unchanged. Forwarded to argparse ``add_argument(choices=…)``
+    # when set, so an out-of-set value is rejected at parse time.
+    choices: Optional[tuple[str, ...]] = field(default=None, kw_only=True)
 
 
 @dataclass(frozen=True)
@@ -144,6 +149,8 @@ def _flag_kwargs(flag: Flag) -> dict[str, Any]:
         )
     if flag.nargs is not None:
         kwargs["nargs"] = flag.nargs
+    if flag.choices is not None:
+        kwargs["choices"] = flag.choices
     if flag.dest is not None:
         kwargs["dest"] = flag.dest
     if flag.default is not None:
