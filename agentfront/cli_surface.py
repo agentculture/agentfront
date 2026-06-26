@@ -20,6 +20,9 @@ if TYPE_CHECKING:
 
 __all__ = ["make_cli", "run_cli"]
 
+# Help string shared by every ``--json`` flag across the generated surface.
+_JSON_HELP = "emit JSON"
+
 
 # ---------------------------------------------------------------------------
 # Local parser — avoids importing agentfront._cli_core at module level, which
@@ -107,6 +110,35 @@ def _propagate_raw_argv(parser: _CliParser, argv: list[str] | None) -> None:
 # ---------------------------------------------------------------------------
 
 
+def _add_param_argument(
+    parser: argparse.ArgumentParser,
+    pname: str,
+    param: inspect.Parameter,
+    annotation: Any,
+) -> None:
+    """Add a single argparse argument derived from one function parameter."""
+    if param.default is inspect.Parameter.empty:
+        # Required → positional
+        kwargs: dict[str, Any] = {}
+        if annotation in (int, float, str):
+            kwargs["type"] = annotation
+        parser.add_argument(pname, **kwargs)
+    elif annotation is bool:
+        # bool with default → --flag/--no-flag
+        parser.add_argument(
+            f"--{pname}",
+            action=argparse.BooleanOptionalAction,
+            default=param.default,
+            dest=pname,
+        )
+    else:
+        # Other default → optional --flag
+        kwargs = {"default": param.default, "dest": pname}
+        if annotation in (int, float, str):
+            kwargs["type"] = annotation
+        parser.add_argument(f"--{pname}", **kwargs)
+
+
 def _derive_args_from_sig(
     parser: argparse.ArgumentParser,
     func: Callable[..., Any],
@@ -129,29 +161,8 @@ def _derive_args_from_sig(
             continue
         if param.kind in (param.VAR_POSITIONAL, param.VAR_KEYWORD):
             continue
-
         annotation = hints.get(pname, param.annotation)
-
-        if param.default is inspect.Parameter.empty:
-            # Required → positional
-            kwargs: dict[str, Any] = {}
-            if annotation in (int, float, str):
-                kwargs["type"] = annotation
-            parser.add_argument(pname, **kwargs)
-        else:
-            # Has default → optional flag
-            if annotation is bool:
-                parser.add_argument(
-                    f"--{pname}",
-                    action=argparse.BooleanOptionalAction,
-                    default=param.default,
-                    dest=pname,
-                )
-            else:
-                kwargs = {"default": param.default, "dest": pname}
-                if annotation in (int, float, str):
-                    kwargs["type"] = annotation
-                parser.add_argument(f"--{pname}", **kwargs)
+        _add_param_argument(parser, pname, param, annotation)
 
 
 def _make_dispatcher(entry: "ToolEntry") -> Callable[[argparse.Namespace], int]:
@@ -196,7 +207,41 @@ def _group_overview_handler(
     return handler
 
 
-def _explain_handler(app: App, args: argparse.Namespace) -> int:
+def _collect_path_children(app: App, path: tuple[str, ...]) -> list[tuple[str, str]]:
+    """Child ``(name, description)`` pairs one level below *path* in the registry."""
+    children: list[tuple[str, str]] = []
+    for tool in app.list_tools():
+        full = tool.group + (tool.name,)
+        if full[: len(path)] == path and len(full) > len(path):
+            children.append((full[len(path)], tool.description or ""))
+    return children
+
+
+def _print_leaf_doc(path: tuple[str, ...], doc: str, json_mode: bool) -> None:
+    """Render a single op's doc (the ``explain <path>`` leaf case)."""
+    if json_mode:
+        print(json.dumps({"path": list(path), "doc": doc}, ensure_ascii=False))
+    else:
+        print(doc if doc.endswith("\n") else doc + "\n")
+
+
+def _print_group_children(
+    path: tuple[str, ...], children: list[tuple[str, str]], json_mode: bool
+) -> None:
+    """Render the child verbs of a group prefix (the ``explain <group>`` case)."""
+    if json_mode:
+        payload = {
+            "path": list(path),
+            "children": [{"name": n, "description": d} for n, d in children],
+        }
+        print(json.dumps(payload, ensure_ascii=False))
+    else:
+        lines = [f"Available commands in {' '.join(path)}:"]
+        lines.extend(f"  {name}: {desc}" for name, desc in children)
+        print("\n".join(lines))
+
+
+def _explain_handler(app: App, args: argparse.Namespace) -> None:
     """Dispatch for the ``explain`` verb — prints an op's doc or group listing."""
     from agentfront.errors import EXIT_USER_ERROR, AgentfrontError
 
@@ -206,41 +251,17 @@ def _explain_handler(app: App, args: argparse.Namespace) -> int:
         print(f"# {app.name} v{app.version}")
         if app.description:
             print(app.description)
-        return 0
+        return
 
     entry = app.get_by_path(path)
     if entry is not None:
-        # Leaf op found — print its doc
-        doc = entry.doc or entry.description or ""
-        if args.json:
-            payload: dict[str, Any] = {"path": list(path), "doc": doc}
-            print(json.dumps(payload, ensure_ascii=False))
-        else:
-            print(doc if doc.endswith("\n") else doc + "\n")
-        return 0
+        _print_leaf_doc(path, entry.doc or entry.description or "", args.json)
+        return
 
-    # Path is a group prefix — list child verbs
-    children: list[tuple[str, str]] = []
-    for tool in app.list_tools():
-        full = tool.group + (tool.name,)
-        if full[: len(path)] == path and len(full) > len(path):
-            child_name = full[len(path)]
-            children.append((child_name, tool.description or ""))
-
+    children = _collect_path_children(app, path)
     if children:
-        if args.json:
-            payload = {
-                "path": list(path),
-                "children": [{"name": n, "description": d} for n, d in children],
-            }
-            print(json.dumps(payload, ensure_ascii=False))
-        else:
-            lines: list[str] = []
-            lines.append(f"Available commands in {' '.join(path)}:")
-            for name, desc in children:
-                lines.append(f"  {name}: {desc}")
-            print("\n".join(lines))
-        return 0
+        _print_group_children(path, children, args.json)
+        return
 
     # Unknown path
     raise AgentfrontError(
@@ -250,52 +271,55 @@ def _explain_handler(app: App, args: argparse.Namespace) -> int:
     )
 
 
-def _overview_handler(app: App, args: argparse.Namespace) -> int:
-    """Dispatch for the ``overview`` verb — lists registry nouns."""
-    # Collect top-level nouns: groups (first element) and top-level ops
-    seen: dict[str, str] = {}  # name -> description
-    for tool in app.list_tools():
+def _collect_top_level_nouns(app: App) -> dict[str, str]:
+    """Map each top-level noun (group head or ungrouped op) to its description."""
+    seen: dict[str, str] = {}
+    tools = app.list_tools()
+    for tool in tools:
         if tool.group:
             noun = tool.group[0]
             if noun not in seen:
-                count = len([t for t in app.list_tools() if t.group and t.group[0] == noun])
+                count = len([t for t in tools if t.group and t.group[0] == noun])
                 seen[noun] = f"group with {count} commands"
-        else:
-            if tool.name not in seen:
-                seen[tool.name] = tool.description or ""
+        elif tool.name not in seen:
+            seen[tool.name] = tool.description or ""
+    return seen
 
-    if args.scope:
-        # Scoped to a specific noun
-        noun = args.scope
-        children: list[tuple[str, str]] = []
-        for tool in app.list_tools():
-            if tool.group and tool.group[0] == noun:
-                children.append((tool.name, tool.description or ""))
-            elif not tool.group and tool.name == noun:
-                children.append((tool.name, tool.description or ""))
 
-        if args.json:
-            payload = {"noun": noun, "verbs": [{"name": n, "description": d} for n, d in children]}
-            print(json.dumps(payload, ensure_ascii=False))
-        else:
-            lines: list[str] = []
-            lines.append(f"Commands in {noun}:")
-            for name, desc in children:
-                lines.append(f"  {name}: {desc}")
-            print("\n".join(lines))
-        return 0
+def _print_scoped_overview(app: App, noun: str, json_mode: bool) -> None:
+    """Render the verbs under a single noun (``overview <noun>``)."""
+    children: list[tuple[str, str]] = []
+    for tool in app.list_tools():
+        if (tool.group and tool.group[0] == noun) or (not tool.group and tool.name == noun):
+            children.append((tool.name, tool.description or ""))
 
-    # Full overview
-    if args.json:
+    if json_mode:
+        payload = {"noun": noun, "verbs": [{"name": n, "description": d} for n, d in children]}
+        print(json.dumps(payload, ensure_ascii=False))
+    else:
+        lines = [f"Commands in {noun}:"]
+        lines.extend(f"  {name}: {desc}" for name, desc in children)
+        print("\n".join(lines))
+
+
+def _print_full_overview(app: App, json_mode: bool) -> None:
+    """Render the top-level noun listing (``overview`` with no scope)."""
+    seen = _collect_top_level_nouns(app)
+    if json_mode:
         payload = [{"name": name, "description": desc} for name, desc in seen.items()]
         print(json.dumps(payload, ensure_ascii=False))
     else:
-        lines: list[str] = []
-        lines.append(f"{app.name} — available commands")
-        for name, desc in seen.items():
-            lines.append(f"  {name}: {desc}")
+        lines = [f"{app.name} — available commands"]
+        lines.extend(f"  {name}: {desc}" for name, desc in seen.items())
         print("\n".join(lines))
-    return 0
+
+
+def _overview_handler(app: App, args: argparse.Namespace) -> None:
+    """Dispatch for the ``overview`` verb — lists registry nouns."""
+    if args.scope:
+        _print_scoped_overview(app, args.scope, args.json)
+    else:
+        _print_full_overview(app, args.json)
 
 
 def _learn_handler(app: App, args: argparse.Namespace) -> int:
@@ -336,18 +360,18 @@ def _learn_handler(app: App, args: argparse.Namespace) -> int:
     return 0
 
 
-def _doctor_handler(app: App, args: argparse.Namespace) -> int:
+def _doctor_handler(app: App) -> None:
     """Dispatch for the ``doctor`` verb — prints a readiness check."""
     doc_count = len(app.list_docs())
     tool_count = len(app.list_tools())
 
-    lines: list[str] = []
-    lines.append(f"{app.name} v{app.version} — readiness check")
-    lines.append(f"  docs: {doc_count}")
-    lines.append(f"  tools: {tool_count}")
-    lines.append("  status: healthy")
+    lines = [
+        f"{app.name} v{app.version} — readiness check",
+        f"  docs: {doc_count}",
+        f"  tools: {tool_count}",
+        "  status: healthy",
+    ]
     print("\n".join(lines))
-    return 0
 
 
 def _dispatch(args: argparse.Namespace, *, json_mode: bool) -> int:
@@ -377,6 +401,51 @@ def _dispatch(args: argparse.Namespace, *, json_mode: bool) -> int:
     return rc if rc is not None else 0
 
 
+def _add_leaf_verb(subparsers: Any, entry: "ToolEntry") -> None:
+    """Add one tool as a leaf verb parser (signature args, flags, ``--json``)."""
+    from agentfront._registry import apply_flags
+
+    verb_parser = subparsers.add_parser(
+        entry.name,
+        help=entry.description,
+        aliases=list(entry.aliases),
+    )
+    _derive_args_from_sig(verb_parser, entry.func)
+    apply_flags(verb_parser, entry)
+    verb_parser.add_argument("--json", action="store_true", help=_JSON_HELP)
+    verb_parser.set_defaults(func=_make_dispatcher(entry))
+
+
+def _ensure_group_chain(
+    root_sub: Any,
+    group: tuple[str, ...],
+    group_parsers: dict[tuple[str, ...], Any],
+    group_subparsers: dict[tuple[str, ...], Any],
+    tools_by_group: dict[tuple[str, ...], list["ToolEntry"]],
+) -> Any:
+    """Walk/create the nested subparser chain for *group*; return its leaf subparsers.
+
+    Intermediate group parsers are shared across siblings via *group_parsers* /
+    *group_subparsers*, so calling this once per grouped tool builds each level
+    exactly once.
+    """
+    current_sub = root_sub
+    for i, noun in enumerate(group):
+        prefix = group[: i + 1]
+        if prefix not in group_parsers:
+            group_parser = current_sub.add_parser(noun, help=f"commands for {noun}")
+            group_parsers[prefix] = group_parser
+            tools_by_group[prefix] = []
+            current_sub = group_parser.add_subparsers(
+                dest=f"command_{i}",
+                parser_class=_CliParser,
+            )
+            group_subparsers[prefix] = current_sub
+        else:
+            current_sub = group_subparsers[prefix]
+    return current_sub
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -388,7 +457,7 @@ def make_cli(app: App) -> argparse.ArgumentParser:
     Creates nested noun-group subparsers for each registered tool, host
     commands, and the learn/doctor meta-verbs.
     """
-    from agentfront._registry import ToolEntry, apply_flags
+    from agentfront._registry import ToolEntry
 
     parser = _CliParser(
         prog=app.name,
@@ -399,87 +468,38 @@ def make_cli(app: App) -> argparse.ArgumentParser:
 
     # --- learn, explain, overview, and doctor meta-verbs ------------------
     learn_parser = sub.add_parser("learn", help="agent-facing summary")
-    learn_parser.add_argument("--json", action="store_true", help="emit JSON")
+    learn_parser.add_argument("--json", action="store_true", help=_JSON_HELP)
     learn_parser.set_defaults(func=lambda a: _learn_handler(app, a))
 
     explain_parser = sub.add_parser("explain", help="explain a command or group")
     explain_parser.add_argument("path", nargs="*", help="command path (e.g. feedback record)")
-    explain_parser.add_argument("--json", action="store_true", help="emit JSON")
+    explain_parser.add_argument("--json", action="store_true", help=_JSON_HELP)
     explain_parser.set_defaults(func=lambda a: _explain_handler(app, a))
 
     overview_parser = sub.add_parser("overview", help="list available commands")
     overview_parser.add_argument("scope", nargs="?", help="optional noun to scope to")
-    overview_parser.add_argument("--json", action="store_true", help="emit JSON")
+    overview_parser.add_argument("--json", action="store_true", help=_JSON_HELP)
     overview_parser.set_defaults(func=lambda a: _overview_handler(app, a))
 
     doctor_parser = sub.add_parser("doctor", help="readiness check")
-    doctor_parser.set_defaults(func=lambda a: _doctor_handler(app, a))
+    doctor_parser.set_defaults(func=lambda a: _doctor_handler(app))
 
     # --- grouped tools: build nested subparser chains -------------------
-    # Map from group prefix → subparser action so siblings share the same
-    # intermediate group subparser.
+    # Maps from group prefix → parser / subparser action, so siblings share the
+    # same intermediate group parser.
     group_subparsers: dict[tuple[str, ...], argparse._SubParsersAction] = {}
     group_parsers: dict[tuple[str, ...], argparse.ArgumentParser] = {}
-
-    # Collect tools by group for overview handlers
     tools_by_group: dict[tuple[str, ...], list[ToolEntry]] = {}
 
     for entry in app.list_tools():
         if not entry.group:
-            # Top-level tool: add directly under root subparsers
-            verb_parser = sub.add_parser(
-                entry.name,
-                help=entry.description,
-                aliases=list(entry.aliases),
-            )
-            _derive_args_from_sig(verb_parser, entry.func)
-            apply_flags(verb_parser, entry)
-            verb_parser.add_argument("--json", action="store_true", help="emit JSON")
-            verb_parser.set_defaults(func=_make_dispatcher(entry))
+            _add_leaf_verb(sub, entry)
             continue
-
-        # Build nested chain for grouped tool
-        group = entry.group
-        current_sub = sub
-
-        # Walk/create intermediate group parsers
-        for i, noun in enumerate(group):
-            prefix = group[: i + 1]
-            if prefix not in group_parsers:
-                # Create the group subparser
-                group_parser = current_sub.add_parser(
-                    noun,
-                    help=f"commands for {noun}",
-                )
-                group_parsers[prefix] = group_parser
-                # Collect tools for this group
-                tools_by_group[prefix] = []
-                # Create sub-subparsers for the next level
-                next_sub = group_parser.add_subparsers(
-                    dest=f"command_{i}",
-                    parser_class=_CliParser,
-                )
-                group_subparsers[prefix] = next_sub
-                current_sub = next_sub
-            else:
-                # Reuse existing group parser's subparsers
-                current_sub = group_subparsers[prefix]
-
-        # Add the leaf verb
-        verb_parser = current_sub.add_parser(
-            entry.name,
-            help=entry.description,
-            aliases=list(entry.aliases),
+        leaf_sub = _ensure_group_chain(
+            sub, entry.group, group_parsers, group_subparsers, tools_by_group
         )
-        _derive_args_from_sig(verb_parser, entry.func)
-        apply_flags(verb_parser, entry)
-        verb_parser.add_argument("--json", action="store_true", help="emit JSON")
-        verb_parser.set_defaults(func=_make_dispatcher(entry))
-
-        # Register this tool in its group for overview
-        if group not in tools_by_group:
-            tools_by_group[group] = []
-        tools_by_group[group].append(entry)
+        _add_leaf_verb(leaf_sub, entry)
+        tools_by_group.setdefault(entry.group, []).append(entry)
 
     # Set up bare-noun overview handlers on each group parser
     for prefix, tools_list in tools_by_group.items():

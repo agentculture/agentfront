@@ -19,6 +19,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 
 - agentfront.cli._errors.AfiError renamed to the public AgentfrontError (completes the deferred PR #22 rename).
+- Maintainability cleanup of the new CLI surface (no behaviour change, all 442 tests green): split the explain/overview handlers and the signature/flag derivation into focused helpers to clear SonarCloud cognitive-complexity (S3776) and invariant-return (S3516) findings, merged a duplicated overview branch (S1871), hoisted the repeated `--json` help literal into a constant (S1192), and dropped the unused `doctor` handler arg (S1172).
 
 ## [0.13.1] - 2026-06-26
 

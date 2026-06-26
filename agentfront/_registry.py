@@ -133,28 +133,32 @@ def derive_input_schema(func: Callable[..., Any]) -> dict[str, Any]:
     return schema
 
 
+def _flag_kwargs(flag: Flag) -> dict[str, Any]:
+    """Translate a :class:`Flag` into argparse ``add_argument`` kwargs."""
+    kwargs: dict[str, Any] = {}
+    if flag.type is not None:
+        kwargs["type"] = flag.type
+    if flag.action is not None:
+        kwargs["action"] = (
+            argparse.BooleanOptionalAction if flag.action == "boolean_optional" else flag.action
+        )
+    if flag.nargs is not None:
+        kwargs["nargs"] = flag.nargs
+    if flag.dest is not None:
+        kwargs["dest"] = flag.dest
+    if flag.default is not None:
+        kwargs["default"] = flag.default
+    if flag.help:
+        kwargs["help"] = flag.help
+    if flag.required:
+        kwargs["required"] = flag.required
+    return kwargs
+
+
 def apply_flags(parser: argparse.ArgumentParser, entry: ToolEntry) -> None:
     """Add each :class:`Flag` in *entry* to *parser*."""
     for flag in entry.flags:
-        kwargs: dict[str, Any] = {}
-        if flag.type is not None:
-            kwargs["type"] = flag.type
-        if flag.action is not None:
-            if flag.action == "boolean_optional":
-                kwargs["action"] = argparse.BooleanOptionalAction
-            else:
-                kwargs["action"] = flag.action
-        if flag.nargs is not None:
-            kwargs["nargs"] = flag.nargs
-        if flag.dest is not None:
-            kwargs["dest"] = flag.dest
-        if flag.default is not None:
-            kwargs["default"] = flag.default
-        if flag.help:
-            kwargs["help"] = flag.help
-        if flag.required:
-            kwargs["required"] = flag.required
-        parser.add_argument(*flag.names, **kwargs)
+        parser.add_argument(*flag.names, **_flag_kwargs(flag))
 
 
 class DuplicateError(ValueError):
