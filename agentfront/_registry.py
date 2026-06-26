@@ -36,6 +36,7 @@ class ToolEntry:
     description: str
     input_schema: dict[str, Any]
     func: Callable[..., Any]
+    group: tuple[str, ...] = ()
 
 
 # Minimal Python-annotation → JSON-Schema type mapping. Anything unrecognised
@@ -137,29 +138,39 @@ class Registry:
         *,
         name: Optional[str] = None,
         description: Optional[str] = None,
+        group: tuple[str, ...] = (),
     ) -> ToolEntry:
         tool_name = name or getattr(func, "__name__", None)
         if not tool_name or tool_name == "<lambda>":
             raise ValueError("tool needs a name (pass name= for a lambda/partial)")
-        if tool_name in self._tools:
-            raise DuplicateError(f"tool name already registered: {tool_name!r}")
+        full_path: tuple[str, ...] = group + (tool_name,)
+        if full_path in self._tools:
+            raise DuplicateError(f"tool path already registered: {full_path!r}")
         desc = description if description is not None else _first_line(func.__doc__)
         entry = ToolEntry(
             name=tool_name,
             description=desc,
             input_schema=derive_input_schema(func),
             func=func,
+            group=group,
         )
-        self._tools[tool_name] = entry
+        self._tools[full_path] = entry
         return entry
 
-    def remove_tool(self, name: str) -> None:
-        if name not in self._tools:
-            raise KeyError(f"no such tool: {name!r}")
-        del self._tools[name]
+    def remove_tool(self, path: tuple[str, ...] | str) -> None:
+        if isinstance(path, str):
+            path = (path,)
+        if path not in self._tools:
+            raise KeyError(f"no such tool: {path!r}")
+        del self._tools[path]
 
     def get_tool(self, name: str) -> Optional[ToolEntry]:
-        return self._tools.get(name)
+        """Look up a top-level (ungrouped) tool by bare name."""
+        return self._tools.get((name,))
+
+    def get_by_path(self, path: tuple[str, ...]) -> Optional[ToolEntry]:
+        """Resolve a tool by its full path (group + name)."""
+        return self._tools.get(path)
 
     def tools(self) -> list[ToolEntry]:
         return list(self._tools.values())
