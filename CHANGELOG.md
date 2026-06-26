@@ -5,6 +5,63 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/). This project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] - 2026-06-24
+
+### Added
+
+- **Memory-discipline "Conventions and workflow" section in `CLAUDE.md`** — a
+  per-task *recall-before / remember-after* convention (scope localized to this
+  repo's nick) so the vendored `remember` / `recall` skills are actually used,
+  not just present: `/recall` before non-trivial work to build on prior
+  decisions instead of re-deriving them, and `/remember` when a non-obvious
+  decision, constraint, fix-and-why, or hard-won gotcha surfaces. The section
+  documents this repo's memory as **in-repo and public** — records resolve to
+  `<repo-root>/.eidetic/memory` (committed, team- and mesh-shared). Inserted
+  idempotently (skipped if already present), slotted under an existing
+  "Conventions and workflow" heading when one exists, else appended.
+
+### Changed
+
+- **Refreshed the `remember` + `recall` wrappers from eidetic-cli 0.10.0**
+  (cite-don't-import) — picks up eidetic's **project-local store default**: the
+  files backend now resolves per record by visibility — PUBLIC records inside a
+  git repo go to `<repo-root>/.eidetic/memory` (committed, team-shared), PRIVATE
+  records (or any record outside a repo) go to `$HOME/.eidetic/memory` (never
+  committed), an explicit `EIDETIC_DATA_DIR` still wins, and recall reads both
+  stores and merges. Also carries the 0.9.3 hardening (interactive-stdin guard,
+  `help` as a search term, SIGPIPE-safe suffix parsing). **Recipe policy
+  override (the wrappers here are NOT byte-verbatim):** the injected default
+  visibility is flipped from eidetic's `private` to **`public`**, so a plain
+  `/remember` lands the note in `./.eidetic/memory` in this repo, kept as part
+  of the repo — pass `--visibility private` to route a record to `$HOME`
+  instead. `remember` drives `eidetic remember` (idempotent upsert of one JSON
+  record or an NDJSON batch on stdin); `recall` drives `eidetic recall` with
+  four search modes (exact / approximate / keyword / hybrid). Each `SKILL.md` is
+  localized only in the illustrative `--scope <nick>` examples (Provenance keeps
+  "First-party to eidetic-cli"). Runtime dep: the `eidetic` CLI on PATH (else a
+  local eidetic-cli checkout with `uv`) — **`eidetic >= 0.10.0`** for the
+  in-repo routing; on an older CLI the public records still work but are stored
+  in `$HOME/.eidetic/memory` instead of in-repo. Propagated by rollout-cli's
+  `eidetic-memory` recipe.
+
+### Fixed
+
+- **teken wrapper bumped in lockstep to `0.13.0`** — the rollout-cli version
+  bump did not carry `packaging/teken/pyproject.toml`, so the version,
+  `agentfront==` pin, and `agentfront[mcp]==` pin lagged at `0.11.1`. That
+  tripped the teken-lockstep CI guard and `tests/unit/test_wrapper_lockstep.py`.
+  All three are now realigned to `0.13.0`.
+- **Corrected the public-default docs in the `remember`/`recall` wrappers** —
+  the recipe POLICY OVERRIDE flips the injected default visibility to `public`,
+  but the `remember.sh` usage text and the `remember.sh`/`recall.sh` header
+  comments still described eidetic's upstream `private` default. The docstrings
+  and comments now state the `public` default (pass `--visibility private` to
+  route a record to `$HOME`), matching behavior. Also hardened the
+  `remember.sh` interactive-stdin guard to fire on a flags-only invocation that
+  carries no JSON record (not just on zero args), so it can't hang on a TTY.
+  These doc/guard fixes are filed upstream against the rollout-cli
+  `eidetic-memory` recipe + eidetic-cli to be re-propagated.
+
 ## [0.12.0] - 2026-06-23
 
 ### Added
