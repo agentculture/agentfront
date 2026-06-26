@@ -95,14 +95,8 @@ def _derive_args_from_sig(
             if annotation is bool:
                 parser.add_argument(
                     f"--{pname}",
-                    action="store_true",
+                    action=argparse.BooleanOptionalAction,
                     default=param.default,
-                    dest=pname,
-                )
-                parser.add_argument(
-                    f"--no-{pname}",
-                    action="store_false",
-                    default=not param.default,
                     dest=pname,
                 )
             else:

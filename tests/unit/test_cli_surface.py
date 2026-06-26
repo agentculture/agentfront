@@ -103,6 +103,46 @@ def test_unknown_verb_exits_nonzero(app: App) -> None:
     assert rc != 0
 
 
+# --- bool-annotated params use BooleanOptionalAction ----------------------
+
+
+def test_bool_param_true_default_with_no_flag(capsys) -> None:
+    """bool param with default=True: --no-verbose sets to False, no flag keeps True."""
+
+    app = App(name="t", version="1.0")
+
+    @app.tool
+    def t(verbose: bool = True) -> str:
+        return str(verbose)
+
+    # --no-verbose should give False
+    rc = run_cli(app, ["t", "--no-verbose"])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "False" in out
+
+    # No flag should keep default True
+    rc = run_cli(app, ["t"])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "True" in out
+
+
+def test_bool_param_false_default_with_flag(capsys) -> None:
+    """bool param with default=False: --q sets to True."""
+
+    app = App(name="t", version="1.0")
+
+    @app.tool
+    def u(q: bool = False) -> str:
+        return str(q)
+
+    # --q should give True
+    rc = run_cli(app, ["u", "--q"])
+    assert rc == 0
+    assert "True" in capsys.readouterr().out
+
+
 # --- make_cli returns parser ---------------------------------------------
 
 
