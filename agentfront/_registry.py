@@ -221,7 +221,7 @@ class Registry:
         self._tools[full_path] = entry
         for alias in aliases:
             alias_path: tuple[str, ...] = group + (alias,)
-            if alias_path in self._tools:
+            if alias_path in self._tools or alias_path in self._aliases:
                 raise DuplicateError(f"tool path already registered: {alias_path!r}")
             self._aliases[alias_path] = full_path
         return entry
