@@ -129,3 +129,11 @@ mcp = ["mcp>=1.28.0"]
 ```
 
 A CI guard asserts no third-party module is imported on the core path.
+
+## Dogfooding
+
+agentfront is expected to render its own CLI/MCP/HTTP surfaces from an App once
+bootstrapped; this consumer API is that round-trip. The same `App` object that
+builds the CLI via `app.cli()` also yields `app.mcp_server()` (single-dispatch
+with one `run` tool) and `app.http_app()` (WSGI markdown site), all derived
+from the single registry — so the three surfaces cannot drift apart.
