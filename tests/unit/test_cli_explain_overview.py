@@ -203,3 +203,54 @@ def test_new_op_appears_in_learn(consumer_app: App, capsys) -> None:
     payload = json.loads(capsys.readouterr().out)
     tool_paths = [t["path"] for t in payload["tools"]]
     assert ["feedback", "clear"] in tool_paths
+
+
+# --- explain surfaces a flag's choices (issue #38 Ask 1) ----------------
+
+
+def _choices_app() -> App:
+    """A consumer App whose verb declares a ``--algo`` choices flag."""
+    from agentfront.app import Flag
+
+    app = App(name="consumer", version="0.1.0")
+
+    @app.tool(
+        flags=(Flag(names=("--algo",), choices=("sha256", "md5"), help="checksum algorithm"),),
+        doc="Approve a hook by checksum.",
+    )
+    def approve(target: str) -> str:
+        """Approve a hook."""
+        return target
+
+    return app
+
+
+def test_explain_leaf_renders_flag_choices_text(capsys) -> None:
+    """explain <verb> shows a Flags section listing the flag and its allowed values."""
+    rc = run_cli(_choices_app(), ["explain", "approve"])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "Flags:" in out
+    assert "--algo" in out
+    assert "sha256" in out
+    assert "md5" in out
+    assert "checksum algorithm" in out
+
+
+def test_explain_leaf_renders_flag_choices_json(capsys) -> None:
+    """explain --json carries a 'flags' array with 'choices' on the choices flag."""
+    rc = run_cli(_choices_app(), ["explain", "approve", "--json"])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out)
+    algo = next(f for f in payload["flags"] if "--algo" in f["names"])
+    assert algo["choices"] == ["sha256", "md5"]
+    assert algo["help"] == "checksum algorithm"
+
+
+def test_explain_leaf_without_flags_omits_flags_key(consumer_app: App, capsys) -> None:
+    """A flag-less op's --json payload has no 'flags' key — back-compat preserved."""
+    rc = run_cli(consumer_app, ["explain", "search", "--json"])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert "flags" not in payload
+    assert payload["path"] == ["search"]

@@ -40,6 +40,7 @@ class Flag:
     type: Optional[Callable[[str], Any]] = None
     action: Optional[str] = None
     nargs: Optional[str | int] = None
+    choices: Optional[tuple[str, ...]] = None
     dest: Optional[str] = None
     default: Any = None
     help: str = ""
@@ -144,6 +145,8 @@ def _flag_kwargs(flag: Flag) -> dict[str, Any]:
         )
     if flag.nargs is not None:
         kwargs["nargs"] = flag.nargs
+    if flag.choices is not None:
+        kwargs["choices"] = flag.choices
     if flag.dest is not None:
         kwargs["dest"] = flag.dest
     if flag.default is not None:

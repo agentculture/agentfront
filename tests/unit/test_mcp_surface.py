@@ -75,6 +75,38 @@ def test_run_tool_input_schema_has_command_and_args(app: App):
     assert "args" in schema["required"]
 
 
+# --- public run_tool accessor (issue #38 Ask 2) --------------------------
+
+
+def test_run_tool_attribute_is_the_listed_tool(app: App):
+    """``server.run_tool`` is the SAME Tool the server lists — no private import."""
+    server = make_mcp_server(app)
+    listed = anyio.run(_list_tools, server)
+    assert server.run_tool is listed[0]
+    assert server.run_tool.name == "run"
+    assert set(server.run_tool.inputSchema["required"]) == {"command", "args"}
+
+
+def test_run_tool_public_round_trip_matches_cli(app: App, capsys):
+    """A {command, args} dispatch yields the identical value the CLI verb produces."""
+    import json
+
+    from agentfront.cli_surface import run_cli
+
+    server = make_mcp_server(app)
+    # Introspect + dispatch entirely through the public surface.
+    assert server.run_tool.name == "run"
+    mcp_result = anyio.run(
+        _call_tool, server, "run", {"command": ["add"], "args": {"x": 3, "y": 4}}
+    )
+
+    rc = run_cli(app, ["add", "3", "4", "--json"])
+    assert rc == 0
+    cli_result = json.loads(capsys.readouterr().out)
+
+    assert mcp_result == cli_result == 7
+
+
 # --- calling tools -------------------------------------------------------
 
 

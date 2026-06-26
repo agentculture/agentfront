@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any, Callable
 from agentfront.app import App
 
 if TYPE_CHECKING:
-    from agentfront._registry import ToolEntry
+    from agentfront._registry import Flag, ToolEntry
 
 __all__ = ["make_cli", "run_cli"]
 
@@ -217,12 +217,56 @@ def _collect_path_children(app: App, path: tuple[str, ...]) -> list[tuple[str, s
     return children
 
 
-def _print_leaf_doc(path: tuple[str, ...], doc: str, json_mode: bool) -> None:
-    """Render a single op's doc (the ``explain <path>`` leaf case)."""
+def _flag_label(flag: "Flag") -> str:
+    """One human-facing line for a flag in the explain ``Flags:`` section."""
+    label = ", ".join(flag.names)
+    if flag.choices is not None:
+        label += " {" + ",".join(str(c) for c in flag.choices) + "}"
+    parts = [f"  {label}"]
+    if flag.help:
+        parts.append(flag.help)
+    if flag.required:
+        parts.append("(required)")
+    return "  ".join(parts)
+
+
+def _flag_json(flag: "Flag") -> dict[str, Any]:
+    """Structured view of a flag for ``explain --json``."""
+    payload: dict[str, Any] = {
+        "names": list(flag.names),
+        "help": flag.help,
+        "required": flag.required,
+    }
+    if flag.choices is not None:
+        payload["choices"] = list(flag.choices)
+    return payload
+
+
+def _print_leaf_doc(
+    path: tuple[str, ...],
+    doc: str,
+    json_mode: bool,
+    flags: "tuple[Flag, ...]" = (),
+) -> None:
+    """Render a single op's doc (the ``explain <path>`` leaf case).
+
+    When the op declares flags, they are surfaced too: a ``Flags:`` section in
+    text mode and a ``flags`` array in JSON mode (each entry carrying ``names``,
+    ``help``, ``required``, and — for a flag declared with ``choices`` — the
+    allowed value set). The ``flags`` key is omitted entirely when the op
+    declares none, so a flag-less op renders exactly as before.
+    """
     if json_mode:
-        print(json.dumps({"path": list(path), "doc": doc}, ensure_ascii=False))
+        payload: dict[str, Any] = {"path": list(path), "doc": doc}
+        if flags:
+            payload["flags"] = [_flag_json(f) for f in flags]
+        print(json.dumps(payload, ensure_ascii=False))
     else:
-        print(doc if doc.endswith("\n") else doc + "\n")
+        body = doc if doc.endswith("\n") else doc + "\n"
+        if flags:
+            flag_lines = "\n".join(_flag_label(f) for f in flags)
+            body = f"{body}\nFlags:\n{flag_lines}\n"
+        print(body)
 
 
 def _print_group_children(
@@ -255,7 +299,7 @@ def _explain_handler(app: App, args: argparse.Namespace) -> None:
 
     entry = app.get_by_path(path)
     if entry is not None:
-        _print_leaf_doc(path, entry.doc or entry.description or "", args.json)
+        _print_leaf_doc(path, entry.doc or entry.description or "", args.json, entry.flags)
         return
 
     children = _collect_path_children(app, path)

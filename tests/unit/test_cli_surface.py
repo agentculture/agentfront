@@ -11,6 +11,7 @@ import json
 import pytest
 
 from agentfront import App
+from agentfront.app import Flag
 from agentfront.cli_surface import make_cli, run_cli
 
 # --- fixtures -----------------------------------------------------------
@@ -216,3 +217,47 @@ def test_missing_required_positional_text_error(capsys: pytest.CaptureFixture[st
     assert stdout == "", f"stdout should be clean, got: {stdout!r}"
     assert "error:" in stderr, f"stderr should contain 'error:', got: {stderr!r}"
     assert "hint:" in stderr, f"stderr should contain 'hint:', got: {stderr!r}"
+
+
+# --- choices flags: parse-time rejection through the structured-error path ---
+
+
+def _checksum_app() -> App:
+    """An App with a ``--algo`` choices flag (the colleague call site shape)."""
+    a = App(name="t", version="1.0")
+
+    @a.tool(flags=(Flag(names=("--algo",), choices=("sha256", "md5"), default="sha256"),))
+    def checksum(target: str) -> str:
+        return f"checked {target}"
+
+    return a
+
+
+def test_choices_flag_accepts_in_set_value(capsys) -> None:
+    """An in-set ``--algo`` value parses and the verb runs."""
+    rc = run_cli(_checksum_app(), ["checksum", "x", "--algo", "md5"])
+    assert rc == 0
+    out, _ = capsys.readouterr()
+    assert "checked x" in out
+
+
+def test_choices_flag_rejects_out_of_set_value_text(capsys) -> None:
+    """An out-of-set ``--algo`` is rejected at parse time via the structured path."""
+    rc = run_cli(_checksum_app(), ["checksum", "x", "--algo", "crc32"])
+    assert rc == 1
+    stdout, stderr = capsys.readouterr()
+    assert stdout == "", f"stdout should be clean, got: {stdout!r}"
+    assert "error:" in stderr
+    assert "hint:" in stderr
+
+
+def test_choices_flag_rejects_out_of_set_value_json(capsys) -> None:
+    """The same rejection renders as the structured JSON error under --json."""
+    rc = run_cli(_checksum_app(), ["checksum", "x", "--algo", "crc32", "--json"])
+    assert rc == 1
+    stdout, stderr = capsys.readouterr()
+    assert stdout == "", f"stdout should be clean, got: {stdout!r}"
+    payload = json.loads(stderr)
+    assert payload["code"] == 1
+    assert "message" in payload
+    assert "remediation" in payload

@@ -8,6 +8,10 @@ The server registers exactly **one** MCP tool (``run``) whose inputSchema
 accepts ``{'command': [...], 'args': {...}}``.  The tool's description embeds
 the full command catalog derived from ``app.list_tools()``, so an agent can
 discover all available commands from the single tool listing.
+
+The server returned by ``make_mcp_server`` (and ``app.mcp_server()``) exposes
+that one tool as a public ``run_tool`` attribute, so a consumer can inspect or
+round-trip it without importing a private helper.
 """
 
 from __future__ import annotations
@@ -76,14 +80,30 @@ def make_mcp_server(app: App) -> Server:
     The ``run`` tool accepts ``{'command': [...], 'args': {...}}`` and
     dispatches to the matching registered tool via ``app.get_by_path``.
     The tool's description embeds the full command catalog.
+
+    The returned server carries a public ``run_tool`` attribute — the
+    :class:`mcp.Tool` the server lists — so a consumer can introspect its
+    ``name`` and ``inputSchema``, or drive a ``{command, args}`` round-trip in a
+    test, through a supported API rather than the private ``_build_run_tool``::
+
+        server = app.mcp_server()
+        server.run_tool.name                      # 'run'
+        server.run_tool.inputSchema["required"]   # ['command', 'args']
     """
     server = Server(app.name)
+
+    # The single ``run`` tool, built once from the registry and exposed as a
+    # public attribute so a consumer can introspect/round-trip it (its name +
+    # inputSchema) without importing the private ``_build_run_tool``. The same
+    # object is what ``list_tools`` yields, so ``server.run_tool`` is identical
+    # to the tool an MCP client sees in the listing.
+    server.run_tool = _build_run_tool(app)
 
     # --- list_tools -------------------------------------------------------
 
     @server.list_tools()
     async def list_tools() -> list[Tool]:
-        return [_build_run_tool(app)]
+        return [server.run_tool]
 
     # --- call_tool --------------------------------------------------------
 
