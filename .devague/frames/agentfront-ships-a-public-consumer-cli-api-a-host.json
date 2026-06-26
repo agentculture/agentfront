@@ -1,0 +1,601 @@
+{
+  "slug": "agentfront-ships-a-public-consumer-cli-api-a-host",
+  "title": "agentfront ships a public consumer CLI API: a host registers its operations into one App and app.cli() renders its entire nested noun/verb CLI \u2014 tool dispatch, per-verb --json, structured {code,message,remediation} errors to stderr, explain/overview from the registry, and a host extension hook for hand-written subcommands \u2014 pure-stdlib, from the same registry that backs MCP and HTTP",
+  "schema_version": 1,
+  "status": "exported",
+  "created": "2026-06-26T03:47:58Z",
+  "updated": "2026-06-26T04:41:46Z",
+  "claims": [
+    {
+      "id": "c1",
+      "kind": "announcement",
+      "text": "agentfront ships a public consumer CLI API: a host registers its operations into one App and app.cli() renders its entire nested noun/verb CLI \u2014 tool dispatch, per-verb --json, structured {code,message,remediation} errors to stderr, explain/overview from the registry, and a host extension hook for hand-written subcommands \u2014 pure-stdlib, from the same registry that backs MCP and HTTP",
+      "origin": "user",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h8",
+          "text": "an end-to-end test on a consumer App asserts app.cli() renders nested verbs + dispatch + per-verb --json + structured errors + the extension hook, with zero third-party runtime imports on that path",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c2",
+      "kind": "audience",
+      "text": "host packages building an agent-first tool (colleague first) that want a full CLI from importing agentfront, plus the AI agents that consume that CLI",
+      "origin": "user",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h9",
+          "text": "colleague can render its full CLI by importing agentfront with no hand-rolled argparse \u2014 its converged spec's acceptance is satisfied by this API's public surface",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c3",
+      "kind": "before_state",
+      "text": "App.cli() is a meta CLI emitting only learn/doctor; registered @app.tool funcs are exposed to MCP/HTTP but never dispatched on the CLI; the rich nested-verb machinery exists only in agentfront's internal self-audit CLI (agentfront/cli/) with no consumer API, so a host must rebuild it all by hand",
+      "origin": "user",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h10",
+          "text": "verified against current main: agentfront/cli_surface.py make_cli registers only learn+doctor (lines ~105/109) and no path dispatches registered @app.tool ToolEntry funcs on the CLI",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c4",
+      "kind": "after_state",
+      "text": "a consumer registers operations into one App and gets a full agent-first CLI rendered from that registry \u2014 nested noun/verb groups to arbitrary depth, per-verb signature-derived flags, per-verb --json, structured {code,message,remediation} errors to stderr with non-zero exit, explain catalog and overview nouns \u2014 the same registry that yields app.mcp_server() and app.http_app()",
+      "origin": "user",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h11",
+          "text": "the after-state is exactly the conjunction of the success-signal tests passing on a consumer App built only by registration",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c5",
+      "kind": "why_it_matters",
+      "text": "colleague intends to take agentfront as its one base runtime dependency and stop hand-maintaining agent-first CLI scaffolding (import, do not duplicate); registering its ops into one App also exposes colleague over MCP and HTTP for free; colleague's migration is upstream-first and gated on this shipping",
+      "origin": "user",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h12",
+          "text": "colleague's spec docs/specs/2026-06-25-colleague-s-agent-first-cli-is-rendered-from-an-im.md states its migration is gated on this; shipping it removes colleague's duplicated scaffolding",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c6",
+      "kind": "boundary",
+      "text": "agentfront cannot express a raw-mode REPL or live TUI and will not try; those stay host-owned launcher verbs the host registers via the extension hook. Core stays pure-stdlib \u2014 no new third-party runtime dep; mcp stays behind the [mcp] extra. CLI may have full operation coverage (learnability surface); MCP minimalism is unchanged",
+      "origin": "user",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h13",
+          "text": "a host-owned REPL/TUI verb is added via the extension hook (not generated), and a CI guard asserts the core path adds no third-party runtime dependency",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c7",
+      "kind": "non_goal",
+      "text": "not a re-architecture of the registry's role: docs/tools still declared once; the CLI builder only adds a read path that dispatches tools, it does not introduce a second store",
+      "origin": "user",
+      "status": "confirmed",
+      "honesty_conditions": [],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c8",
+      "kind": "success_signal",
+      "text": "a consumer builds a CLI with >=2 levels of nesting and per-verb flags purely by registering ops (no hand-rolled argparse); every generated verb supports --json (success->stdout, failure->{code,message,remediation}->stderr + non-zero exit); explain <path> and overview are registry-derived; a host registers its own hand-written subcommand alongside generated ones (one test invokes both); the same App still yields mcp_server()/http_app() unchanged and a test asserts CLI/MCP/learn enumerate the same operation set; no new runtime dep; the public symbol is documented and versioned",
+      "origin": "user",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h14",
+          "text": "the acceptance-criteria test suite (nesting, --json, structured errors, explain/overview, extension hook, cross-surface parity, no-new-dep, versioned symbol) is green",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c9",
+      "kind": "decision",
+      "text": "Public symbol: grow App.cli() so it dispatches registered tools (instead of adding a separate app.build_cli()). cli() stays the one documented entry; learn/doctor become auto-registered meta-verbs alongside the host's generated nouns",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c10",
+      "kind": "decision",
+      "text": "Nesting representation: declare noun/verb path via an explicit group/path on registration (e.g. @app.tool(group='feedback') or app.group('feedback')) rather than overloading dotted tool names; keeps MCP tool names clean and makes the tree explicit in the registry",
+      "origin": "llm",
+      "status": "rejected",
+      "honesty_conditions": [],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c11",
+      "kind": "decision",
+      "text": "Extension hook: app.cli() accepts/returns a seam letting the host add hand-written argparse subcommands (e.g. an extend=callable(subparsers) hook or exposing the subparsers object) so host-owned launcher verbs (session, tui) sit beside generated ones",
+      "origin": "llm",
+      "status": "rejected",
+      "honesty_conditions": [],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c12",
+      "kind": "decision",
+      "text": "Reuse, don't fork: promote the existing internal machinery (AfiError {code,message,remediation}, emit_result/emit_error stdout/stderr split, the _AgentfrontArgumentParser register(sub) pattern, explain catalog, overview) into a shared internal module the consumer surface builds on, so agentfront's own CLI and a consumer's CLI share one implementation",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c13",
+      "kind": "requirement",
+      "text": "Tool->CLI dispatch: a registered operation becomes an invocable subcommand whose arguments are derived from its signature/type hints, then the func is called \u2014 not merely listed",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h1",
+          "text": "a test registers a typed function, invokes it through the generated CLI subcommand with parsed args, and asserts the function actually ran with the right values (not just that it was listed)",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c14",
+      "kind": "requirement",
+      "text": "Nested noun/verb groups to arbitrary depth are buildable purely from registration (e.g. a feedback noun with record|show|list verbs)",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h2",
+          "text": "a test builds a >=2-level tree (noun -> verb -> verb) from registration alone and invokes a leaf verb successfully",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c15",
+      "kind": "requirement",
+      "text": "Every generated verb supports --json; on success the result goes to stdout, on failure a structured {code,message,remediation} goes to stderr with a non-zero exit code",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h3",
+          "text": "a test asserts: --json present on every generated verb; success payload on stdout; an induced failure emits {code,message,remediation} on stderr with a non-zero exit; stdout stays clean on failure",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c16",
+      "kind": "requirement",
+      "text": "explain <path> and overview are derivable from the registry for any consumer App, not just agentfront's own CLI",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h4",
+          "text": "a test on a consumer App (not agentfront's own) asserts explain <path> returns the verb's catalog entry and overview lists the registry's nouns",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c17",
+      "kind": "requirement",
+      "text": "A host can register its own hand-written subcommand alongside generated ones via a documented extension hook",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h5",
+          "text": "a test registers a hand-written subcommand via the documented hook and invokes both it and a generated verb in one CLI run",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c18",
+      "kind": "requirement",
+      "text": "Cross-surface invariant: the same App still yields app.mcp_server() and app.http_app() unchanged, and the CLI / MCP / learn surfaces enumerate the same operation set (no drift)",
+      "origin": "llm",
+      "status": "rejected",
+      "honesty_conditions": [
+        {
+          "id": "h6",
+          "text": "a test asserts the set of operations enumerated by the CLI equals the set exposed by mcp_server() and by learn, for the same App",
+          "status": "rejected"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c19",
+      "kind": "requirement",
+      "text": "The whole consumer CLI API is pure-stdlib: no new third-party runtime dependency; mcp stays an optional extra",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h7",
+          "text": "the import graph of the consumer CLI API touches only stdlib + agentfront; a test/CI guard asserts no third-party import on the core path and that the [mcp] extra remains optional",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c20",
+      "kind": "decision",
+      "text": "CLI nesting via explicit group= on registration (e.g. @app.tool(group='feedback') / app.group('feedback')) feeds the nested subparser tree to arbitrary depth. The 'clean MCP names' rationale is moot now that MCP collapses to a single tool, but explicit grouping keeps the registry tree first-class and makes the single MCP tool's command catalog trivial to derive",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h15",
+          "text": "a test asserts, for one consumer App, that the CLI verb set == the single MCP tool's command catalog == learn's catalog, and that http_app() still serves the registry docs",
+          "status": "rejected"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c21",
+      "kind": "decision",
+      "text": "MCP = 'CLI on MCP': instead of N MCP tools (one per op), the MCP surface exposes ONE dispatching tool that accepts the command path + args (argv-style parameters) and dispatches through the same registry, returning structured success/failure feedback (the {code,message,remediation} shape). Rationale (user): reduce MCP tool-call noise; the single tool's documented command catalog == the CLI verb tree == learn catalog. Refines the issue's 'mcp_server() unchanged' \u2014 mcp_server() still exists and is registry-derived, but its shape becomes single-tool",
+      "origin": "llm",
+      "status": "rejected",
+      "honesty_conditions": [
+        {
+          "id": "h16",
+          "text": "a test invokes the single MCP tool with a valid command path+args and asserts the op ran with the right result; a second invocation with a bad path/args asserts a structured {code,message,remediation} failure payload",
+          "status": "rejected"
+        }
+      ],
+      "hard_questions": [
+        {
+          "id": "q1",
+          "text": "CONFLICT: single-dispatch 'CLI on MCP' (1 MCP tool) breaks colleague's converged honesty condition requiring CLI/MCP/learn to enumerate the SAME set (N MCP tools). RESOLVED (user, 2026-06-26): single-dispatch ONLY; colleague revises its CLI/MCP/learn set-equality honesty condition to compare the single MCP tool's command catalog (colleague-side follow-up).",
+          "resolved": true,
+          "blocking": true
+        }
+      ],
+      "links": []
+    },
+    {
+      "id": "c22",
+      "kind": "decision",
+      "text": "Extension hook = app.add_command(name, handler, help=...): a host registers its own hand-written command into the App (e.g. an interactive session/tui launcher agentfront can't generate); the CLI builder wires it beside the generated verbs. Keeps everything routed through the App rather than leaking the raw argparse subparsers object",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c23",
+      "kind": "requirement",
+      "text": "Cross-surface invariant from ONE registry: the CLI renders the nested verb tree; the MCP surface exposes a single dispatching tool whose command catalog enumerates the same operations; learn lists the same set; http_app() still serves the docs. Add/remove an op once -> all surfaces update together (no drift)",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h23",
+          "text": "a test asserts, for one consumer App, that the CLI verb set == the single MCP tool's documented command catalog == learn's catalog, and http_app() still serves the registry docs; adding/removing an op updates all three together",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c24",
+      "kind": "requirement",
+      "text": "The MCP dispatch tool runs a registered op by command path + args and returns its result on success, and on failure returns a structured {code,message,remediation} payload (not an opaque exception) so an agent gets actionable feedback",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h24",
+          "text": "a test invokes the single MCP tool with a valid command-path + args and asserts the op ran with the right result; a bad path/args yields a structured {code,message,remediation} failure payload, not an opaque exception",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c25",
+      "kind": "assumption",
+      "text": "Grounded in current main: explain (agentfront/explain/catalog.py) is a hand-authored static ENTRIES dict and overview (agentfront/overview/cli_surface.py) enumerates nouns by a regex+filesystem walk of _commands/*.py \u2014 NEITHER is registry-derived today. The consumer API must add a registry-derivation path so explain/overview work for any App, not just agentfront's own self-audit",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c26",
+      "kind": "decision",
+      "text": "Reuse surface is clean (per machinery audit): _output.py is fully generic; _errors.py is generic except an ISSUES_URL in the bug-wrap; _AgentfrontArgumentParser + _dispatch are generic except _brand refs. Promotion = parameterize prog/version/issues_url (supplied by App), move AfiError to a shared package-level module (e.g. agentfront._errors) so non-CLI consumers import it without argparse, and keep the register(sub) convention as-is (zero coupling)",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c27",
+      "kind": "requirement",
+      "text": "Parse-time argparse errors (unknown verb, missing required arg) route through the structured {code,message,remediation} format, not raw argparse 'prog: error:' text \u2014 via a parser_class override propagated to every subparser, plus a pre-parse raw-argv --json peek so parse-time errors honour --json before args.json exists",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h17",
+          "text": "a test runs a malformed command with --json and asserts a structured JSON {code,message,remediation} error on stderr with non-zero exit and clean stdout; the same without --json prints 'error:/hint:' lines",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c28",
+      "kind": "requirement",
+      "text": "Bare noun with no subverb auto-falls-through to that noun's overview \u2014 a framework default emitted from the group, not hand-wired per host group (colleague has this identical _no_verb->overview pattern across all 13 groups)",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h18",
+          "text": "a test invokes a registered noun group with no verb and asserts it renders that group's overview (exit 0), with no host code wiring the fallback",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c29",
+      "kind": "requirement",
+      "text": "explain <path> and learn are auto-generated from the registry: registered operations carry markdown doc metadata, so explain/learn/overview enumerate the same registry set as the CLI (no hand-written per-command catalog) \u2014 this is what preserves CLI<->learn set-equality",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h19",
+          "text": "a test on a consumer App asserts explain <noun> <verb> returns that op's registered doc and learn lists exactly the registered op set; adding an op makes it appear in all three with no catalog edit",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c30",
+      "kind": "requirement",
+      "text": "Per-verb flag declarations are rich: beyond signature-derived args, the registration accommodates custom flags with explicit type, boolean on/off (BooleanOptionalAction-style), nargs, dest-rename, and defaults (colleague's 'work' verb alone declares ~18 such flags) \u2014 otherwise generated subparsers are bare and the host re-hand-rolls flags",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h20",
+          "text": "a test registers an op with a custom typed flag, a boolean --x/--no-x flag, and a renamed dest, invokes it, and asserts the handler received the parsed values",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c31",
+      "kind": "requirement",
+      "text": "Dispatch is robust: KeyboardInterrupt exits 130 cleanly; any non-structured exception from a handler is wrapped into {code,message,remediation} so no Python traceback ever leaks to stderr",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h21",
+          "text": "a test asserts a handler raising a bare Exception yields a structured error + non-zero exit (no traceback), and a simulated KeyboardInterrupt yields exit 130",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c32",
+      "kind": "requirement",
+      "text": "App.cli() supports a host-supplied top-level no-command default handler so a bare invocation (e.g. 'colleague' with no args) can route to host logic (session at a TTY vs help) instead of agentfront hardcoding the bare-invocation behaviour",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h22",
+          "text": "a test sets a no-command handler on a consumer App and asserts a bare invocation calls it; with none set, a bare invocation prints help and exits 0",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c33",
+      "kind": "decision",
+      "text": "Native verb/noun aliases: registration accepts alias names (e.g. alias=['wheels']) mapping multiple names to one handler, so deprecated aliases (colleague's wheels->backends, drive->work) don't force two hand-written add_command entries",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c34",
+      "kind": "non_goal",
+      "text": "The framework error machinery must not swallow or destroy a partial result a host attaches to its structured error (colleague's CliError.result, emitted to stdout in --json before re-raise) \u2014 agentfront only guarantees not to destroy it; partial-result semantics stay host-owned",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c35",
+      "kind": "assumption",
+      "text": "Depth: colleague needs exactly 2-level nesting (noun verb) across 13 groups, widest is 'tui' with 10 subverbs; 'arbitrary depth' in the spec exceeds the immediate need but is harmless. No 3-level nesting is required by the first consumer",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c36",
+      "kind": "decision",
+      "text": "MCP = single-dispatch 'CLI on MCP' ONLY (user decision 2026-06-26): app.mcp_server() exposes ONE tool taking a command-path + args, dispatching through the same registry, returning the op result on success and a structured {code,message,remediation} payload on failure. Supersedes N-tools. Consequence: colleague's converged spec must revise its CLI/MCP/learn set-equality honesty condition to compare the single tool's command catalog (colleague-side follow-up)",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h25",
+          "text": "surfaces_agree(app) returns True for a consumer App under single-dispatch MCP, comparing the single tool's command catalog to the CLI verb set and learn catalog; a regression test covers it",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c37",
+      "kind": "requirement",
+      "text": "The existing cross-surface harness in agentfront/serve.py (surface_inventory / surfaces_agree, which today asserts registry_tools == cli_tools == mcp_tools) is updated so under single-dispatch MCP it compares the single tool's command catalog (not N tool entries) against the CLI/learn set \u2014 otherwise the existing set-equality test fails by construction",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h27",
+          "text": "a regression test asserts surfaces_agree(app) is True for a consumer App under single-dispatch MCP \u2014 comparing the single tool's command catalog to the CLI verb set and learn catalog (the serve.py mcp comparison is updated from N-entry to catalog-based)",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c38",
+      "kind": "decision",
+      "text": "Promote the structured error type to a PUBLIC importable symbol (e.g. agentfront.errors.AfiError or re-exported from agentfront) so consumers stop reaching into the private agentfront.cli._errors; agentfront's own CLI and consumer CLIs share one public type. Move it to a shared module that does not import argparse so non-CLI consumers can import it too",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h26",
+          "text": "the single MCP tool's inputSchema (or description) embeds the command catalog so an agent can discover available commands from the one tool, and learn/explain expose the same catalog",
+          "status": "rejected"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c39",
+      "kind": "assumption",
+      "text": "Accepted tradeoff of single-dispatch MCP (per colleague's ergonomics analysis): an MCP client sees ONE tool via tools/list and loses per-op JSON schemas + native discoverability, so it must learn the command grammar via learn/explain. Accepted in exchange for minimal tool-call noise regardless of registry size; mitigated by the single tool's inputSchema embedding the command catalog and by learn/explain being registry-derived",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h28",
+          "text": "the single MCP tool's inputSchema/description embeds the command catalog so an agent discovers available commands from the one tool; learn/explain expose the same registry-derived catalog",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    }
+  ],
+  "open_vagueness": [
+    {
+      "id": "v1",
+      "text": "signature->argparse arg typing is coarse: Optional[T]/Union/list[int] fall back to string today (same edge as derive_input_schema). Acceptable for v1; richer typing is a follow-up",
+      "kind": "unknown_nonblocking",
+      "claim_id": null
+    },
+    {
+      "id": "v2",
+      "text": "positional-vs-flag mapping rule (required params -> positional, defaulted -> optional --flag) needs to be pinned in the spec but does not block convergence",
+      "kind": "unknown_nonblocking",
+      "claim_id": null
+    },
+    {
+      "id": "v3",
+      "text": "which agentfront version ships this and the exact >= floor colleague pins is a release-time follow-up",
+      "kind": "follow_up",
+      "claim_id": null
+    },
+    {
+      "id": "v4",
+      "text": "colleague's converged spec must revise its CLI/MCP/learn set-equality honesty condition to compare the single MCP tool's command catalog (not N tool entries) \u2014 a colleague-side follow-up triggered by the single-dispatch-only decision; coordinate via an issue on agentculture/colleague",
+      "kind": "follow_up",
+      "claim_id": null
+    }
+  ]
+}
