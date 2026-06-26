@@ -99,6 +99,7 @@ class App:
         name: Optional[str] = None,
         description: Optional[str] = None,
         group: Optional[str | tuple[str, ...]] = None,
+        doc: Optional[str] = None,
     ) -> Any:
         """Register a function as a tool.
 
@@ -113,7 +114,7 @@ class App:
             group = ()
 
         def register(f: Callable[..., Any]) -> Callable[..., Any]:
-            self._registry.add_tool(f, name=name, description=description, group=group)
+            self._registry.add_tool(f, name=name, description=description, group=group, doc=doc)
             return f
 
         if func is not None:
@@ -207,11 +208,14 @@ class _GroupRegistrar:
         *,
         name: Optional[str] = None,
         description: Optional[str] = None,
+        doc: Optional[str] = None,
     ) -> Any:
         """Register a function as a tool under this registrar's group prefix."""
 
         def register(f: Callable[..., Any]) -> Callable[..., Any]:
-            self._app._registry.add_tool(f, name=name, description=description, group=self._prefix)
+            self._app._registry.add_tool(
+                f, name=name, description=description, group=self._prefix, doc=doc
+            )
             return f
 
         if func is not None:
