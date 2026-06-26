@@ -98,15 +98,22 @@ class App:
         *,
         name: Optional[str] = None,
         description: Optional[str] = None,
+        group: Optional[str | tuple[str, ...]] = None,
     ) -> Any:
         """Register a function as a tool.
 
         Usable as ``@app.tool``, ``@app.tool(name=...)``, or ``app.tool(fn)``.
+        ``group`` accepts a single noun string or a tuple of nouns for nested
+        paths; the registered op's full path is ``group + (name,)``.
         Returns the original function so it stays callable in the host.
         """
+        if isinstance(group, str):
+            group = (group,)
+        elif group is None:
+            group = ()
 
         def register(f: Callable[..., Any]) -> Callable[..., Any]:
-            self._registry.add_tool(f, name=name, description=description)
+            self._registry.add_tool(f, name=name, description=description, group=group)
             return f
 
         if func is not None:
@@ -119,8 +126,20 @@ class App:
     def get_tool(self, name: str) -> Optional[ToolEntry]:
         return self._registry.get_tool(name)
 
+    def get_by_path(self, path: tuple[str, ...]) -> Optional[ToolEntry]:
+        return self._registry.get_by_path(path)
+
     def list_tools(self) -> list[ToolEntry]:
         return self._registry.tools()
+
+    def group(self, *prefix: str) -> "_GroupRegistrar":
+        """Return a sub-registrar that nests tools under *prefix*.
+
+        Chaining is supported::
+
+            app.group("a").group("b").tool  # registers under ("a", "b")
+        """
+        return _GroupRegistrar(self, tuple(prefix))
 
     # --- surfaces ---------------------------------------------------------
     # One call each, all derived from this App's single registry. Imports are
@@ -166,6 +185,38 @@ class App:
         from agentfront.cli_surface import make_cli
 
         return make_cli(self)
+
+
+class _GroupRegistrar:
+    """Sub-registrar that prefixes tool registrations with a group path.
+
+    Returned by :meth:`App.group`; supports chaining via :meth:`group`.
+    """
+
+    def __init__(self, app: App, prefix: tuple[str, ...]) -> None:
+        self._app = app
+        self._prefix = prefix
+
+    def group(self, *more: str) -> "_GroupRegistrar":
+        """Extend the group prefix and return a new sub-registrar."""
+        return _GroupRegistrar(self._app, self._prefix + more)
+
+    def tool(
+        self,
+        func: Optional[Callable[..., Any]] = None,
+        *,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+    ) -> Any:
+        """Register a function as a tool under this registrar's group prefix."""
+
+        def register(f: Callable[..., Any]) -> Callable[..., Any]:
+            self._app._registry.add_tool(f, name=name, description=description, group=self._prefix)
+            return f
+
+        if func is not None:
+            return register(func)
+        return register
 
 
 def _title_of(markdown_text: str, fallback: str) -> str:
