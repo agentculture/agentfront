@@ -9,6 +9,8 @@ import pytest
 
 from agentfront.taui.state import (
     Action,
+    Background,
+    ConversationLine,
     Header,
     Panel,
     PanelItem,
@@ -271,3 +273,145 @@ def test_popup_actions_independent() -> None:
     u2 = Popup(id="u2", kind="alert")
     u1.actions.append(Action(selector="s2", input="j"))
     assert len(u2.actions) == 0
+
+
+# ---------------------------------------------------------------------------
+# Background
+# ---------------------------------------------------------------------------
+
+
+def test_background_defaults() -> None:
+    """Background() has empty strings and zero frame."""
+    bg = Background()
+    assert bg.theme == ""
+    assert bg.animation == ""
+    assert bg.frame == 0
+    assert bg.semantic == ""
+
+
+def test_background_round_trip() -> None:
+    """Background survives to_dict / from_dict."""
+    bg = Background(theme="dark", animation="pulse", frame=3, semantic="active")
+    assert Background.from_dict(bg.to_dict()) == bg
+
+
+def test_background_round_trip_defaults() -> None:
+    """Default Background() round-trips cleanly."""
+    bg = Background()
+    assert Background.from_dict(bg.to_dict()) == bg
+
+
+def test_background_to_dict_keys() -> None:
+    """to_dict emits all four keys."""
+    d = Background(theme="t", animation="a", frame=1, semantic="s").to_dict()
+    assert set(d.keys()) == {"theme", "animation", "frame", "semantic"}
+
+
+def test_background_from_dict_uses_get_defaults() -> None:
+    """from_dict tolerates missing keys, applying defaults."""
+    bg = Background.from_dict({})
+    assert bg == Background()
+
+
+# ---------------------------------------------------------------------------
+# ConversationLine
+# ---------------------------------------------------------------------------
+
+
+def test_conversation_line_default_count() -> None:
+    """ConversationLine defaults to count=1."""
+    line = ConversationLine(text="hello")
+    assert line.count == 1
+
+
+def test_conversation_line_render_count_one() -> None:
+    """render() returns just the text when count == 1."""
+    line = ConversationLine(text="hello")
+    assert line.render() == "hello"
+
+
+def test_conversation_line_render_count_gt_one() -> None:
+    """render() appends ' ×N' (multiplication sign) when count > 1."""
+    line = ConversationLine(text="hello", count=3)
+    assert line.render() == "hello ×3"
+
+
+def test_conversation_line_render_uses_multiplication_sign() -> None:
+    """The separator character is the Unicode multiplication sign U+00D7, not 'x'."""
+    line = ConversationLine(text="ping", count=5)
+    rendered = line.render()
+    assert "×" in rendered
+    assert "x" not in rendered
+
+
+def test_conversation_line_round_trip() -> None:
+    """ConversationLine survives to_dict / from_dict."""
+    line = ConversationLine(text="step done", count=2)
+    assert ConversationLine.from_dict(line.to_dict()) == line
+
+
+def test_conversation_line_round_trip_default_count() -> None:
+    """from_dict defaults count to 1 if omitted."""
+    line = ConversationLine.from_dict({"text": "hi"})
+    assert line.count == 1
+    assert line.text == "hi"
+
+
+# ---------------------------------------------------------------------------
+# TAUIState new fields: background + conversation
+# ---------------------------------------------------------------------------
+
+
+def test_tauistate_exposes_background() -> None:
+    """TAUIState has a background field of type Background."""
+    state = TAUIState()
+    assert isinstance(state.background, Background)
+
+
+def test_tauistate_exposes_conversation() -> None:
+    """TAUIState has a conversation field that defaults to an empty list."""
+    state = TAUIState()
+    assert state.conversation == []
+
+
+def test_tauistate_to_dict_contains_background_and_conversation_keys() -> None:
+    """to_dict includes 'background' and 'conversation' keys."""
+    d = TAUIState().to_dict()
+    assert "background" in d
+    assert "conversation" in d
+
+
+def test_tauistate_round_trip_with_background_and_conversation() -> None:
+    """An enriched TAUIState (non-default background + conversation lines) round-trips."""
+    state = TAUIState(
+        background=Background(theme="focus", animation="blink", frame=7, semantic="busy"),
+        conversation=[
+            ConversationLine(text="starting up"),
+            ConversationLine(text="step one", count=3),
+        ],
+    )
+    assert TAUIState.from_dict(state.to_dict()) == state
+
+
+def test_tauistate_round_trip_bare_still_works() -> None:
+    """A bare TAUIState() with new defaults round-trips (backward compat)."""
+    state = TAUIState()
+    assert TAUIState.from_dict(state.to_dict()) == state
+
+
+def test_tauistate_from_dict_without_new_keys_uses_defaults() -> None:
+    """from_dict on old-style dicts (no background/conversation) uses defaults."""
+    old_dict = {
+        "screen": "main",
+        "mode": "planning",
+        "focused": "input.prompt",
+        "zones": {},
+        "panels": [],
+        "popups": [],
+        "status": {"severity": "info", "message": ""},
+        "work": None,
+        "problems": [],
+    }
+    state = TAUIState.from_dict(old_dict)
+    assert state.background == Background()
+    assert state.conversation == []

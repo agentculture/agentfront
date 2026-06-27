@@ -21,6 +21,7 @@ from agentfront.taui.state import PanelItem, TAUIState
 # Module constants (SonarCloud S1192).
 _INPUT_PROMPT = "input.prompt"
 _ALIAS_PREFIX = "alias:"
+_KIND_ZONE = "zone"
 
 # Sentinel returned for the standing selector "input.prompt".
 _INPUT_SENTINEL: dict[str, str] = {"kind": "input", "selector": _INPUT_PROMPT}
@@ -82,6 +83,11 @@ def resolve(state: TAUIState, selector: str) -> Any:
     node = _resolve_in_popups(state, selector)
     if node is not None:
         return node
+
+    # Zones (resolvable but not advertised).
+    zone = state.zones.get(selector)
+    if zone is not None:
+        return {"kind": _KIND_ZONE, "selector": selector, "visible": zone.visible}
 
     raise AgentfrontError(
         code=EXIT_USER_ERROR,

@@ -198,6 +198,52 @@ class WorkItem:
 
 
 @dataclass(frozen=True)
+class Background:
+    """Background theme and animation state."""
+
+    theme: str = ""
+    animation: str = ""
+    frame: int = 0
+    semantic: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "theme": self.theme,
+            "animation": self.animation,
+            "frame": self.frame,
+            "semantic": self.semantic,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> Background:
+        return cls(
+            theme=d.get("theme", ""),
+            animation=d.get("animation", ""),
+            frame=d.get("frame", 0),
+            semantic=d.get("semantic", ""),
+        )
+
+
+@dataclass(frozen=True)
+class ConversationLine:
+    """A conversation line with consecutive-duplicate collapse count."""
+
+    text: str
+    count: int = 1
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"text": self.text, "count": self.count}
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> ConversationLine:
+        return cls(text=d["text"], count=d.get("count", 1))
+
+    def render(self) -> str:
+        """Render as plain text, or 'text ×N' when count > 1."""
+        return self.text if self.count <= 1 else f"{self.text} ×{self.count}"
+
+
+@dataclass(frozen=True)
 class TAUIState:
     """The single source of truth for the TUI cockpit.
 
@@ -223,6 +269,8 @@ class TAUIState:
     status: Status = field(default_factory=Status)
     work_item: WorkItem | None = None
     problems: list[dict] = field(default_factory=list)
+    background: Background = field(default_factory=Background)
+    conversation: list[ConversationLine] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -236,6 +284,8 @@ class TAUIState:
             "status": self.status.to_dict(),
             "work": self.work_item.to_dict() if self.work_item is not None else None,
             "problems": list(self.problems),
+            "background": self.background.to_dict(),
+            "conversation": [c.to_dict() for c in self.conversation],
         }
 
     @classmethod
@@ -255,4 +305,6 @@ class TAUIState:
             status=Status.from_dict(d["status"]) if "status" in d else Status(),
             work_item=work_item,
             problems=list(d.get("problems", [])),
+            background=Background.from_dict(d["background"]) if "background" in d else Background(),
+            conversation=[ConversationLine.from_dict(c) for c in d.get("conversation", [])],
         )

@@ -15,7 +15,7 @@ from typing import Any
 
 from agentfront.taui.state import TAUIState
 
-SCHEMA_VERSION: str = "0.1"
+SCHEMA_VERSION: str = "0.2"
 
 
 def serialize(state: TAUIState) -> dict[str, Any]:

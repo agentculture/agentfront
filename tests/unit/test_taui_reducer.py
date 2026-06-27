@@ -2,9 +2,18 @@
 
 from __future__ import annotations
 
-from agentfront.taui.events import Dismiss, KeyPress, SelectorAction, Tick, UserInput
-from agentfront.taui.reducer import focus_order, reduce
-from agentfront.taui.state import Panel, PanelItem, Popup, TAUIState
+from agentfront.taui.events import (
+    Dismiss,
+    KeyPress,
+    SelectorAction,
+    SkillSuggested,
+    Tick,
+    UserInput,
+    WorkStep,
+)
+from agentfront.taui.reducer import focus_order, reduce, replay
+from agentfront.taui.selectors import resolve
+from agentfront.taui.state import Panel, PanelItem, Popup, TAUIState, WorkItem
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -216,20 +225,243 @@ def test_selector_action_invalid_selector_is_noop() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Tick / UserInput — no-op
+# Tick — advances background.frame
 # ---------------------------------------------------------------------------
 
 
-def test_tick_is_noop() -> None:
-    state = _state_with_three_items()
+def test_tick_advances_background_frame() -> None:
+    state = TAUIState()
+    result = reduce(state, Tick(delta=3))
+    assert result.background.frame == 3
+
+
+def test_tick_delta_accumulates() -> None:
+    state = TAUIState()
+    s1 = reduce(state, Tick(delta=1))
+    s2 = reduce(s1, Tick(delta=2))
+    assert s2.background.frame == 3
+
+
+def test_tick_default_delta_is_one() -> None:
+    state = TAUIState()
     result = reduce(state, Tick())
-    assert result == state
+    assert result.background.frame == 1
 
 
-def test_user_input_is_noop() -> None:
-    state = _state_with_three_items()
+# ---------------------------------------------------------------------------
+# UserInput — appends to conversation with duplicate collapse
+# ---------------------------------------------------------------------------
+
+
+def test_user_input_appends_conversation() -> None:
+    state = TAUIState()
     result = reduce(state, UserInput(text="hello"))
-    assert result == state
+    assert len(result.conversation) == 1
+    assert result.conversation[0].text == "hello"
+    assert result.conversation[0].count == 1
+
+
+def test_user_input_consecutive_duplicate_collapse() -> None:
+    """Same text twice → one ConversationLine with count==2 and render()=='text ×2'."""
+    state = TAUIState()
+    s1 = reduce(state, UserInput(text="text"))
+    s2 = reduce(s1, UserInput(text="text"))
+    assert len(s2.conversation) == 1
+    assert s2.conversation[0].count == 2
+    assert s2.conversation[0].render() == "text ×2"
+
+
+def test_user_input_non_consecutive_does_not_collapse() -> None:
+    state = TAUIState()
+    s1 = reduce(state, UserInput(text="first"))
+    s2 = reduce(s1, UserInput(text="second"))
+    assert len(s2.conversation) == 2
+
+
+def test_user_input_triple_collapse() -> None:
+    """Three consecutive identical inputs → one line, count==3."""
+    state = TAUIState()
+    s = reduce(state, UserInput(text="x"))
+    s = reduce(s, UserInput(text="x"))
+    s = reduce(s, UserInput(text="x"))
+    assert len(s.conversation) == 1
+    assert s.conversation[0].count == 3
+
+
+# ---------------------------------------------------------------------------
+# SkillSuggested — opens popup + sets background
+# ---------------------------------------------------------------------------
+
+
+def test_skill_suggested_opens_visible_non_blocking_popup() -> None:
+    state = TAUIState()
+    result = reduce(state, SkillSuggested(skill="myskill", reason="it is better"))
+    assert len(result.popups) == 1
+    popup = result.popups[0]
+    assert popup.id == "popup.skill-suggested"
+    assert popup.visible is True
+    assert popup.blocking is False
+
+
+def test_skill_suggested_sets_background_theme_and_semantic() -> None:
+    state = TAUIState()
+    result = reduce(state, SkillSuggested(skill="myskill", theme="custom_theme", semantic="s"))
+    assert result.background.theme == "custom_theme"
+    assert result.background.semantic == "s"
+
+
+def test_skill_suggested_popup_message_with_skill() -> None:
+    state = TAUIState()
+    result = reduce(state, SkillSuggested(skill="myskill"))
+    assert result.popups[0].message == "Suggested skill: myskill"
+
+
+def test_skill_suggested_popup_message_without_skill() -> None:
+    state = TAUIState()
+    result = reduce(state, SkillSuggested(skill=""))
+    assert result.popups[0].message == "Skill suggested"
+
+
+def test_skill_suggested_default_theme_and_semantic() -> None:
+    """SkillSuggested defaults propagate to background correctly."""
+    state = TAUIState()
+    result = reduce(state, SkillSuggested())
+    assert result.background.theme == "skill_suggested"
+    assert result.background.semantic == "stronger_agent_recommended"
+
+
+def test_skill_suggested_popup_actions_resolve() -> None:
+    """Both popup action selectors must be resolvable via selectors.resolve()."""
+    state = TAUIState()
+    result = reduce(state, SkillSuggested(skill="myskill", reason="better fit"))
+    popup = result.popups[0]
+    assert len(popup.actions) == 2
+    for action in popup.actions:
+        node = resolve(result, action.selector)
+        assert node is not None
+
+
+def test_skill_suggested_popup_reason_stored() -> None:
+    state = TAUIState()
+    result = reduce(state, SkillSuggested(skill="myskill", reason="specialist required"))
+    assert result.popups[0].reason == "specialist required"
+
+
+def test_skill_suggested_pure_input_unchanged() -> None:
+    """SkillSuggested does not mutate the input state."""
+    state = TAUIState()
+    original = state.to_dict()
+    reduce(state, SkillSuggested(skill="myskill"))
+    assert state.to_dict() == original
+
+
+# ---------------------------------------------------------------------------
+# WorkStep — appends conversation, increments step_count, error popup
+# ---------------------------------------------------------------------------
+
+
+def test_work_step_appends_conversation() -> None:
+    state = TAUIState()
+    result = reduce(state, WorkStep(label="Doing thing"))
+    assert len(result.conversation) == 1
+    assert result.conversation[0].text == "Doing thing"
+
+
+def test_work_step_increments_step_count_with_work_item() -> None:
+    state = TAUIState(work_item=WorkItem(task_id="t1"))
+    result = reduce(state, WorkStep(label="step"))
+    assert result.work_item is not None
+    assert result.work_item.step_count == 1
+
+
+def test_work_step_no_crash_without_work_item() -> None:
+    """WorkStep with work_item=None must not crash and leaves work_item None."""
+    state = TAUIState(work_item=None)
+    result = reduce(state, WorkStep(label="step"))
+    assert result.work_item is None
+
+
+def test_work_step_ok_does_not_open_error_popup() -> None:
+    state = TAUIState()
+    result = reduce(state, WorkStep(label="step", ok=True))
+    assert len(result.popups) == 0
+
+
+def test_work_step_not_ok_opens_visible_blocking_error_popup() -> None:
+    state = TAUIState()
+    result = reduce(state, WorkStep(label="step", ok=False, error="Something went wrong"))
+    assert len(result.popups) == 1
+    popup = result.popups[0]
+    assert popup.id == "popup.work-error"
+    assert popup.visible is True
+    assert popup.blocking is True
+    assert popup.message == "Something went wrong"
+
+
+def test_work_step_not_ok_uses_label_when_no_error() -> None:
+    state = TAUIState()
+    result = reduce(state, WorkStep(label="the step", ok=False, error=""))
+    assert result.popups[0].message == "the step"
+
+
+def test_work_step_not_ok_default_message_when_no_label_or_error() -> None:
+    state = TAUIState()
+    result = reduce(state, WorkStep(label="", ok=False, error=""))
+    assert result.popups[0].message == "Work step failed"
+
+
+def test_work_step_conversation_collapse() -> None:
+    """Consecutive identical WorkStep labels also collapse."""
+    state = TAUIState()
+    s1 = reduce(state, WorkStep(label="ping"))
+    s2 = reduce(s1, WorkStep(label="ping"))
+    assert len(s2.conversation) == 1
+    assert s2.conversation[0].count == 2
+
+
+def test_work_step_pure_input_unchanged() -> None:
+    """WorkStep does not mutate the input state."""
+    state = TAUIState(work_item=WorkItem(task_id="t1"))
+    original = state.to_dict()
+    reduce(state, WorkStep(label="step", ok=False, error="err"))
+    assert state.to_dict() == original
+
+
+# ---------------------------------------------------------------------------
+# replay() — fold an event list into a TAUIState
+# ---------------------------------------------------------------------------
+
+
+def test_replay_empty_events_none_initial_returns_default() -> None:
+    result = replay([], None)
+    assert result == TAUIState()
+
+
+def test_replay_empty_events_with_initial() -> None:
+    initial = TAUIState(mode="executing")
+    result = replay([], initial)
+    assert result == initial
+
+
+def test_replay_matches_manual_reduction() -> None:
+    """replay() folds events into the same state as manual sequential reduce()."""
+    events = [Tick(delta=2), UserInput(text="hello"), UserInput(text="world")]
+    s = TAUIState()
+    for ev in events:
+        s = reduce(s, ev)
+    replayed = replay(events, TAUIState())
+    assert replayed.to_dict() == s.to_dict()
+
+
+def test_replay_with_skill_suggested_and_work_step() -> None:
+    events = [
+        SkillSuggested(skill="fast-path"),
+        WorkStep(label="step 1"),
+        WorkStep(label="step 2"),
+    ]
+    result = replay(events)
+    assert len(result.popups) == 1
+    assert len(result.conversation) == 2
 
 
 # ---------------------------------------------------------------------------
@@ -303,3 +535,41 @@ def test_reduce_pure_with_dismiss() -> None:
     original = state.to_dict()
     reduce(state, Dismiss())
     assert state.to_dict() == original
+
+
+# ---------------------------------------------------------------------------
+# Review-driven regression tests (issue #43 SHOULD-FIX items)
+# ---------------------------------------------------------------------------
+
+
+def test_dismiss_clears_blocking_so_diagnose_stays_ok():
+    """Dismissing a blocking error popup must not leave a blocking+invisible
+    popup that diagnose_structured would flag as a POPUP_LIFECYCLE bug."""
+    from agentfront.taui.diagnose import diagnose_structured
+
+    state = TAUIState(work_item=WorkItem(task_id="t1", engine="mock", running=True))
+    failed = reduce(state, WorkStep(label="call tool", ok=False, error="boom"))
+    err = next(p for p in failed.popups if p.id == "popup.work-error")
+    assert err.visible is True and err.blocking is True
+    assert diagnose_structured(failed).ok is True
+
+    dismissed = reduce(failed, Dismiss())
+    err2 = next(p for p in dismissed.popups if p.id == "popup.work-error")
+    assert err2.visible is False
+    assert err2.blocking is False  # dismissed modal no longer blocks
+    assert diagnose_structured(dismissed).ok is True
+
+
+def test_repeated_failed_work_step_keeps_single_error_popup():
+    """Repeated failed steps refresh one work-error popup rather than appending
+    duplicate ids (which diagnose_structured would flag as a LAYOUT bug)."""
+    from agentfront.taui.diagnose import diagnose_structured
+
+    state = TAUIState(work_item=WorkItem(task_id="t1", engine="mock", running=True))
+    s1 = reduce(state, WorkStep(label="step one", ok=False, error="first"))
+    s2 = reduce(s1, WorkStep(label="step two", ok=False, error="second"))
+    work_errors = [p for p in s2.popups if p.id == "popup.work-error"]
+    assert len(work_errors) == 1  # one live error popup, not two
+    assert work_errors[0].message == "second"  # reflects the latest failure
+    assert s2.work_item.step_count == 2
+    assert diagnose_structured(s2).ok is True

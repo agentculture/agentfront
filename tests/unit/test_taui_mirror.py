@@ -11,6 +11,7 @@ from agentfront.taui.render.ansi import render_ansi
 from agentfront.taui.selectors import resolve
 from agentfront.taui.state import (
     Action,
+    ConversationLine,
     Header,
     Panel,
     PanelItem,
@@ -201,3 +202,72 @@ class TestMirrorStructure:
         mirror = serialize(state)
         selectors = [entry["selector"] for entry in mirror["available_actions"]]
         assert "input.prompt" in selectors
+
+
+# ---------------------------------------------------------------------------
+# v0.2 schema assertions
+# ---------------------------------------------------------------------------
+
+
+class TestSchemaV02:
+    """SCHEMA_VERSION is 0.2 and the mirror carries background/conversation."""
+
+    def test_schema_version_constant(self) -> None:
+        """SCHEMA_VERSION module constant equals '0.2'."""
+        assert SCHEMA_VERSION == "0.2"
+
+    def test_taui_version_in_mirror_is_v02(self) -> None:
+        """serialize(state)['taui_version'] == '0.2'."""
+        state = _baseline_state()
+        mirror = serialize(state)
+        assert mirror["taui_version"] == "0.2"
+
+    def test_background_key_present(self) -> None:
+        """Mirror carries 'background' key forwarded from to_dict."""
+        state = _baseline_state()
+        mirror = serialize(state)
+        assert "background" in mirror
+
+    def test_conversation_key_present(self) -> None:
+        """Mirror carries 'conversation' key forwarded from to_dict."""
+        state = _baseline_state()
+        mirror = serialize(state)
+        assert "conversation" in mirror
+
+    def test_conversation_round_trips(self) -> None:
+        """For a state with a populated conversation the dicts round-trip."""
+        lines = [
+            ConversationLine(text="hello", count=1),
+            ConversationLine(text="world", count=3),
+        ]
+        state = TAUIState(
+            conversation=lines,
+        )
+        mirror = serialize(state)
+        conv = mirror["conversation"]
+        assert len(conv) == 2
+        assert conv[0] == {"text": "hello", "count": 1}
+        assert conv[1] == {"text": "world", "count": 3}
+        # Verify round-trip via ConversationLine.from_dict.
+        restored = [ConversationLine.from_dict(d) for d in conv]
+        assert restored == lines
+
+    def test_conversation_empty_by_default(self) -> None:
+        """A bare TAUIState serializes conversation as an empty list."""
+        state = TAUIState()
+        mirror = serialize(state)
+        assert mirror["conversation"] == []
+
+    def test_background_fields_forwarded(self) -> None:
+        """Background subfields (theme, animation, frame, semantic) appear in mirror."""
+        from agentfront.taui.state import Background
+
+        bg = Background(theme="dark", animation="pulse", frame=4, semantic="active")
+        state = TAUIState(background=bg)
+        mirror = serialize(state)
+        assert mirror["background"] == {
+            "theme": "dark",
+            "animation": "pulse",
+            "frame": 4,
+            "semantic": "active",
+        }

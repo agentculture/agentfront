@@ -5,15 +5,32 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/). This project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.17.0] - 2026-06-27
+## [0.18.0] - 2026-06-27
 
+### Added
+
+- TAUI v0.2 work-loop cockpit: Background field (theme/animation/frame/semantic) and a conversation panel with consecutive-duplicate collapse on TAUIState
+- TAUI SkillSuggested and WorkStep events; reducer now folds Tick (advances background.frame), UserInput (appends to the conversation panel), SkillSuggested (opens a skill-suggestion popup + sets background) and WorkStep (steps the work item, logs, and opens an error popup on failure)
+- Structured 7-class diagnose_structured() (STATE/RENDER/LAYOUT/FOCUS/INPUT_ROUTING/THEME/POPUP_LIFECYCLE) alongside the existing flat diagnose()
+- agentfront.taui.snapshot: write/read the snapshot quad (.taui.json/.ansi/.events.jsonl/.md), replay() to fold an event trail back to a state, and a JSON<->Markdown faithful() check
+- selectors.resolve() now resolves zone keys (e.g. top.status); ANSI render gains a frame-driven status glyph and both renderers render the conversation panel
+
+### Changed
+
+- TAUI SCHEMA_VERSION bumped 0.1 -> 0.2; the JSON mirror now carries background + conversation
+- Closed all 12 colleague-parity gaps tracked in test_taui_colleague_parity.py (unblocks colleague importing agentfront.taui instead of maintaining its own TUI)
+
+### Fixed
+
+- Dismissing a popup now also clears its blocking flag, and repeated failed WorkSteps refresh a single error popup, so diagnose_structured no longer false-positives on normal work-loop states
+
+## [0.17.0] - 2026-06-27
 
 ### Added
 
 - TAUI — agentfront's fourth generated surface: one TAUIState renders to a JSON mirror (agent baseline), ANSI/TUI (human terminal), and markdown (readable), with stable ids, dotted-path selectors, and a derived available_actions list so an agent drives the exact UI a human uses.
 - app.taui() / app.taui_mirror() / app.taui_driver() lazy accessors deriving a baseline cockpit from the App command registry (stdlib-only, no new dependency).
 - agentfront.taui package: state, events, reducer (a single fold for both agent SelectorAction and human KeyPress), selectors, derive, mirror, diagnose (cross-render invariant), render/ansi, render/markdown, and a thin reference driver.
-
 
 ### Changed
 

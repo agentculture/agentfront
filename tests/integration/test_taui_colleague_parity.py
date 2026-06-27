@@ -12,86 +12,76 @@ PARITY GAPS
 =============================================================================
 
 The following behavioural differences between colleague's CockpitState and
-agentfront's TAUIState were identified while writing these tests. They are
-NOT bugs — they represent deliberate scope differences. Any consumer importing
-agentfront.taui instead of colleague.tui must account for them.
+agentfront's TAUIState were identified while writing these tests. The v0.2
+full-uplift (issue #43) CLOSED gaps 1, 3, 4, 7, 9, 10, and 12 so agentfront.taui
+is now a complete work-loop cockpit colleague can import. The remaining gaps
+(2, 5, 6, 8, 11) are deliberate, agentfront-side choices that colleague conforms
+to on its side. Any consumer importing agentfront.taui must account for them.
 
-PARITY GAP 1: Background field absent
-    colleague.tui.state.CockpitState has a `background` field (Background
-    dataclass with theme/animation/frame/semantic) used for visual ambience and
-    THEME bug-class signals (e.g. "stronger_agent_recommended" semantic).
-    agentfront.taui.state.TAUIState has NO `background` field — the TAUI
-    package does not model visual/animation ambience at all.
-    Tested by: test_parity_gap_background_field_absent
+PARITY GAP 1 [CLOSED v0.2]: Background field
+    TAUIState now has a frozen `background` field (Background dataclass with
+    theme/animation/frame/semantic) used for visual ambience and THEME signals
+    (e.g. "stronger_agent_recommended" semantic). Round-trips via to_dict/from_dict.
+    Tested by: test_parity_gap_background_field_present
 
-PARITY GAP 2: Header field is agentfront-specific
+PARITY GAP 2 [agentfront keeps]: Header field is agentfront-specific
     agentfront.taui.state.TAUIState has an extra `header` field (Header
     dataclass with title/subtitle/version) to expose the app identity in the
-    mirror. colleague.tui.state.CockpitState has no `header` field.
-    Not blocked by a test — every TAUIState round-trip includes header.
+    mirror. colleague adopts it; every TAUIState round-trip includes header.
 
-PARITY GAP 3: SkillSuggested event absent
-    colleague.tui.events.SkillSuggested fires when a stronger agent is
-    recommended; colleague's reducer opens a skill-suggestion popup and sets
-    background.theme/semantic.  agentfront.taui.events has no SkillSuggested
-    — skill suggestions must be modelled as a Popup injected directly into
-    TAUIState by the caller.
-    Tested by: test_parity_gap_skill_suggested_absent
+PARITY GAP 3 [CLOSED v0.2]: SkillSuggested event
+    agentfront.taui.events.SkillSuggested fires when a stronger agent is
+    recommended; the reducer opens a skill-suggestion popup and sets
+    background.theme/semantic.
+    Tested by: test_parity_gap_skill_suggested_present
 
-PARITY GAP 4: WorkStep event absent
-    colleague.tui.events.WorkStep fires on each tool-call step; colleague's
-    reducer increments work_item.step_count and opens an error popup on
-    failure.  agentfront.taui.events has no WorkStep — callers must construct
-    updated TAUIState directly.
-    Tested by: test_parity_gap_work_step_absent
+PARITY GAP 4 [CLOSED v0.2]: WorkStep event
+    agentfront.taui.events.WorkStep fires on each tool-call step; the reducer
+    increments work_item.step_count, appends a conversation line, and opens an
+    error popup on failure.
+    Tested by: test_parity_gap_work_step_present
 
-PARITY GAP 5: Serializer renamed
+PARITY GAP 5 [colleague conforms]: Serializer name
     colleague: `from colleague.tui.taui import serialize`
     agentfront: `from agentfront.taui.mirror import serialize`
     (The function plays the same role but lives in a different module.)
 
-PARITY GAP 6: selectors.resolve() signature differs
-    colleague: `resolve(taui_dict, selector)` — operates on the serialised
-    TAUI mirror dict.
+PARITY GAP 6 [colleague conforms]: selectors.resolve() signature
+    colleague historically used `resolve(taui_dict, selector)`.
     agentfront: `resolve(state, selector)` — operates on the TAUIState object.
     Tests that call resolve() use the agentfront signature throughout.
 
-PARITY GAP 7: diagnose() interface is completely different
-    colleague: `diagnose(taui_dict, ansi_str, events_list) -> Diagnosis`
+PARITY GAP 7 [CLOSED v0.2]: structured diagnose
+    agentfront now exposes BOTH the flat `diagnose(state) -> DiagnoseResult(ok,
+    problems)` cross-render checker AND `diagnose_structured(state) -> Diagnosis`
     with seven explicit bug classes (STATE, RENDER, LAYOUT, FOCUS,
-    INPUT_ROUTING, THEME, POPUP_LIFECYCLE).
-    agentfront: `diagnose(state) -> DiagnoseResult(ok, problems)` — a simpler
-    cross-render invariant checker; no separate bug classes.
-    Tests mirror the purity/consistency invariants, not the seven-class taxonomy.
+    INPUT_ROUTING, THEME, POPUP_LIFECYCLE). The snapshot/replay quad
+    (write_snapshot/read_snapshot/replay/faithful) lands in
+    agentfront.taui.snapshot. Tested in the unit suites for diagnose + snapshot.
 
-PARITY GAP 8: available_actions composition differs
+PARITY GAP 8 [colleague conforms]: available_actions composition
     colleague: visible popup actions + standing `input.prompt`.
     agentfront: visible panel items (with input="select") + visible popup
-    actions + standing `input.prompt`.
-    Tests verify that every selector in available_actions resolves, not the
-    exact membership.
+    actions + standing `input.prompt` (a superset). Tests verify that every
+    selector in available_actions resolves, not the exact membership.
 
-PARITY GAP 9: SCHEMA_VERSION
-    colleague TAUI schema version is "0.2"; agentfront is "0.1".
+PARITY GAP 9 [CLOSED v0.2]: SCHEMA_VERSION
+    Both agentfront and colleague TAUI schema versions are now "0.2".
 
-PARITY GAP 10: Reducer event coverage differs
-    colleague's reducer handles Tick (advance background.frame), UserInput
-    (append to conversation panel), WorkStep (increment step_count/open popup).
-    agentfront's reducer treats Tick and UserInput as no-ops (returns
-    unchanged state).
+PARITY GAP 10 [CLOSED v0.2]: Reducer event coverage
+    agentfront's reducer now handles Tick (advance background.frame), UserInput
+    (append to the conversation panel, with consecutive-duplicate collapse), and
+    WorkStep (increment step_count / open popup).
 
-PARITY GAP 11: Frozen vs mutable dataclasses
+PARITY GAP 11 [colleague conforms]: Frozen vs mutable dataclasses
     agentfront.taui.state uses frozen=True dataclasses (immutable); all
-    mutations go through dataclasses.replace().  colleague.tui.state uses
-    mutable dataclasses.  The invariant tests still hold; equality semantics
-    differ when constructing modified copies.
+    mutations go through dataclasses.replace(). colleague rewrites its in-place
+    mutations to functional replace(). The invariant tests still hold.
 
-PARITY GAP 12: Zone resolution via selectors.resolve()
-    colleague.tui.selectors.resolve() can resolve zone keys (e.g.
-    "top.status") directly via the taui dict.
-    agentfront.taui.selectors.resolve() does NOT resolve zone keys — zones are
-    not in the resolve lookup.  Zone info is in TAUIState.zones but not
-    addressed via the public resolve() API.
+PARITY GAP 12 [CLOSED v0.2]: Zone resolution via selectors.resolve()
+    agentfront.taui.selectors.resolve() now resolves zone keys (e.g.
+    "top.status") to a `{"kind": "zone", ...}` sentinel, in addition to
+    panels/items/popups/actions/input.prompt.
 =============================================================================
 """
 
@@ -104,6 +94,8 @@ from agentfront.taui.mirror import SCHEMA_VERSION, serialize
 from agentfront.taui.selectors import resolve
 from agentfront.taui.state import (
     Action,
+    Background,
+    ConversationLine,
     Header,
     Panel,
     PanelItem,
@@ -119,18 +111,18 @@ from agentfront.taui.state import (
 # =============================================================================
 
 PARITY_GAPS = [
-    "GAP 1: background field absent — TAUIState has no Background (theme/animation/frame/semantic)",
-    "GAP 2: header field is agentfront-specific — CockpitState has no Header",
-    "GAP 3: SkillSuggested event absent — agentfront has no SkillSuggested",
-    "GAP 4: WorkStep event absent — agentfront has no WorkStep",
-    "GAP 5: serializer renamed — taui.serialize → mirror.serialize",
-    "GAP 6: selectors.resolve() signature — colleague takes (dict, str), agentfront (state, str)",
-    "GAP 7: diagnose() interface is completely different — no 7-class taxonomy in agentfront",
-    "GAP 8: available_actions composition — agentfront also includes panel items (input=select)",
-    "GAP 9: SCHEMA_VERSION — colleague='0.2', agentfront='0.1'",
-    "GAP 10: reducer event coverage — Tick/UserInput/WorkStep are no-ops in agentfront",
-    "GAP 11: frozen vs mutable dataclasses — agentfront uses frozen=True",
-    "GAP 12: Zone resolution — agentfront selectors.resolve() does NOT resolve zone keys",
+    "GAP 1 [CLOSED v0.2]: Background field present — TAUIState.background (theme/frame/semantic)",
+    "GAP 2 [agentfront keeps]: header field — colleague adopts the extra Header",
+    "GAP 3 [CLOSED v0.2]: SkillSuggested event present — reducer opens popup + sets background",
+    "GAP 4 [CLOSED v0.2]: WorkStep event present — reducer steps work_item + logs + error popup",
+    "GAP 5 [colleague conforms]: serializer lives at mirror.serialize (not taui.serialize)",
+    "GAP 6 [colleague conforms]: selectors.resolve(state, str) operates on the state object",
+    "GAP 7 [CLOSED v0.2]: structured 7-class diagnose_structured() added (DiagnoseResult kept)",
+    "GAP 8 [colleague conforms]: available_actions superset — agentfront also includes panel items",
+    "GAP 9 [CLOSED v0.2]: SCHEMA_VERSION — both agentfront and colleague are '0.2'",
+    "GAP 10 [CLOSED v0.2]: reducer event coverage — Tick/UserInput/WorkStep now folded",
+    "GAP 11 [colleague conforms]: frozen vs mutable — agentfront keeps frozen=True",
+    "GAP 12 [CLOSED v0.2]: zone resolution — selectors.resolve() now resolves zone keys",
 ]
 
 
@@ -146,39 +138,60 @@ def test_parity_gaps_surface():
 # =============================================================================
 
 
-def test_parity_gap_background_field_absent():
-    """PARITY GAP 1: TAUIState has no background field (colleague does).
+def test_parity_gap_background_field_present():
+    """PARITY GAP 1 (CLOSED in v0.2): TAUIState now has a background field.
 
     Mirrors: colleague's TestFieldPresence.test_background_field_has_frame
     """
+    from agentfront.taui.state import Background
+
     state = TAUIState()
-    assert not hasattr(
-        state, "background"
-    ), "GAP 1 would be closed: TAUIState now has a 'background' field"
+    assert hasattr(state, "background"), "GAP 1 closed: TAUIState exposes a 'background' field"
+    assert isinstance(state.background, Background)
+    # Background carries theme / animation / frame / semantic and round-trips.
+    bg = Background(
+        theme="alert", animation="pulse", frame=7, semantic="stronger_agent_recommended"
+    )
+    enriched = replace(state, background=bg)
+    assert TAUIState.from_dict(enriched.to_dict()) == enriched
+    assert enriched.to_dict()["background"]["frame"] == 7
 
 
-def test_parity_gap_skill_suggested_absent():
-    """PARITY GAP 3: agentfront has no SkillSuggested event.
+def test_parity_gap_skill_suggested_present():
+    """PARITY GAP 3 (CLOSED in v0.2): agentfront now has a SkillSuggested event.
 
     Mirrors: colleague's test_skill_suggested_opens_popup
     """
     from agentfront.taui import events as ev_mod
+    from agentfront.taui.reducer import reduce
 
-    assert not hasattr(
-        ev_mod, "SkillSuggested"
-    ), "GAP 3 would be closed: agentfront now has a SkillSuggested event"
+    assert hasattr(ev_mod, "SkillSuggested"), "GAP 3 closed: SkillSuggested event exists"
+    # The reducer opens a skill-suggestion popup and sets background theme/semantic.
+    state = reduce(
+        TAUIState(),
+        ev_mod.SkillSuggested(skill="deep-research", semantic="stronger_agent_recommended"),
+    )
+    assert any(p.visible and p.kind == "skill_suggestion" for p in state.popups)
+    assert state.background.semantic == "stronger_agent_recommended"
 
 
-def test_parity_gap_work_step_absent():
-    """PARITY GAP 4: agentfront has no WorkStep event.
+def test_parity_gap_work_step_present():
+    """PARITY GAP 4 (CLOSED in v0.2): agentfront now has a WorkStep event.
 
     Mirrors: colleague's test_drive_step_increments_step_count_when_drive_active
     """
     from agentfront.taui import events as ev_mod
+    from agentfront.taui.reducer import reduce
 
-    assert not hasattr(
-        ev_mod, "WorkStep"
-    ), "GAP 4 would be closed: agentfront now has a WorkStep event"
+    assert hasattr(ev_mod, "WorkStep"), "GAP 4 closed: WorkStep event exists"
+    # On an active work item, a step increments step_count and logs to the conversation.
+    state = TAUIState(work_item=WorkItem(task_id="t1", engine="mock", step_count=0, running=True))
+    stepped = reduce(state, ev_mod.WorkStep(label="call tool foo"))
+    assert stepped.work_item.step_count == 1
+    assert any(line.text == "call tool foo" for line in stepped.conversation)
+    # A failed step opens an error popup.
+    failed = reduce(state, ev_mod.WorkStep(label="call tool bar", ok=False, error="boom"))
+    assert any(p.visible and p.kind == "error" for p in failed.popups)
 
 
 # =============================================================================
@@ -195,7 +208,8 @@ def _minimal_state() -> TAUIState:
 def _rich_state() -> TAUIState:
     """Return a TAUIState with all nested objects populated for round-trip.
 
-    Note: TAUIState has a header field (GAP 2) and no background field (GAP 1).
+    Note: TAUIState has a header field (GAP 2) and, since v0.2, a background
+    field (GAP 1 CLOSED) and a conversation panel (GAP 10 CLOSED).
     """
     action = Action(selector="button.ok", input="enter", description="Confirm")
     item = PanelItem(id="skill-1", label="My Skill", status="active")
@@ -220,6 +234,13 @@ def _rich_state() -> TAUIState:
     header = Header(title="My App", subtitle="Test subtitle", version="1.0.0")
     status = Status(severity="warn", message="Heads up")
     work_item = WorkItem(task_id="abc123", engine="vllm-openai", step_count=3, running=True)
+    background = Background(
+        theme="alert", animation="pulse", frame=4, semantic="stronger_agent_recommended"
+    )
+    conversation = [
+        ConversationLine(text="user: do the thing"),
+        ConversationLine(text="step: call tool foo", count=3),
+    ]
     return TAUIState(
         screen="main",
         mode="executing",
@@ -231,6 +252,8 @@ def _rich_state() -> TAUIState:
         status=status,
         work_item=work_item,
         problems=[{"code": "E001", "message": "Something went wrong"}],
+        background=background,
+        conversation=conversation,
     )
 
 
@@ -724,32 +747,38 @@ class TestReducerPurity:
         assert s1.mode == s0.mode
         assert s1.focused == s0.focused
 
-    def test_tick_is_a_noop(self):
-        """Tick is a no-op in agentfront (GAP 10).
+    def test_tick_advances_frame(self):
+        """Tick advances background.frame by delta (GAP 10 + GAP 1 CLOSED in v0.2).
 
-        Mirrors: colleague test_tick_advances_frame_by_delta — but the invariant
-        here is that reduce() does NOT crash and returns a valid state.
+        Mirrors: colleague test_tick_advances_frame_by_delta — agentfront now
+        drives a frame-counter animation through the reducer (no clock/thread).
         """
         from agentfront.taui.reducer import reduce
 
         s0 = _fresh()
         s1 = reduce(s0, Tick(delta=3))
         assert isinstance(s1, TAUIState)
-        # No background field → frame counter unchanged (GAP 1 + GAP 10)
-        assert s1 == s0
+        assert s1.background.frame == s0.background.frame + 3
+        # Purity: the input state is untouched.
+        assert s0.background.frame == 0
 
-    def test_user_input_is_a_noop(self):
-        """UserInput is a no-op in agentfront (GAP 10).
+    def test_user_input_appends_to_conversation(self):
+        """UserInput appends a line to the conversation panel (GAP 10 CLOSED in v0.2).
 
-        Mirrors: colleague test_user_input_focuses_prompt (the key invariant
-        there is that the state changed; here we verify no crash + valid return).
+        Mirrors: colleague test_user_input_focuses_prompt — agentfront now folds
+        user input into a generic conversation/log panel.
         """
         from agentfront.taui.reducer import reduce
 
         s0 = _fresh()
         s1 = reduce(s0, UserInput(text="hello"))
         assert isinstance(s1, TAUIState)
-        assert s1 == s0
+        assert [line.text for line in s1.conversation] == ["hello"]
+        # Consecutive-duplicate collapse: repeating folds into a count.
+        s2 = reduce(s1, UserInput(text="hello"))
+        assert len(s2.conversation) == 1
+        assert s2.conversation[0].count == 2
+        assert s2.conversation[0].render() == "hello ×2"
 
     def test_key_press_does_not_crash(self):
         """Mirrors: colleague test_key_does_not_crash"""
