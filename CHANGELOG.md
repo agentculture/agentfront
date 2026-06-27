@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/). This project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.0] - 2026-06-27
+
+### Added
+
+- An explicit `Flag` whose `dest` (or `--<param>` long option) matches a signature parameter now **replaces** that parameter's auto-derived CLI arg instead of colliding with it at build time (issue #40). Only the explicit `Flag` is registered, so it can carry `choices`/`type` for a **value-carrying** flag; the dispatcher still forwards the value because the parameter stays in the signature and the `Flag` writes to the same `dest`. The signature default is backfilled onto the merged flag when the `Flag` declares none, so omitting the flag yields the function's own default rather than `None`. This lets a value-carrying flag (e.g. `--algo sha256|md5` whose value the verb consumes) express its parse-time `choices` declaratively instead of a per-verb hand-rolled guard. Tools with no explicit `Flag` for a signature param are byte-identical to before; `Flag`-only flags are unchanged; `explain`/`overview` surface the merged flag's `choices` (as #38 already does).
+
 ## [0.15.0] - 2026-06-26
 
 ### Added
