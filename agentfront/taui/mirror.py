@@ -2,16 +2,17 @@
 
 The mirror is the agent-facing representation of the TUI state.  It starts
 from :meth:`TAUIState.to_dict` and augments it with ``taui_version`` and
-``available_actions`` derived directly from the state tree so the invariant
-holds: every selector in ``available_actions`` resolves via
-:func:`~agentfront.taui.selectors.resolve`.
+``available_actions`` derived directly from the state tree, so every selector
+in ``available_actions`` resolves *by construction*.
+:func:`agentfront.taui.diagnose.diagnose` validates that cross-render
+invariant; ``serialize`` itself is a pure projection that never raises on a
+valid :class:`TAUIState`.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from agentfront.taui.selectors import resolve
 from agentfront.taui.state import TAUIState
 
 SCHEMA_VERSION: str = "0.1"
@@ -74,8 +75,8 @@ def serialize(state: TAUIState) -> dict[str, Any]:
 
     result["available_actions"] = actions
 
-    # Invariant check: every selector must resolve.
-    for entry in actions:
-        resolve(state, entry["selector"])
-
+    # Every selector above is taken from a real node in the state tree
+    # (panel item id, popup action selector, or the standing input prompt), so
+    # it resolves by construction. diagnose() is the validator for the broader
+    # cross-render invariant; serialize() stays a pure, non-throwing projection.
     return result

@@ -87,6 +87,12 @@ def surface_inventory(app: App) -> dict[str, set[str]]:
     """What each surface independently enumerates, alongside the registry truth."""
     cli_docs, cli_tools = _cli_inventory(app)
     registry_tool_paths = {"/".join(list(t.group) + [t.name]) for t in app.list_tools()}
+    # TAUI tool coverage, compared on the same tools-only basis as cli/mcp:
+    # a registry tool counts as covered iff its dotted selector is advertised in
+    # the TAUI mirror. Host commands and the standing input.prompt are *also* in
+    # available_actions but are intentionally excluded here — none of
+    # registry/cli/mcp tool-sets include host commands either, so the comparison
+    # stays symmetric.
     mirror = app.taui_mirror()
     taui_selectors = {a["selector"] for a in mirror["available_actions"]}
     taui_tools = {

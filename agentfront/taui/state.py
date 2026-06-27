@@ -15,7 +15,7 @@ from typing import Any
 class Header:
     """Top-of-screen header information."""
 
-    title: str
+    title: str = ""
     subtitle: str = ""
     version: str = ""
 

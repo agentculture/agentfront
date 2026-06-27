@@ -37,6 +37,13 @@ def reduce(state: TAUIState, event: Event) -> TAUIState:
     """Pure reducer: ``state`` + ``event`` → new ``TAUIState``.
 
     Never mutates *state*; always returns a (possibly equal) new instance.
+
+    v1 scope is **navigation parity**: this single fold moves focus and toggles
+    popup visibility, and an agent ``SelectorAction(sel)`` reaches the same
+    state as the human ``KeyPress`` navigation to ``sel``. Tool *execution*
+    (via ``SelectorAction.args``) and keyboard-reachable popup actions are
+    deferred to the live-driver work, so the agent/human equivalence here is
+    over the navigation/visibility fold, not invocation.
     """
     if isinstance(event, KeyPress):
         return _reduce_key(state, event.key)

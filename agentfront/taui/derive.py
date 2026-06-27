@@ -24,7 +24,9 @@ def make_baseline(app: App) -> TAUIState:
         version=app.version,
     )
 
-    # Collect items keyed by panel id.
+    # Collect items keyed by panel id. The registry guarantees unique
+    # (group, name) tool paths (Registry.add_tool raises DuplicateError), so the
+    # dotted ids below are unique by construction — no de-dup needed here.
     panels: dict[str, list[PanelItem]] = {}
 
     # --- tools -----------------------------------------------------------
