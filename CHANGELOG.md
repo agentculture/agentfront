@@ -23,6 +23,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Fixed
 
 - Dismissing a popup now also clears its blocking flag, and repeated failed WorkSteps refresh a single error popup, so diagnose_structured no longer false-positives on normal work-loop states
+- Dismiss(target=id) now hides the named popup (colleague's by-id semantics); bare Dismiss() still hides the topmost. Repeated SkillSuggested events refresh a single skill-suggestion popup instead of appending duplicate ids. A malformed Tick delta (e.g. from a hand-edited event trail) degrades to a no-op frame advance instead of crashing replay()
 
 ## [0.17.0] - 2026-06-27
 

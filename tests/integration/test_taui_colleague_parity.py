@@ -811,8 +811,9 @@ class TestReducerPurity:
         """Dismiss event hides the topmost visible popup.
 
         Mirrors: colleague test_dismiss_hides_popup
-        Note: agentfront dismiss targets the topmost visible popup; colleague
-        targets by `event.target` id.
+        Note: bare Dismiss() hides the topmost visible popup; Dismiss(target=id)
+        hides the named popup (colleague's by-id semantics), so agentfront now
+        supports both.
         """
         from agentfront.taui.reducer import reduce
 

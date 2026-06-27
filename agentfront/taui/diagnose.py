@@ -174,6 +174,80 @@ class Diagnosis:
         return [f for f in self.findings if f.bug_class == bug_class]
 
 
+def _findings_state(state: TAUIState) -> list[Finding]:
+    """STATE: the state must survive a JSON round-trip."""
+    if TAUIState.from_dict(state.to_dict()) != state:
+        return [Finding(_BC_STATE, "state does not survive JSON round-trip")]
+    return []
+
+
+def _findings_focus(state: TAUIState) -> list[Finding]:
+    """FOCUS: the focused selector must resolve."""
+    return [Finding(_BC_FOCUS, msg) for msg in _check_focused_resolves(state)]
+
+
+def _findings_input_routing(state: TAUIState, mirror: dict[str, Any]) -> list[Finding]:
+    """INPUT_ROUTING: advertised and available_actions selectors must resolve."""
+    msgs = _check_all_selectors_resolve(state) + _check_available_actions_resolve(state, mirror)
+    return [Finding(_BC_INPUT_ROUTING, msg) for msg in msgs]
+
+
+def _findings_render(state: TAUIState, ansi: str, markdown: str) -> list[Finding]:
+    """RENDER: visible panel item labels and conversation lines appear in renders."""
+    findings = [Finding(_BC_RENDER, msg) for msg in _check_labels_in_renders(state, ansi, markdown)]
+    for line in state.conversation:
+        text = line.render()
+        if text not in ansi:
+            findings.append(
+                Finding(_BC_RENDER, f"Conversation text {text!r} missing from ANSI render")
+            )
+        if text not in markdown:
+            findings.append(
+                Finding(_BC_RENDER, f"Conversation text {text!r} missing from markdown render")
+            )
+    return findings
+
+
+def _duplicate_ids(ids: list[str]) -> list[str]:
+    """Return ids that appear more than once, each reported once, in first-seen order."""
+    counts: dict[str, int] = {}
+    for i in ids:
+        counts[i] = counts.get(i, 0) + 1
+    return [i for i, n in counts.items() if n > 1]
+
+
+def _findings_layout(state: TAUIState) -> list[Finding]:
+    """LAYOUT: duplicate panel ids or popup ids."""
+    findings = [
+        Finding(_BC_LAYOUT, f"Duplicate panel id {pid!r}")
+        for pid in _duplicate_ids([p.id for p in state.panels])
+    ]
+    findings += [
+        Finding(_BC_LAYOUT, f"Duplicate popup id {pid!r}")
+        for pid in _duplicate_ids([p.id for p in state.popups])
+    ]
+    return findings
+
+
+def _findings_theme(state: TAUIState) -> list[Finding]:
+    """THEME: background semantic/theme/frame coherence."""
+    findings: list[Finding] = []
+    if state.background.semantic and not state.background.theme:
+        findings.append(Finding(_BC_THEME, "background.semantic set without a theme"))
+    if state.background.frame < 0:
+        findings.append(Finding(_BC_THEME, "background.frame is negative"))
+    return findings
+
+
+def _findings_popup_lifecycle(state: TAUIState) -> list[Finding]:
+    """POPUP_LIFECYCLE: every blocking popup must be visible."""
+    return [
+        Finding(_BC_POPUP_LIFECYCLE, f"blocking popup {popup.id!r} is not visible")
+        for popup in state.popups
+        if popup.blocking and not popup.visible
+    ]
+
+
 def diagnose_structured(
     state: TAUIState,
     *,
@@ -208,61 +282,11 @@ def diagnose_structured(
         markdown = render_markdown(state)
 
     findings: list[Finding] = []
-
-    # STATE: JSON round-trip fidelity.
-    if TAUIState.from_dict(state.to_dict()) != state:
-        findings.append(Finding(_BC_STATE, "state does not survive JSON round-trip"))
-
-    # FOCUS: the focused selector must resolve.
-    for msg in _check_focused_resolves(state):
-        findings.append(Finding(_BC_FOCUS, msg))
-
-    # INPUT_ROUTING: advertised selectors and available_actions must all resolve.
-    for msg in _check_all_selectors_resolve(state):
-        findings.append(Finding(_BC_INPUT_ROUTING, msg))
-    for msg in _check_available_actions_resolve(state, mirror):
-        findings.append(Finding(_BC_INPUT_ROUTING, msg))
-
-    # RENDER: visible panel item labels and conversation lines must appear in renders.
-    for msg in _check_labels_in_renders(state, ansi, markdown):
-        findings.append(Finding(_BC_RENDER, msg))
-    for line in state.conversation:
-        text = line.render()
-        if text not in ansi:
-            findings.append(
-                Finding(_BC_RENDER, f"Conversation text {text!r} missing from ANSI render")
-            )
-        if text not in markdown:
-            findings.append(
-                Finding(_BC_RENDER, f"Conversation text {text!r} missing from markdown render")
-            )
-
-    # LAYOUT: detect duplicate panel ids or popup ids (report each dup id once).
-    panel_id_counts: dict[str, int] = {}
-    for p in state.panels:
-        panel_id_counts[p.id] = panel_id_counts.get(p.id, 0) + 1
-    for pid, count in panel_id_counts.items():
-        if count > 1:
-            findings.append(Finding(_BC_LAYOUT, f"Duplicate panel id {pid!r}"))
-
-    popup_id_counts: dict[str, int] = {}
-    for p in state.popups:
-        popup_id_counts[p.id] = popup_id_counts.get(p.id, 0) + 1
-    for pid, count in popup_id_counts.items():
-        if count > 1:
-            findings.append(Finding(_BC_LAYOUT, f"Duplicate popup id {pid!r}"))
-
-    # THEME: background coherence.
-    if state.background.semantic and not state.background.theme:
-        findings.append(Finding(_BC_THEME, "background.semantic set without a theme"))
-    if state.background.frame < 0:
-        findings.append(Finding(_BC_THEME, "background.frame is negative"))
-
-    # POPUP_LIFECYCLE: every blocking popup must be visible.
-    for popup in state.popups:
-        if popup.blocking and not popup.visible:
-            findings.append(
-                Finding(_BC_POPUP_LIFECYCLE, f"blocking popup {popup.id!r} is not visible")
-            )
-
+    findings += _findings_state(state)
+    findings += _findings_focus(state)
+    findings += _findings_input_routing(state, mirror)
+    findings += _findings_render(state, ansi, markdown)
+    findings += _findings_layout(state)
+    findings += _findings_theme(state)
+    findings += _findings_popup_lifecycle(state)
     return Diagnosis(findings=findings)

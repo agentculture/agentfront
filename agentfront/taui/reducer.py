@@ -86,61 +86,107 @@ def reduce(state: TAUIState, event: Event) -> TAUIState:
     if isinstance(event, SelectorAction):
         return _reduce_selector(state, event.selector)
     if isinstance(event, Dismiss):
-        return _reduce_dismiss(state)
+        return _reduce_dismiss(state, event.target)
     if isinstance(event, Tick):
-        new_bg = replace(state.background, frame=state.background.frame + event.delta)
-        return _replace(state, background=new_bg)
+        return _reduce_tick(state, event)
     if isinstance(event, UserInput):
-        return _replace(state, conversation=append_conversation(state.conversation, event.text))
+        return _reduce_user_input(state, event)
     if isinstance(event, SkillSuggested):
-        popup = Popup(
-            id=_ID_SKILL_SUGGESTED,
-            kind=_KIND_SKILL_SUGGESTION,
-            visible=True,
-            blocking=False,
-            opened_by="system",
-            reason=event.reason,
-            message=(f"Suggested skill: {event.skill}" if event.skill else "Skill suggested"),
-            actions=[
-                Action(selector=_SEL_SKILL_ACCEPT, input="enter", description="Adopt suggestion"),
-                Action(selector=_SEL_SKILL_DISMISS, input="esc", description="Dismiss"),
-            ],
-        )
-        new_bg = replace(state.background, theme=event.theme, semantic=event.semantic)
-        return _replace(state, popups=[*state.popups, popup], background=new_bg)
+        return _reduce_skill_suggested(state, event)
     if isinstance(event, WorkStep):
-        conv = append_conversation(state.conversation, event.label)
-        work = state.work_item
-        if work is not None:
-            work = replace(work, step_count=work.step_count + 1)
-        popups = state.popups
-        if not event.ok:
-            err = Popup(
-                id=_ID_WORK_ERROR,
-                kind=_KIND_ERROR,
-                visible=True,
-                blocking=True,
-                opened_by="system",
-                reason=_REASON_WORK_STEP_FAILED,
-                message=(event.error or event.label or _MSG_WORK_STEP_FAILED_DEFAULT),
-                actions=[
-                    Action(
-                        selector=_SEL_WORK_ERROR_DISMISS,
-                        input="esc",
-                        description="Dismiss",
-                    )
-                ],
-            )
-            # Refresh a single live error popup rather than appending a duplicate
-            # id on every failed step (repeated failures are normal in a work
-            # loop; duplicate ids would trip the LAYOUT diagnose check).
-            if any(p.id == _ID_WORK_ERROR for p in popups):
-                popups = [err if p.id == _ID_WORK_ERROR else p for p in popups]
-            else:
-                popups = [*popups, err]
-        return _replace(state, conversation=conv, work_item=work, popups=popups)
+        return _reduce_work_step(state, event)
     # Unknown event → no-op
     return state
+
+
+# ---------------------------------------------------------------------------
+# Popup helper
+# ---------------------------------------------------------------------------
+
+
+def _upsert_popup(popups: list[Popup], popup: Popup) -> list[Popup]:
+    """Return *popups* with *popup* added, or replaced in place if its id exists.
+
+    Keeps a single live popup per id so re-firing an event (another skill
+    suggestion, another failed step) refreshes rather than appending a
+    duplicate id — duplicate ids would trip the LAYOUT diagnose check.
+    """
+    if any(p.id == popup.id for p in popups):
+        return [popup if p.id == popup.id else p for p in popups]
+    return [*popups, popup]
+
+
+# ---------------------------------------------------------------------------
+# Tick / UserInput handlers
+# ---------------------------------------------------------------------------
+
+
+def _reduce_tick(state: TAUIState, event: Tick) -> TAUIState:
+    """Advance ``background.frame`` by the tick delta.
+
+    A malformed *delta* (non-numeric, e.g. from a hand-edited event trail
+    replayed via :func:`replay`) degrades to a 0-frame advance rather than
+    crashing the fold.
+    """
+    try:
+        delta = int(event.delta)
+    except (TypeError, ValueError):
+        delta = 0
+    new_bg = replace(state.background, frame=state.background.frame + delta)
+    return _replace(state, background=new_bg)
+
+
+def _reduce_user_input(state: TAUIState, event: UserInput) -> TAUIState:
+    """Append the user's text to the conversation panel (with collapse)."""
+    return _replace(state, conversation=append_conversation(state.conversation, event.text))
+
+
+# ---------------------------------------------------------------------------
+# SkillSuggested / WorkStep handlers
+# ---------------------------------------------------------------------------
+
+
+def _reduce_skill_suggested(state: TAUIState, event: SkillSuggested) -> TAUIState:
+    """Open (or refresh) the skill-suggestion popup and set the background theme."""
+    popup = Popup(
+        id=_ID_SKILL_SUGGESTED,
+        kind=_KIND_SKILL_SUGGESTION,
+        visible=True,
+        blocking=False,
+        opened_by="system",
+        reason=event.reason,
+        message=(f"Suggested skill: {event.skill}" if event.skill else "Skill suggested"),
+        actions=[
+            Action(selector=_SEL_SKILL_ACCEPT, input="enter", description="Adopt suggestion"),
+            Action(selector=_SEL_SKILL_DISMISS, input="esc", description="Dismiss"),
+        ],
+    )
+    new_bg = replace(state.background, theme=event.theme, semantic=event.semantic)
+    return _replace(state, popups=_upsert_popup(state.popups, popup), background=new_bg)
+
+
+def _reduce_work_step(state: TAUIState, event: WorkStep) -> TAUIState:
+    """Log the step, advance the work item, and surface an error popup on failure."""
+    conv = append_conversation(state.conversation, event.label)
+    work = state.work_item
+    if work is not None:
+        work = replace(work, step_count=work.step_count + 1)
+    popups = state.popups
+    if not event.ok:
+        err = Popup(
+            id=_ID_WORK_ERROR,
+            kind=_KIND_ERROR,
+            visible=True,
+            blocking=True,
+            opened_by="system",
+            reason=_REASON_WORK_STEP_FAILED,
+            message=(event.error or event.label or _MSG_WORK_STEP_FAILED_DEFAULT),
+            actions=[
+                Action(selector=_SEL_WORK_ERROR_DISMISS, input="esc", description="Dismiss"),
+            ],
+        )
+        popups = _upsert_popup(popups, err)
+    return _replace(state, conversation=conv, work_item=work, popups=popups)
 
 
 # ---------------------------------------------------------------------------
@@ -194,15 +240,28 @@ def _reduce_selector(state: TAUIState, selector: str) -> TAUIState:
 # ---------------------------------------------------------------------------
 
 
-def _reduce_dismiss(state: TAUIState) -> TAUIState:
-    """Hide the topmost visible popup."""
-    popups = state.popups
-    # Find the last visible popup (topmost)
-    target_idx = None
+def _find_dismiss_target(popups: list[Popup], target: str) -> int | None:
+    """Return the index of the popup to dismiss, or ``None`` if there is none.
+
+    When *target* is a non-empty id, the named visible popup is chosen; this
+    is colleague's by-id dismiss semantics. With an empty *target* the topmost
+    (last) visible popup is chosen.
+    """
+    if target:
+        for i, popup in enumerate(popups):
+            if popup.id == target and popup.visible:
+                return i
+        return None
     for i in range(len(popups) - 1, -1, -1):
         if popups[i].visible:
-            target_idx = i
-            break
+            return i
+    return None
+
+
+def _reduce_dismiss(state: TAUIState, target: str = "") -> TAUIState:
+    """Hide the popup named by *target*, or the topmost visible popup."""
+    popups = state.popups
+    target_idx = _find_dismiss_target(popups, target)
 
     if target_idx is None:
         return state

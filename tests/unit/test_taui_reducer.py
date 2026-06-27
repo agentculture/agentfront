@@ -573,3 +573,56 @@ def test_repeated_failed_work_step_keeps_single_error_popup():
     assert work_errors[0].message == "second"  # reflects the latest failure
     assert s2.work_item.step_count == 2
     assert diagnose_structured(s2).ok is True
+
+
+# ---------------------------------------------------------------------------
+# Qodo review fixes (PR #44): dismiss-by-target, skill popup refresh, tick guard
+# ---------------------------------------------------------------------------
+
+
+def test_dismiss_honors_target_id():
+    """Dismiss(target=id) hides that specific popup, not just the topmost."""
+    state = TAUIState(
+        popups=[
+            Popup(id="p1", kind="alert", visible=True),
+            Popup(id="p2", kind="confirm", visible=True),
+            Popup(id="p3", kind="help", visible=True),
+        ],
+    )
+    result = reduce(state, Dismiss(target="p1"))
+    by_id = {p.id: p for p in result.popups}
+    assert by_id["p1"].visible is False  # the targeted popup is hidden
+    assert by_id["p2"].visible is True  # topmost untouched
+    assert by_id["p3"].visible is True
+
+
+def test_dismiss_unknown_target_is_noop():
+    """Dismiss(target=<unknown id>) changes nothing (mirrors colleague)."""
+    state = TAUIState(popups=[Popup(id="p1", kind="alert", visible=True)])
+    assert reduce(state, Dismiss(target="nope")) == state
+
+
+def test_repeated_skill_suggested_refreshes_single_popup():
+    """Two SkillSuggested events keep ONE popup.skill-suggested (no dup ids)."""
+    from agentfront.taui.diagnose import diagnose_structured
+
+    s1 = reduce(TAUIState(), SkillSuggested(skill="alpha"))
+    s2 = reduce(s1, SkillSuggested(skill="beta"))
+    skill_popups = [p for p in s2.popups if p.id == "popup.skill-suggested"]
+    assert len(skill_popups) == 1
+    assert skill_popups[0].message == "Suggested skill: beta"  # latest wins
+    assert diagnose_structured(s2).ok is True
+
+
+def test_malformed_tick_does_not_crash_replay():
+    """A Tick with a non-int delta (e.g. from a hand-edited trail) degrades to a
+    0-frame advance instead of crashing the fold."""
+    from agentfront.taui.events import event_from_dict
+
+    bad_tick = event_from_dict({"type": "tick", "delta": "oops"})
+    result = reduce(TAUIState(), bad_tick)
+    assert isinstance(result, TAUIState)
+    assert result.background.frame == 0  # malformed delta -> no advance, no crash
+    # And a stringified number still folds via replay without crashing.
+    folded = replay([event_from_dict({"type": "tick", "delta": "5"})], TAUIState())
+    assert folded.background.frame == 5
