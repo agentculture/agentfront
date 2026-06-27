@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from agentfront.errors import AgentfrontError, EXIT_USER_ERROR
+from agentfront.errors import EXIT_USER_ERROR, AgentfrontError
 from agentfront.taui.selectors import (
     advertised_selectors,
     all_selectors_resolve,

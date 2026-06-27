@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from agentfront.errors import AgentfrontError, EXIT_USER_ERROR
+from agentfront.errors import EXIT_USER_ERROR, AgentfrontError
 from agentfront.taui.state import TAUIState
 
 # Sentinel returned for the standing selector "input.prompt".
