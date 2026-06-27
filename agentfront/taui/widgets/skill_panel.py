@@ -7,7 +7,7 @@ is rendered on its own line with a status glyph prefix.
 
 from __future__ import annotations
 
-from agentfront.taui.render.layout import SKILL_COL_WIDTH
+from agentfront.taui.render.layout import SKILL_COL_WIDTH, clip_title
 from agentfront.taui.state import TAUIState
 
 # Status glyph map
@@ -23,7 +23,7 @@ _BORDER = "─"
 
 def _hline(width: int, title: str = "") -> str:
     if title:
-        inner = f" {title} "
+        inner = f" {clip_title(title, width)} "
         pad = max(0, width - len(inner) - 2)
         return "┌" + inner + _BORDER * pad + "┐"
     return "└" + _BORDER * (width - 2) + "┘"

@@ -7,7 +7,7 @@ renders as a double-line box with a kind-derived title, its ``message``
 
 from __future__ import annotations
 
-from agentfront.taui.render.layout import DEFAULT_WIDTH
+from agentfront.taui.render.layout import DEFAULT_WIDTH, clip_title
 from agentfront.taui.state import Popup, TAUIState
 
 _BORDER_H = "─"
@@ -32,7 +32,7 @@ def _popup_title(popup: Popup) -> str:
 
 
 def _box_top(width: int, title: str) -> str:
-    inner = f" {title} "
+    inner = f" {clip_title(title, width)} "
     pad = max(0, width - len(inner) - 2)
     return f"╔{inner}{_BORDER_H * pad}╗"
 

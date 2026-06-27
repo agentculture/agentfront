@@ -8,7 +8,7 @@ Returns ``""`` when no ``"commands"`` panel is present or it is not visible.
 
 from __future__ import annotations
 
-from agentfront.taui.render.layout import DEFAULT_WIDTH
+from agentfront.taui.render.layout import DEFAULT_WIDTH, clip_title
 from agentfront.taui.state import TAUIState
 
 _BORDER = "─"
@@ -16,7 +16,7 @@ _BORDER = "─"
 
 def _hline(width: int, title: str = "") -> str:
     if title:
-        inner = f" {title} "
+        inner = f" {clip_title(title, width)} "
         pad = max(0, width - len(inner) - 2)
         return "┌" + inner + _BORDER * pad + "┐"
     return "└" + _BORDER * (width - 2) + "┘"

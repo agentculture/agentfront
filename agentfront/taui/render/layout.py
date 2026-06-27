@@ -58,3 +58,20 @@ def clip(text: str, width: int) -> str:
     if width > 0 and len(text) > width:
         return text[: max(1, width - 1)] + "…"
     return text
+
+
+def clip_title(title: str, width: int) -> str:
+    """Truncate a box *title* so the framed top border fits within *width*.
+
+    A title border is ``<corner> <title> <fill…> <corner>`` — two corner cells
+    plus a space on each side of the title — so the title field is at most
+    ``width - 4`` cells.  Returns *title* unchanged when it already fits, clips it
+    with a trailing ellipsis otherwise, and yields ``""`` when *width* is too small
+    to frame any title (the box then degrades but its top border never overflows
+    *width* at any normal terminal size).  The single home for the box-title
+    truncation rule every boxed widget shares, so their borders stay aligned.
+    """
+    budget = width - 4
+    if budget <= 0:
+        return ""
+    return clip(title, budget)

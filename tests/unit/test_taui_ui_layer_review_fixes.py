@@ -216,3 +216,50 @@ def test_clip_shared_helper():
     assert clip("hello", 3) == "he…"  # truncated with ellipsis
     assert clip("hello", 0) == "hello"  # width <= 0 → no truncation
     assert clip("hello", -5) == "hello"
+
+
+# ---------------------------------------------------------------------------
+# Box title never overflows width (Qodo finding: "Box title exceeds width")
+# ---------------------------------------------------------------------------
+
+
+def test_clip_title_helper():
+    from agentfront.taui.render.layout import clip_title
+
+    assert clip_title("Skills", 30) == "Skills"  # fits in width - 4
+    # A long title is clipped to the title field budget (width - 4) with ellipsis.
+    long = "work-error-deploy-step-7-permission-denied"
+    assert len(clip_title(long, 40)) <= 40 - 4
+    assert clip_title(long, 40).endswith("…")
+    assert clip_title("anything", 3) == ""  # too narrow to frame a title
+
+
+def test_boxed_widget_titles_never_exceed_width():
+    from agentfront.taui.colors import strip_ansi
+    from agentfront.taui.state import Popup
+    from agentfront.taui.widgets.command_palette import render_command_palette
+    from agentfront.taui.widgets.conversation import render_conversation
+    from agentfront.taui.widgets.popup_layer import render_popup_layer
+
+    width = 40
+    long_id = "work-error-deploy-step-7-permission-denied-and-then-some"
+
+    # popup title is built from kind + popup.id, the worst case for overflow.
+    popup_state = TAUIState(popups=[Popup(id=long_id, kind="error", visible=True, message="boom")])
+    cmd_state = TAUIState(
+        panels=[
+            Panel(
+                id="commands", title=long_id, visible=True, items=[PanelItem(id="t", label="ship")]
+            )
+        ]
+    )
+    conv_state = TAUIState(conversation=[ConversationLine(text="hello")])
+
+    renders = [
+        render_popup_layer(popup_state, width=width),
+        render_command_palette(cmd_state, width=width),
+        render_conversation(conv_state, width=width),
+    ]
+    for out in renders:
+        for line in out.splitlines():
+            assert len(strip_ansi(line)) <= width, (len(strip_ansi(line)), line)
