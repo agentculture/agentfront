@@ -16,7 +16,7 @@ from __future__ import annotations
 from typing import Any
 
 from agentfront.errors import EXIT_USER_ERROR, AgentfrontError
-from agentfront.taui.state import TAUIState
+from agentfront.taui.state import PanelItem, TAUIState
 
 # Module constants (SonarCloud S1192).
 _INPUT_PROMPT = "input.prompt"
@@ -26,19 +26,24 @@ _ALIAS_PREFIX = "alias:"
 _INPUT_SENTINEL: dict[str, str] = {"kind": "input", "selector": _INPUT_PROMPT}
 
 
+def _item_matches(item: PanelItem, selector: str) -> bool:
+    """True if *item* is addressed by *selector* directly or via an alias tag."""
+    if item.id == selector:
+        return True
+    for tag in item.tags:
+        if tag.startswith(_ALIAS_PREFIX) and tag[len(_ALIAS_PREFIX) :] == selector:
+            return True
+    return False
+
+
 def _resolve_in_panels(state: TAUIState, selector: str) -> Any:
     """Return the matching Panel, PanelItem, or None from *state.panels*."""
     for panel in state.panels:
         if panel.id == selector:
             return panel
         for item in panel.items:
-            if item.id == selector:
+            if _item_matches(item, selector):
                 return item
-            for tag in item.tags:
-                if tag.startswith(_ALIAS_PREFIX):
-                    alias_path = tag[len(_ALIAS_PREFIX) :]
-                    if alias_path == selector:
-                        return item
     return None
 
 
@@ -80,7 +85,7 @@ def resolve(state: TAUIState, selector: str) -> Any:
         code=EXIT_USER_ERROR,
         message=f"Unknown selector: {selector!r}",
         remediation=(
-            "Check the selector string; " "use advertised_selectors() to list valid selectors."
+            "Check the selector string; use advertised_selectors() to list valid selectors."
         ),
     )
 
