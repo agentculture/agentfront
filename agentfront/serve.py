@@ -37,11 +37,12 @@ class Surfaces:
     http: Any  # a WSGI application callable
     mcp: Any  # an mcp.server.Server
     cli: Any  # an argparse.ArgumentParser
+    taui: Any  # the baseline TAUIState
 
 
 def build_surfaces(app: App) -> Surfaces:
     """Build all three surfaces from a single App."""
-    return Surfaces(http=app.http_app(), mcp=app.mcp_server(), cli=app.cli())
+    return Surfaces(http=app.http_app(), mcp=app.mcp_server(), cli=app.cli(), taui=app.taui())
 
 
 def _http_doc_slugs(app: App) -> set[str]:
@@ -86,6 +87,13 @@ def surface_inventory(app: App) -> dict[str, set[str]]:
     """What each surface independently enumerates, alongside the registry truth."""
     cli_docs, cli_tools = _cli_inventory(app)
     registry_tool_paths = {"/".join(list(t.group) + [t.name]) for t in app.list_tools()}
+    mirror = app.taui_mirror()
+    taui_selectors = {a["selector"] for a in mirror["available_actions"]}
+    taui_tools = {
+        "/".join(list(t.group) + [t.name])
+        for t in app.list_tools()
+        if ".".join(list(t.group) + [t.name]) in taui_selectors
+    }
     return {
         "registry_docs": {d.slug for d in app.list_docs()},
         "registry_tools": registry_tool_paths,
@@ -93,12 +101,13 @@ def surface_inventory(app: App) -> dict[str, set[str]]:
         "cli_docs": cli_docs,
         "cli_tools": cli_tools,
         "mcp_tools": _mcp_command_paths(app),
+        "taui_tools": taui_tools,
     }
 
 
 def surfaces_agree(app: App) -> bool:
-    """True iff all three surfaces enumerate the same docs/tools as the registry."""
+    """True iff all surfaces enumerate the same docs/tools as the registry."""
     inv = surface_inventory(app)
     docs_agree = inv["registry_docs"] == inv["http_docs"] == inv["cli_docs"]
-    tools_agree = inv["registry_tools"] == inv["cli_tools"] == inv["mcp_tools"]
+    tools_agree = inv["registry_tools"] == inv["cli_tools"] == inv["mcp_tools"] == inv["taui_tools"]
     return docs_agree and tools_agree
