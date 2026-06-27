@@ -140,13 +140,15 @@ def _add_param_argument(
 
 
 def _covering_flag(pname: str, flags: tuple["Flag", ...]) -> "Flag | None":
-    """Return the explicit Flag that covers signature param *pname*, if any.
+    """Return the explicit Flag that references signature param *pname*, if any.
 
-    A Flag covers *pname* when it writes to the same dest (``dest == pname``)
+    A Flag references *pname* when it writes to the same dest (``dest == pname``)
     or declares the ``--<pname>`` long option that signature-derivation would
-    otherwise create — either way argparse would collide on the duplicate
-    option string. The covered param is dropped from signature-derivation so
-    the explicit Flag (with its choices/type) is the only one added.
+    otherwise create. Whether that reference actually *replaces* the derived
+    argument is decided by the caller: only a param **with a default** derives a
+    ``--<pname>`` option that would collide with the Flag, so only those are
+    dropped (see :func:`_derive_args_from_sig`). A required param derives a
+    positional (no ``--<pname>``, no collision) and is never dropped.
     """
     option = "--" + pname
     for flag in flags:
@@ -162,12 +164,16 @@ def _derive_args_from_sig(
 ) -> dict[str, Any]:
     """Add arguments to *parser* derived from *func*'s signature.
 
-    Params declared by an explicit :class:`Flag` in *flags* are skipped so the
-    Flag (with its choices/type) is the sole source for that argument.
+    A param **with a default** that is also declared by an explicit :class:`Flag`
+    in *flags* is skipped, so the Flag (with its choices/type) is the sole source
+    for that ``--<pname>`` argument and argparse does not collide on the duplicate
+    option string. A **required** param is never skipped — it derives a positional
+    (no ``--<pname>`` form, so no collision) and must keep its parse-time
+    enforcement, even when a Flag references its dest.
 
-    Returns a dict mapping covered param names to their signature defaults, for
-    every covered param that has a default (so the caller can backfill the
-    default onto the Flag's argparse action).
+    Returns a dict mapping each skipped (covered, defaulted) param name to its
+    signature default, so the caller can backfill the default onto the Flag's
+    argparse action.
 
     - Required params (no default) → positional arguments in order.
     - Params with defaults → optional ``--flag`` with that default.
@@ -186,10 +192,12 @@ def _derive_args_from_sig(
             continue
         if param.kind in (param.VAR_POSITIONAL, param.VAR_KEYWORD):
             continue
-        covering = _covering_flag(pname, flags)
-        if covering is not None:
-            if param.default is not inspect.Parameter.empty:
-                covered_defaults[pname] = param.default
+        # Only a defaulted param derives a colliding ``--<pname>`` option, so
+        # only those are replaced by the covering Flag. A required param keeps
+        # its positional (and its parse-time enforcement) even when referenced.
+        has_default = param.default is not inspect.Parameter.empty
+        if has_default and _covering_flag(pname, flags) is not None:
+            covered_defaults[pname] = param.default
             continue
         annotation = hints.get(pname, param.annotation)
         _add_param_argument(parser, pname, param, annotation)
@@ -476,6 +484,20 @@ def _dispatch(args: argparse.Namespace, *, json_mode: bool) -> int:
     return rc if rc is not None else 0
 
 
+def _flag_dest(flag: "Flag") -> str | None:
+    """The argparse ``dest`` a Flag writes to.
+
+    An explicit ``dest`` wins; otherwise argparse derives it from the first long
+    option name (dashes → underscores), so we mirror that.
+    """
+    if flag.dest is not None:
+        return flag.dest
+    for name in flag.names:
+        if name.startswith("--"):
+            return name[2:].replace("-", "_")
+    return None
+
+
 def _backfill_covered_defaults(
     parser: argparse.ArgumentParser,
     entry: "ToolEntry",
@@ -484,26 +506,25 @@ def _backfill_covered_defaults(
     """Give a merged value-carrying flag the signature param's default.
 
     When an explicit Flag replaces a signature param that had a default but the
-    Flag declares no ``default=``, the flag would default to None and the
-    dispatcher would forward None over the function's own default. Setting the
-    argparse action default to the signature default keeps omission equivalent
-    to the pure signature-derived flag.
+    Flag declares no ``default=``, the flag would fall back to its argparse
+    default (``None`` for a plain optional, ``False``/``True`` for a
+    ``store_true``/``store_false``) and the dispatcher would forward that over
+    the function's own default. Setting the action default to the signature
+    default keeps omission equivalent to the pure signature-derived flag,
+    whatever the flag's implicit argparse default would otherwise be.
     """
     if not covered_defaults:
         return
+    actions_by_dest = {action.dest: action for action in parser._actions}
     for flag in entry.flags:
         if flag.default is not None:
             continue  # an explicit Flag default already wins
-        dest = flag.dest
-        if dest is None:
-            for name in flag.names:
-                if name.startswith("--"):
-                    dest = name[2:].replace("-", "_")
-                    break
-        if dest in covered_defaults:
-            for action in parser._actions:
-                if action.dest == dest and action.default is None:
-                    action.default = covered_defaults[dest]
+        dest = _flag_dest(flag)
+        if dest not in covered_defaults:
+            continue
+        action = actions_by_dest.get(dest)
+        if action is not None:
+            action.default = covered_defaults[dest]
 
 
 def _add_leaf_verb(subparsers: Any, entry: "ToolEntry") -> None:
