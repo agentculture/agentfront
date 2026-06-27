@@ -47,8 +47,10 @@ def render_skill_panel(state: TAUIState, *, width: int = SKILL_COL_WIDTH) -> str
     for item in panel.items:
         glyph = _STATUS_GLYPH.get(item.status, _DEFAULT_GLYPH)
         label = item.label
-        # Truncate if too wide
-        max_label = max(1, width - 7)
+        # Width budget: "│ <glyph> <label> │" spends 6 fixed columns (two
+        # borders, three spaces, one glyph), so the label field is width - 6 to
+        # make each row align flush with the width-wide top/bottom borders.
+        max_label = max(1, width - 6)
         if len(label) > max_label:
             label = label[: max_label - 1] + "…"
         lines.append(f"│ {glyph} {label:<{max_label}} │")

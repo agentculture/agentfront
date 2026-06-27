@@ -109,8 +109,10 @@ def test_work_glyph_changes_with_step_count():
     s4 = _make_state(work_item=WorkItem(running=True, step_count=4))
     out0 = render_flat(s0, include_prompt=False)
     out4 = render_flat(s4, include_prompt=False)
-    # The first character of each output is the glyph — they must differ.
-    assert out0[:2] != out4[:2]
+    # The work glyph is frame-driven by step_count, so the two renders differ.
+    assert _WORK_FRAMES[0] in out0
+    assert _WORK_FRAMES[4] in out4
+    assert out0 != out4
 
 
 def test_idle_glyph_error():

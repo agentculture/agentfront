@@ -8,12 +8,17 @@ look (issue #45): **no box borders**, hierarchy from spacing + headings (a
 Markdown feel), colour, and a **moving emoji state glyph** that animates while
 a work item runs.  This module is that view.
 
-Single source of truth
-----------------------
-Like :func:`agentfront.taui.render.markdown.render_markdown`, :func:`render_flat`
-derives from :func:`agentfront.taui.mirror.serialize` — so the borderless ANSI
-view and the Markdown view are two renders of one dict and cannot drift.  Any
-new panel added to the state appears here for free.
+Derived from the mirror
+-----------------------
+:func:`render_flat` derives entirely from
+:func:`agentfront.taui.mirror.serialize` — the same agent-facing projection an
+agent reads — so the flat view is a render of the mirror dict, not of private
+renderer state.  It covers the same zones the sibling tiers do — header, status,
+panels, conversation, popups — so a new field added to the state surfaces across
+``render_ansi`` (boxed), ``render_markdown``, and this flat view together rather
+than drifting between them.  (``render_markdown`` renders the same zones from the
+state object directly; the agreement is checked by the surface-agreement tests,
+not guaranteed structurally.)
 
 Purity
 ------
@@ -67,18 +72,45 @@ def _heading(title: str) -> str:
     return f"{_BOLD}{_CYAN}{title}{_RESET}"
 
 
+def _header_block(taui: dict[str, Any]) -> list[str]:
+    """Render the header zone as a bold title with a dim version/subtitle meta line.
+
+    Returns ``[]`` when there is no title, so a header-less state renders no
+    header block.  Mirrors what ``render_ansi`` / ``render_markdown`` show, so the
+    flat view does not silently drop the tool name + version.
+    """
+    header = taui.get("header") or {}
+    title = str(header.get("title", ""))
+    if not title:
+        return []
+    meta = " — ".join(
+        part for part in (str(header.get("version", "")), str(header.get("subtitle", ""))) if part
+    )
+    line = f"{_BOLD}{title}{_RESET}"
+    if meta:
+        line += f"  {_DIM}{meta}{_RESET}"
+    return [line]
+
+
 def _state_line(taui: dict[str, Any]) -> str:
     """Top line: the moving state glyph + the status message (no box)."""
     message = str(taui.get("status", {}).get("message", ""))
     return f"{_state_glyph(taui)}  {_BOLD}{message}{_RESET}"
 
 
-def _panel_block(panel: dict[str, Any], width: int) -> list[str]:
+def _panel_block(
+    panel: dict[str, Any],
+    width: int,
+    *,
+    tag_text: dict[str, str] | None = None,
+    tag_icon: dict[str, str] | None = None,
+) -> list[str]:
     """Render one visible panel as a borderless heading + summary + items.
 
     Summary lines are kept verbatim — the terminal soft-wraps them, giving the
     Markdown feel.  Only item text (which may include long descriptions) is
-    truncated to keep each item on one line.
+    truncated to keep each item on one line.  *tag_text* / *tag_icon* are passed
+    through to :func:`format_tags` so a consumer's tag vocabulary is honored.
     """
     title = str(panel.get("title", panel.get("id", "")))
     summary = str(panel.get("content_summary", ""))
@@ -92,7 +124,7 @@ def _panel_block(panel: dict[str, Any], width: int) -> list[str]:
     for num, item in enumerate(items, start=1):
         label = str(item.get("label", item.get("id", "")))
         status = str(item.get("status", ""))
-        tags = format_tags(item.get("tags", []))
+        tags = format_tags(item.get("tags", []), tag_text=tag_text, tag_icon=tag_icon)
         bullet = f"{num}." if numbered else "•"
         text = f"{label} — {status}" if status and status != "available" else label
         if tags:
@@ -128,7 +160,13 @@ def _popup_block(popup: dict[str, Any], width: int) -> list[str]:
 
 
 def render_flat(
-    state: TAUIState, *, width: int = DEFAULT_WIDTH, include_prompt: bool = True
+    state: TAUIState,
+    *,
+    width: int = DEFAULT_WIDTH,
+    include_prompt: bool = True,
+    skip_panel_prefixes: tuple[str, ...] = ("slash.",),
+    tag_text: dict[str, str] | None = None,
+    tag_icon: dict[str, str] | None = None,
 ) -> str:
     """Render *state* as a borderless, colorized, Markdown-feel cockpit frame.
 
@@ -142,20 +180,30 @@ def render_flat(
     include_prompt:
         When ``False``, the bottom prompt line is omitted so an interactive
         session can anchor the typing cursor via :func:`input`.
+    skip_panel_prefixes:
+        Panel-id prefixes to omit from the body (default ``("slash.",)`` — the
+        slash-command tree is surfaced through the live ``/`` popup, so its
+        static panels are redundant here).  A consumer with different panel-id
+        conventions overrides this (pass ``()`` to render every panel).
+    tag_text, tag_icon:
+        Tag badge vocabularies passed through to :func:`format_tags` for panel
+        items (default: the module constants), so a consumer's tag set is honored.
 
     Returns a deterministic multi-line ANSI string — same *state* → same output.
     No clock, no randomness, no thread.
     """
     taui = serialize(state)
-    blocks: list[list[str]] = [[_state_line(taui)]]
+    blocks: list[list[str]] = []
+
+    header = _header_block(taui)
+    if header:
+        blocks.append(header)
+    blocks.append([_state_line(taui)])
 
     for panel in taui.get("panels", []):
-        # The ``slash.*`` panels carry the slash-command tree for the
-        # agent-facing Markdown/TAUI tiers; the live cockpit surfaces those
-        # through the ``/`` popup, so the static tree is redundant here and
-        # is skipped.
-        if panel.get("visible") and not str(panel.get("id", "")).startswith("slash."):
-            blocks.append(_panel_block(panel, width))
+        panel_id = str(panel.get("id", ""))
+        if panel.get("visible") and not any(panel_id.startswith(p) for p in skip_panel_prefixes):
+            blocks.append(_panel_block(panel, width, tag_text=tag_text, tag_icon=tag_icon))
 
     # Conversation zone — stored at the top level in the mirror dict, not
     # inside a panel, so it is rendered separately and always kept in sync

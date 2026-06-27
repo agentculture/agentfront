@@ -20,7 +20,7 @@ bound to the shipped set.
 
 from __future__ import annotations
 
-from typing import Sequence
+from typing import Protocol, Sequence
 
 from agentfront.taui.render.layout import DEFAULT_WIDTH
 
@@ -28,6 +28,24 @@ _RESET = "\x1b[0m"
 _REVERSE = "\x1b[7m"
 _BOLD = "\x1b[1m"
 _DIM = "\x1b[2m"
+
+
+class SlashSpec(Protocol):
+    """The duck-typed contract a ``matches`` item must satisfy.
+
+    Declared as a :class:`typing.Protocol` (structural typing) so this widget
+    documents exactly what it reads — ``.name`` / ``.arg_hint`` /
+    ``.description`` / ``.group`` / ``.tags`` — without importing any concrete
+    spec class.  A consumer's own command objects satisfy it by shape alone, so
+    the widget stays fully decoupled from the state/consumer layer.
+    """
+
+    name: str
+    arg_hint: str
+    description: str
+    group: str
+    tags: Sequence[str]
+
 
 # ---------------------------------------------------------------------------
 # Shared tag vocabulary + group display
@@ -119,14 +137,18 @@ def _line(text: str, width: int, *, sgr: str = "") -> str:
 
 
 def _group_order(
-    matches: Sequence[object],
+    matches: Sequence[SlashSpec],
     groups: list[tuple[str, str]],
+    default_group: str,
 ) -> list[str]:
     """Group keys in display order: the known groups first (from *groups*), then any
-    unexpected group seen in *matches* (so a mis-tagged command is still shown, last)."""
+    unexpected group seen in *matches* (so a mis-tagged command is still shown, last).
+
+    A match with no ``group`` falls into *default_group* rather than a hard-coded
+    bucket, so a consumer's own group taxonomy is honored."""
     order = [key for key, _ in groups]
     for spec in matches:
-        key = getattr(spec, "group", "") or "session"
+        key = getattr(spec, "group", "") or default_group
         if key not in order:
             order.append(key)
     return order
@@ -134,7 +156,7 @@ def _group_order(
 
 def _command_lines(
     index: int,
-    spec: object,
+    spec: SlashSpec,
     *,
     selected: int,
     width: int,
@@ -145,7 +167,7 @@ def _command_lines(
     """The borderless line(s) for one command: an indented ``/name <arg>  <tags>``
     row, reverse-highlighted with a ``›`` (plus a dim summary sub-line) when it is
     the *selected* row."""
-    left = f"/{spec.name}" + (f" {spec.arg_hint}" if spec.arg_hint else "")  # type: ignore[attr-defined]  # noqa: E501
+    left = f"/{spec.name}" + (f" {spec.arg_hint}" if spec.arg_hint else "")
     tags_str = format_tags(
         getattr(spec, "tags", ()),
         style,
@@ -163,12 +185,14 @@ def _command_lines(
 
 
 def render_slash_autocomplete(
-    matches: Sequence[object],
+    matches: Sequence[SlashSpec],
     selected: int = 0,
     *,
     width: int = DEFAULT_WIDTH,
     style: str = "text",
     groups: list[tuple[str, str]] | None = None,
+    group_icon: str = GROUP_ICON,
+    default_group: str = "session",
     tag_text: dict[str, str] | None = None,
     tag_icon: dict[str, str] | None = None,
 ) -> str:
@@ -186,10 +210,12 @@ def render_slash_autocomplete(
     ``.arg_hint``, ``.description``, ``.group``, ``.tags`` — this widget never
     imports the state module or any session/consumer module.
 
-    *groups* controls the heading order and labels (default: :data:`SLASH_GROUPS`).
-    *tag_text* and *tag_icon* override the tag badge vocabularies (default: module
-    constants), allowing a consumer to supply its own command groups and tag set as
-    data rather than being bound to the shipped set.
+    *groups* controls the heading order and labels (default: :data:`SLASH_GROUPS`),
+    *group_icon* the per-group anchor glyph (default: :data:`GROUP_ICON`),
+    *default_group* the bucket a group-less match falls into (default ``"session"``),
+    and *tag_text* / *tag_icon* the tag badge vocabularies (default: module
+    constants) — so a consumer can supply its own command groups, icon, and tag
+    set as data rather than being bound to the shipped set.
     """
     _groups = groups if groups is not None else SLASH_GROUPS
     _tag_text = tag_text if tag_text is not None else TAG_TEXT
@@ -201,18 +227,18 @@ def render_slash_autocomplete(
 
     # Bucket the flat matches by group, remembering each match's flat index so
     # the selection highlight maps back to the (group-agnostic) navigation model.
-    buckets: dict[str, list[tuple[int, object]]] = {}
+    buckets: dict[str, list[tuple[int, SlashSpec]]] = {}
     for i, spec in enumerate(matches):
-        key = getattr(spec, "group", "") or "session"
+        key = getattr(spec, "group", "") or default_group
         buckets.setdefault(key, []).append((i, spec))
     titles = dict(_groups)
 
     lines: list[str] = []
-    for key in _group_order(matches, _groups):
+    for key in _group_order(matches, _groups, default_group):
         members = buckets.get(key)
         if not members:
             continue
-        lines.append(_line(f"{GROUP_ICON} {titles.get(key, key.title())}", width, sgr=_BOLD))
+        lines.append(_line(f"{group_icon} {titles.get(key, key.title())}", width, sgr=_BOLD))
         for i, spec in members:
             lines.extend(
                 _command_lines(
