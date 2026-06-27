@@ -6,8 +6,10 @@ import ast
 import sys
 from pathlib import Path
 
-from agentfront.taui.render.ansi import render_ansi
+from agentfront.taui.render.ansi import _FRAME_GLYPHS, render_ansi
 from agentfront.taui.state import (
+    Background,
+    ConversationLine,
     Header,
     Panel,
     PanelItem,
@@ -176,10 +178,10 @@ def test_frame_shows_focused_marker() -> None:
 
 
 def test_frame_shows_status_line() -> None:
-    """The status line appears at the end."""
+    """The status line appears at the end, prefixed with a frame glyph."""
     state = _build_state()
     output = render_ansi(state)
-    assert "[info] Ready" in output
+    assert "◐ [info] Ready" in output
 
 
 def test_hidden_panel_not_rendered() -> None:
@@ -190,10 +192,10 @@ def test_hidden_panel_not_rendered() -> None:
 
 
 def test_severity_and_message_in_status() -> None:
-    """Status severity and message are rendered."""
+    """Status severity and message are rendered with a leading frame glyph."""
     state = _build_state(severity="warning", message="Disk space low")
     output = render_ansi(state)
-    assert "[warning] Disk space low" in output
+    assert "◐ [warning] Disk space low" in output
 
 
 def test_focused_on_input_prompt() -> None:
@@ -220,4 +222,113 @@ def test_empty_state() -> None:
     state = TAUIState()
     output = render_ansi(state)
     assert isinstance(output, str)
+    assert render_ansi(state) == render_ansi(state)
+
+
+# ---------------------------------------------------------------------------
+# Frame glyph
+# ---------------------------------------------------------------------------
+
+
+def test_frame_glyph_constant() -> None:
+    """_FRAME_GLYPHS contains exactly the four half-circle spinner glyphs."""
+    assert _FRAME_GLYPHS == ("◐", "◓", "◑", "◒")
+
+
+def test_frame_glyph_frame_zero() -> None:
+    """frame=0 → ◐ on the status line."""
+    state = TAUIState(background=Background(frame=0))
+    output = render_ansi(state)
+    assert output.split("\n")[-1].startswith("◐")
+
+
+def test_frame_glyph_frame_one() -> None:
+    """frame=1 → ◓ on the status line."""
+    state = TAUIState(background=Background(frame=1))
+    output = render_ansi(state)
+    assert output.split("\n")[-1].startswith("◓")
+
+
+def test_frame_glyph_frame_two() -> None:
+    """frame=2 → ◑ on the status line."""
+    state = TAUIState(background=Background(frame=2))
+    output = render_ansi(state)
+    assert output.split("\n")[-1].startswith("◑")
+
+
+def test_frame_glyph_frame_three() -> None:
+    """frame=3 → ◒ on the status line."""
+    state = TAUIState(background=Background(frame=3))
+    output = render_ansi(state)
+    assert output.split("\n")[-1].startswith("◒")
+
+
+def test_frame_glyph_wraps_at_four() -> None:
+    """frame=4 wraps back to ◐ (same as frame=0)."""
+    state = TAUIState(background=Background(frame=4))
+    output = render_ansi(state)
+    assert output.split("\n")[-1].startswith("◐")
+
+
+# ---------------------------------------------------------------------------
+# Conversation section
+# ---------------------------------------------------------------------------
+
+
+def test_conversation_section_renders() -> None:
+    """Non-empty conversation renders a ## Conversation section."""
+    state = TAUIState(
+        conversation=[
+            ConversationLine(text="Hello"),
+            ConversationLine(text="World"),
+        ]
+    )
+    output = render_ansi(state)
+    assert "## Conversation" in output
+    assert "  Hello" in output
+    assert "  World" in output
+
+
+def test_conversation_two_space_indent() -> None:
+    """Each conversation line is indented with exactly two spaces."""
+    state = TAUIState(conversation=[ConversationLine(text="Step 1")])
+    output = render_ansi(state)
+    lines = output.split("\n")
+    indented = [ln for ln in lines if ln.startswith("  Step")]
+    assert indented, "Expected an indented conversation line"
+    assert indented[0] == "  Step 1"
+
+
+def test_conversation_collapse_renders() -> None:
+    """Consecutive-duplicate collapse renders 'text ×N' in the section."""
+    state = TAUIState(conversation=[ConversationLine(text="Retry", count=3)])
+    output = render_ansi(state)
+    assert "  Retry ×3" in output
+
+
+def test_empty_conversation_no_section() -> None:
+    """Empty conversation list renders no ## Conversation section."""
+    state = _build_state()
+    output = render_ansi(state)
+    assert "## Conversation" not in output
+
+
+def test_conversation_appears_before_status_line() -> None:
+    """## Conversation section appears before the status line in the output."""
+    state = TAUIState(conversation=[ConversationLine(text="Step 1")])
+    output = render_ansi(state)
+    lines = output.split("\n")
+    conv_idx = next(i for i, ln in enumerate(lines) if ln == "## Conversation")
+    status_idx = next(i for i, ln in enumerate(lines) if ln and ln[0] in "◐◓◑◒")
+    assert conv_idx < status_idx
+
+
+def test_render_ansi_deterministic_with_conversation() -> None:
+    """Same state with a conversation always produces identical output."""
+    state = TAUIState(
+        conversation=[
+            ConversationLine(text="A"),
+            ConversationLine(text="B", count=2),
+        ]
+    )
     assert render_ansi(state) == render_ansi(state)

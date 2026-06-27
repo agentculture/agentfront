@@ -5,12 +5,15 @@ from __future__ import annotations
 import pytest
 
 from agentfront.taui.events import (
+    _REGISTRY,
     Dismiss,
     Event,
     KeyPress,
     SelectorAction,
+    SkillSuggested,
     Tick,
     UserInput,
+    WorkStep,
     dumps_events,
     event_from_dict,
     loads_events,
@@ -169,3 +172,140 @@ def test_round_trip_missing_field_raises() -> None:
     text = '{"type": "user_input"}\n'
     with pytest.raises(ValueError, match="text"):
         loads_events(text)
+
+
+# ---------------------------------------------------------------------------
+# SkillSuggested
+# ---------------------------------------------------------------------------
+
+
+def test_skill_suggested_defaults() -> None:
+    """SkillSuggested has sensible defaults for all fields."""
+    ev = SkillSuggested()
+    assert ev.type == "skill_suggested"
+    assert ev.skill == ""
+    assert ev.reason == ""
+    assert ev.semantic == "stronger_agent_recommended"
+    assert ev.theme == "skill_suggested"
+
+
+def test_skill_suggested_round_trip() -> None:
+    """SkillSuggested round-trips via to_dict / from_dict."""
+    ev = SkillSuggested(skill="search", reason="better coverage", semantic="custom", theme="t")
+    assert SkillSuggested.from_dict(ev.to_dict()) == ev
+
+
+def test_skill_suggested_round_trip_defaults() -> None:
+    """SkillSuggested() with defaults round-trips cleanly."""
+    ev = SkillSuggested()
+    assert SkillSuggested.from_dict(ev.to_dict()) == ev
+
+
+def test_skill_suggested_to_dict_contains_type() -> None:
+    """to_dict emits the 'type' key."""
+    d = SkillSuggested().to_dict()
+    assert d["type"] == "skill_suggested"
+
+
+def test_skill_suggested_to_dict_all_keys() -> None:
+    """to_dict emits type, skill, reason, semantic, theme."""
+    d = SkillSuggested(skill="s", reason="r").to_dict()
+    assert set(d.keys()) == {"type", "skill", "reason", "semantic", "theme"}
+
+
+def test_skill_suggested_event_from_dict() -> None:
+    """event_from_dict reconstructs a SkillSuggested from a type-keyed dict."""
+    ev = event_from_dict({"type": "skill_suggested", "skill": "search", "reason": "faster"})
+    assert isinstance(ev, SkillSuggested)
+    assert ev.skill == "search"
+    assert ev.reason == "faster"
+
+
+def test_skill_suggested_event_from_dict_defaults() -> None:
+    """event_from_dict with only 'type' uses .get defaults."""
+    ev = event_from_dict({"type": "skill_suggested"})
+    assert isinstance(ev, SkillSuggested)
+    assert ev == SkillSuggested()
+
+
+def test_skill_suggested_in_registry() -> None:
+    """'skill_suggested' is registered in _REGISTRY."""
+    assert "skill_suggested" in _REGISTRY
+    assert _REGISTRY["skill_suggested"] is SkillSuggested
+
+
+# ---------------------------------------------------------------------------
+# WorkStep
+# ---------------------------------------------------------------------------
+
+
+def test_work_step_defaults() -> None:
+    """WorkStep has sensible defaults for all fields."""
+    ev = WorkStep()
+    assert ev.type == "work_step"
+    assert ev.label == ""
+    assert ev.ok is True
+    assert ev.error == ""
+
+
+def test_work_step_round_trip() -> None:
+    """WorkStep round-trips via to_dict / from_dict."""
+    ev = WorkStep(label="fetching data", ok=False, error="timeout")
+    assert WorkStep.from_dict(ev.to_dict()) == ev
+
+
+def test_work_step_round_trip_defaults() -> None:
+    """WorkStep() with defaults round-trips cleanly."""
+    ev = WorkStep()
+    assert WorkStep.from_dict(ev.to_dict()) == ev
+
+
+def test_work_step_to_dict_contains_type() -> None:
+    """to_dict emits the 'type' key."""
+    d = WorkStep().to_dict()
+    assert d["type"] == "work_step"
+
+
+def test_work_step_to_dict_all_keys() -> None:
+    """to_dict emits type, label, ok, error."""
+    d = WorkStep(label="l", ok=False, error="e").to_dict()
+    assert set(d.keys()) == {"type", "label", "ok", "error"}
+
+
+def test_work_step_event_from_dict() -> None:
+    """event_from_dict reconstructs a WorkStep from a type-keyed dict."""
+    ev = event_from_dict(
+        {"type": "work_step", "label": "writing", "ok": False, "error": "disk full"}
+    )
+    assert isinstance(ev, WorkStep)
+    assert ev.label == "writing"
+    assert ev.ok is False
+    assert ev.error == "disk full"
+
+
+def test_work_step_event_from_dict_defaults() -> None:
+    """event_from_dict with only 'type' uses .get defaults."""
+    ev = event_from_dict({"type": "work_step"})
+    assert isinstance(ev, WorkStep)
+    assert ev == WorkStep()
+
+
+def test_work_step_in_registry() -> None:
+    """'work_step' is registered in _REGISTRY."""
+    assert "work_step" in _REGISTRY
+    assert _REGISTRY["work_step"] is WorkStep
+
+
+# ---------------------------------------------------------------------------
+# JSONL round-trip including new event types
+# ---------------------------------------------------------------------------
+
+
+def test_round_trip_all_event_types_including_new() -> None:
+    """loads_events(dumps_events(evs)) round-trips SkillSuggested and WorkStep too."""
+    evts: list[Event] = [
+        SkillSuggested(skill="search", reason="faster"),
+        WorkStep(label="step 1", ok=True),
+        WorkStep(label="step 2", ok=False, error="net error"),
+    ]
+    assert loads_events(dumps_events(evts)) == evts

@@ -43,4 +43,12 @@ def render_markdown(state: TAUIState) -> str:
             lines.append(f"- {item.label} ({item.status}){focused_marker}")
         lines.append("")
 
+    # Conversation section (only when non-empty)
+    if state.conversation:
+        lines.append("## Conversation")
+        lines.append("")
+        for conv_line in state.conversation:
+            lines.append(f"- {conv_line.render()}")
+        lines.append("")
+
     return "\n".join(lines)

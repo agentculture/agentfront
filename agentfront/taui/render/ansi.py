@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from agentfront.taui.state import TAUIState
 
+_FRAME_GLYPHS = ("◐", "◓", "◑", "◒")
+
 
 def render_ansi(state: TAUIState) -> str:
     """Render a deterministic terminal frame from *state*.
@@ -32,7 +34,15 @@ def render_ansi(state: TAUIState) -> str:
             lines.append(f"{prefix}{item.label} [{item.status}]")
         lines.append("")
 
-    # Status line
-    lines.append(f"[{state.status.severity}] {state.status.message}")
+    # Conversation section (only when non-empty)
+    if state.conversation:
+        lines.append("## Conversation")
+        for conv_line in state.conversation:
+            lines.append(f"  {conv_line.render()}")
+        lines.append("")
+
+    # Status line with frame glyph
+    glyph = _FRAME_GLYPHS[state.background.frame % len(_FRAME_GLYPHS)]
+    lines.append(f"{glyph} [{state.status.severity}] {state.status.message}")
 
     return "\n".join(lines)

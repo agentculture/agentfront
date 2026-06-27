@@ -92,11 +92,66 @@ class Dismiss:
         return cls(target=d.get("target", ""))
 
 
+@dataclass(frozen=True)
+class SkillSuggested:
+    """The system recommends a stronger or more specific skill."""
+
+    type: ClassVar[str] = "skill_suggested"
+    skill: str = ""
+    reason: str = ""
+    semantic: str = "stronger_agent_recommended"
+    theme: str = "skill_suggested"
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "type": self.type,
+            "skill": self.skill,
+            "reason": self.reason,
+            "semantic": self.semantic,
+            "theme": self.theme,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> SkillSuggested:
+        return cls(
+            skill=d.get("skill", ""),
+            reason=d.get("reason", ""),
+            semantic=d.get("semantic", "stronger_agent_recommended"),
+            theme=d.get("theme", "skill_suggested"),
+        )
+
+
+@dataclass(frozen=True)
+class WorkStep:
+    """A step appended to the conversation; may open an error popup on failure."""
+
+    type: ClassVar[str] = "work_step"
+    label: str = ""
+    ok: bool = True
+    error: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "type": self.type,
+            "label": self.label,
+            "ok": self.ok,
+            "error": self.error,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> WorkStep:
+        return cls(
+            label=d.get("label", ""),
+            ok=d.get("ok", True),
+            error=d.get("error", ""),
+        )
+
+
 # ---------------------------------------------------------------------------
 # Registry & dispatch
 # ---------------------------------------------------------------------------
 
-Event = UserInput | KeyPress | SelectorAction | Tick | Dismiss
+Event = UserInput | KeyPress | SelectorAction | Tick | Dismiss | SkillSuggested | WorkStep
 
 _REGISTRY: dict[str, type[Event]] = {
     "user_input": UserInput,
@@ -104,6 +159,8 @@ _REGISTRY: dict[str, type[Event]] = {
     "selector_action": SelectorAction,
     "tick": Tick,
     "dismiss": Dismiss,
+    "skill_suggested": SkillSuggested,
+    "work_step": WorkStep,
 }
 
 

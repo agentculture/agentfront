@@ -7,7 +7,7 @@ import importlib
 import inspect
 
 from agentfront.taui.render.markdown import render_markdown
-from agentfront.taui.state import Header, Panel, PanelItem, Status, TAUIState
+from agentfront.taui.state import ConversationLine, Header, Panel, PanelItem, Status, TAUIState
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -345,3 +345,62 @@ def test_multiple_visible_panels() -> None:
     assert "## Beta" in md
     assert "- One (ok)" in md
     assert "- Two (pending)" in md
+
+
+# ---------------------------------------------------------------------------
+# Conversation section
+# ---------------------------------------------------------------------------
+
+
+def test_conversation_section_renders() -> None:
+    """Non-empty conversation renders a ## Conversation section with bullet lines."""
+    state = TAUIState(
+        conversation=[
+            ConversationLine(text="Hello"),
+            ConversationLine(text="World"),
+        ]
+    )
+    md = render_markdown(state)
+    assert "## Conversation" in md
+    assert "- Hello" in md
+    assert "- World" in md
+
+
+def test_conversation_bullet_format() -> None:
+    """Each conversation line is rendered as a markdown list item."""
+    state = TAUIState(conversation=[ConversationLine(text="Step one")])
+    md = render_markdown(state)
+    assert "- Step one" in md
+
+
+def test_conversation_collapse_renders() -> None:
+    """Consecutive-duplicate collapse renders 'text ×N' in the section."""
+    state = TAUIState(conversation=[ConversationLine(text="Retry", count=3)])
+    md = render_markdown(state)
+    assert "- Retry ×3" in md
+
+
+def test_empty_conversation_no_section() -> None:
+    """Empty conversation list renders no ## Conversation section."""
+    state = _make_state()
+    md = render_markdown(state)
+    assert "## Conversation" not in md
+
+
+def test_markdown_no_frame_glyph() -> None:
+    """Markdown renderer never emits a frame glyph (◐◓◑◒ are ANSI-only)."""
+    state = TAUIState(conversation=[ConversationLine(text="Hi")])
+    md = render_markdown(state)
+    for glyph in ("◐", "◓", "◑", "◒"):
+        assert glyph not in md, f"Unexpected frame glyph {glyph!r} in markdown"
+
+
+def test_render_markdown_deterministic_with_conversation() -> None:
+    """Same state with a conversation always produces identical markdown."""
+    state = TAUIState(
+        conversation=[
+            ConversationLine(text="A"),
+            ConversationLine(text="B", count=2),
+        ]
+    )
+    assert render_markdown(state) == render_markdown(state)

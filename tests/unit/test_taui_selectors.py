@@ -16,6 +16,7 @@ from agentfront.taui.state import (
     PanelItem,
     Popup,
     TAUIState,
+    Zone,
 )
 
 # ---------------------------------------------------------------------------
@@ -168,6 +169,52 @@ class TestAdvertisedSelectors:
         state = TAUIState()
         sels = advertised_selectors(state)
         assert sels == ["input.prompt"]
+
+
+# ---------------------------------------------------------------------------
+# resolve() — zone selectors (GAP 12)
+# ---------------------------------------------------------------------------
+
+
+class TestResolveZones:
+    """resolve() handles zone selectors (resolvable-but-not-advertised)."""
+
+    def test_top_status_returns_zone_dict(self) -> None:
+        """resolve('top.status') returns a dict with kind/selector/visible."""
+        state = TAUIState()
+        node = resolve(state, "top.status")
+        assert isinstance(node, dict)
+        assert node["kind"] == "zone"
+        assert node["selector"] == "top.status"
+        assert node["visible"] is True
+
+    def test_all_four_default_zones_resolve(self) -> None:
+        """All four default zone keys resolve successfully."""
+        state = TAUIState()
+        for key in ("top.status", "left.skills", "main.conversation", "bottom.input"):
+            node = resolve(state, key)
+            assert node["kind"] == "zone"
+            assert node["selector"] == key
+
+    def test_hidden_zone_resolves_visible_false(self) -> None:
+        """A zone with visible=False resolves with visible is False."""
+        state = TAUIState(zones={"top.status": Zone(visible=False)})
+        node = resolve(state, "top.status")
+        assert node["visible"] is False
+
+    def test_unknown_selector_still_raises_after_zone_lookup(self) -> None:
+        """A selector that is not panel/popup/zone/input still raises AgentfrontError."""
+        state = TAUIState()
+        with pytest.raises(AgentfrontError) as exc_info:
+            resolve(state, "not.a.zone.or.panel")
+        assert exc_info.value.code == EXIT_USER_ERROR
+
+    def test_zone_keys_not_in_advertised_selectors(self) -> None:
+        """Zone keys are resolvable but NOT in advertised_selectors()."""
+        state = TAUIState()
+        adv = advertised_selectors(state)
+        for key in ("top.status", "left.skills", "main.conversation", "bottom.input"):
+            assert key not in adv
 
 
 # ---------------------------------------------------------------------------
