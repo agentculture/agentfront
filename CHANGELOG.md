@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/). This project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.0] - 2026-06-27
+
+
+### Added
+
+- taui: render.ansi_flat — borderless, Markdown-feel flat ANSI renderer (render_flat) deriving from mirror.serialize, with a frame-driven moon-phase state glyph keyed off work step_count
+- taui: render.layout — width helpers (detect_width) and constants (DEFAULT_WIDTH/MIN_WIDTH/SKILL_COL_WIDTH/GAP_LEN)
+- taui: colors — should_color (TTY + NO_COLOR gating) and strip_ansi for clean non-TTY output
+- taui.widgets package — pure stdlib widget renderers: slash_autocomplete (with overridable group/tag vocabulary), prompt_input (generic context word), status_bar, skill_panel, conversation, command_palette, popup_layer
+
 ## [0.18.0] - 2026-06-27
 
 ### Added
