@@ -30,8 +30,10 @@ def _item_matches(item: PanelItem, selector: str) -> bool:
     """True if *item* is addressed by *selector* directly or via an alias tag."""
     if item.id == selector:
         return True
+    # An alias tag is exactly "alias:<selector>" — compare the whole string
+    # rather than slicing (slice-and-compare trips SonarCloud S6659).
     for tag in item.tags:
-        if tag.startswith(_ALIAS_PREFIX) and tag[len(_ALIAS_PREFIX) :] == selector:
+        if tag == _ALIAS_PREFIX + selector:
             return True
     return False
 
