@@ -121,14 +121,26 @@ def test_pyproject_no_third_party_deps():
 
 def test_taui_public_api_imports():
     """All documented public callables import without error."""
-    from agentfront.taui.derive import make_baseline  # noqa: F401
-    from agentfront.taui.diagnose import diagnose  # noqa: F401
-    from agentfront.taui.driver import Driver  # noqa: F401
-    from agentfront.taui.mirror import serialize  # noqa: F401
-    from agentfront.taui.reducer import reduce  # noqa: F401
-    from agentfront.taui.render.ansi import render_ansi  # noqa: F401
-    from agentfront.taui.render.markdown import render_markdown  # noqa: F401
-    from agentfront.taui.selectors import resolve  # noqa: F401
+    from agentfront.taui.derive import make_baseline
+    from agentfront.taui.diagnose import diagnose
+    from agentfront.taui.driver import Driver
+    from agentfront.taui.mirror import serialize
+    from agentfront.taui.reducer import reduce
+    from agentfront.taui.render.ansi import render_ansi
+    from agentfront.taui.render.markdown import render_markdown
+    from agentfront.taui.selectors import resolve
 
-    # If we got here, all imports succeeded.
-    assert True
+    # Each documented public symbol imported above must be callable.
+    assert all(
+        callable(obj)
+        for obj in (
+            make_baseline,
+            serialize,
+            reduce,
+            resolve,
+            render_ansi,
+            render_markdown,
+            diagnose,
+            Driver,
+        )
+    )

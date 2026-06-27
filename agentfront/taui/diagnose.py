@@ -32,6 +32,50 @@ class DiagnoseResult:
         return {"ok": self.ok, "problems": list(self.problems)}
 
 
+def _check_all_selectors_resolve(state: TAUIState) -> list[str]:
+    """Every advertised selector must resolve."""
+    if not all_selectors_resolve(state):
+        return ["Not all advertised selectors resolve"]
+    return []
+
+
+def _check_available_actions_resolve(state: TAUIState, mirror: dict[str, Any]) -> list[str]:
+    """Every ``available_actions`` selector in the mirror must resolve."""
+    problems: list[str] = []
+    for entry in mirror.get("available_actions", []):
+        sel = entry.get("selector")
+        if sel is None:
+            continue
+        try:
+            resolve(state, sel)
+        except Exception as exc:
+            problems.append(f"available_actions selector {sel!r} does not resolve: {exc}")
+    return problems
+
+
+def _check_labels_in_renders(state: TAUIState, ansi: str, markdown: str) -> list[str]:
+    """Every visible panel item's label must appear in both renders."""
+    problems: list[str] = []
+    for panel in state.panels:
+        if not panel.visible:
+            continue
+        for item in panel.items:
+            if item.label not in ansi:
+                problems.append(f"Visible item label {item.label!r} missing from ANSI render")
+            if item.label not in markdown:
+                problems.append(f"Visible item label {item.label!r} missing from markdown render")
+    return problems
+
+
+def _check_focused_resolves(state: TAUIState) -> list[str]:
+    """The focused selector must resolve."""
+    try:
+        resolve(state, state.focused)
+    except Exception as exc:
+        return [f"Focused selector {state.focused!r} does not resolve: {exc}"]
+    return []
+
+
 def diagnose(
     state: TAUIState,
     *,
@@ -65,35 +109,8 @@ def diagnose(
         markdown = render_markdown(state)
 
     problems: list[str] = []
-
-    # 1. All advertised selectors must resolve.
-    if not all_selectors_resolve(state):
-        problems.append("Not all advertised selectors resolve")
-
-    # 2. Every available_actions selector must resolve.
-    for entry in mirror.get("available_actions", []):
-        sel = entry.get("selector")
-        if sel is not None:
-            try:
-                resolve(state, sel)
-            except Exception as exc:
-                problems.append(f"available_actions selector {sel!r} does not resolve: {exc}")
-
-    # 3. Every visible panel item label must appear in both renders.
-    for panel in state.panels:
-        if not panel.visible:
-            continue
-        for item in panel.items:
-            label = item.label
-            if label not in ansi:
-                problems.append(f"Visible item label {label!r} missing from ANSI render")
-            if label not in markdown:
-                problems.append(f"Visible item label {label!r} missing from markdown render")
-
-    # 4. The focused selector must resolve.
-    try:
-        resolve(state, state.focused)
-    except Exception as exc:
-        problems.append(f"Focused selector {state.focused!r} does not resolve: {exc}")
-
-    return DiagnoseResult(ok=len(problems) == 0, problems=problems)
+    problems += _check_all_selectors_resolve(state)
+    problems += _check_available_actions_resolve(state, mirror)
+    problems += _check_labels_in_renders(state, ansi, markdown)
+    problems += _check_focused_resolves(state)
+    return DiagnoseResult(ok=not problems, problems=problems)

@@ -9,6 +9,7 @@ new frozen ``TAUIState`` via ``dataclasses.replace``.
 from __future__ import annotations
 
 from dataclasses import replace
+from typing import Any, cast
 
 from agentfront.taui.events import (
     Dismiss,
@@ -17,6 +18,11 @@ from agentfront.taui.events import (
     SelectorAction,
 )
 from agentfront.taui.state import Popup, TAUIState
+
+
+def _replace(state: TAUIState, **changes: Any) -> TAUIState:
+    """Typed wrapper around :func:`dataclasses.replace` for :class:`TAUIState`."""
+    return cast(TAUIState, replace(state, **changes))
 
 
 def focus_order(state: TAUIState) -> list[str]:
@@ -86,7 +92,7 @@ def _navigate(state: TAUIState, direction: int) -> TAUIState:
 
     new_idx = idx + direction
     new_idx = max(0, min(len(order) - 1, new_idx))
-    return replace(state, focused=order[new_idx])
+    return _replace(state, focused=order[new_idx])
 
 
 # ---------------------------------------------------------------------------
@@ -97,7 +103,7 @@ def _navigate(state: TAUIState, direction: int) -> TAUIState:
 def _reduce_selector(state: TAUIState, selector: str) -> TAUIState:
     """Set focused to *selector* if it is in the focus order."""
     if selector in focus_order(state):
-        return replace(state, focused=selector)
+        return _replace(state, focused=selector)
     return state
 
 
@@ -123,8 +129,8 @@ def _reduce_dismiss(state: TAUIState) -> TAUIState:
     new_popups: list[Popup] = []
     for i, popup in enumerate(popups):
         if i == target_idx:
-            new_popups.append(replace(popup, visible=False))
+            new_popups.append(cast(Popup, replace(popup, visible=False)))
         else:
             new_popups.append(popup)
 
-    return replace(state, popups=new_popups)
+    return _replace(state, popups=new_popups)

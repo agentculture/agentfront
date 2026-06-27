@@ -117,14 +117,13 @@ def event_from_dict(data: dict[str, Any]) -> Event:
     cls = _REGISTRY.get(type_)
     if cls is None:
         raise ValueError(
-            f"event_from_dict: unknown event type {type_!r}; "
-            f"expected one of {sorted(_REGISTRY)}"
+            f"event_from_dict: unknown event type {type_!r}; expected one of {sorted(_REGISTRY)}"
         )
     try:
         return cls.from_dict(data)
     except KeyError as exc:
         raise ValueError(
-            f"event_from_dict: missing required field {exc.args[0]!r} " f"for event type {type_!r}"
+            f"event_from_dict: missing required field {exc.args[0]!r} for event type {type_!r}"
         ) from exc
 
 
