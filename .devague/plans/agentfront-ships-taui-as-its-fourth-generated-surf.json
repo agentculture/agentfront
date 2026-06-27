@@ -1,0 +1,337 @@
+{
+  "slug": "agentfront-ships-taui-as-its-fourth-generated-surf",
+  "title": "agentfront ships TAUI as its fourth generated surface: one source of truth renders to JSON (the agent baseline), TUI/ANSI (the human terminal), and markdown (readable) \u2014 the JSON mirror exposes stable ids, selectors, and available_actions so an agent can drive and test the exact UI a human uses",
+  "frame_slug": "agentfront-ships-taui-as-its-fourth-generated-surf",
+  "schema_version": 1,
+  "status": "exported",
+  "created": "2026-06-27T11:13:57Z",
+  "updated": "2026-06-27T11:24:29Z",
+  "targets": [
+    {
+      "id": "c1",
+      "kind": "announcement",
+      "text": "agentfront ships TAUI as its fourth generated surface: one source of truth renders to JSON (the agent baseline), TUI/ANSI (the human terminal), and markdown (readable) \u2014 the JSON mirror exposes stable ids, selectors, and available_actions so an agent can drive and test the exact UI a human uses"
+    },
+    {
+      "id": "h1",
+      "kind": "honesty",
+      "text": "One state object is the sole source: the JSON mirror, the ANSI/TUI render, and the markdown render all derive from a single to_dict() \u2014 change state once and all three change; a test asserts no view-specific source of truth"
+    },
+    {
+      "id": "h2",
+      "kind": "honesty",
+      "text": "available_actions in the JSON mirror is DERIVED from the state tree (every advertised selector resolves to a real node) so it cannot drift from what the UI offers; a test asserts every selector resolves"
+    },
+    {
+      "id": "c2",
+      "kind": "audience",
+      "text": "AI agents consuming a tool's interface (primary) and the humans operating the same tool (co-equal); plus tool authors who define one App config and want a fourth surface for free"
+    },
+    {
+      "id": "h5",
+      "kind": "honesty",
+      "text": "The agent-facing JSON mirror and the human-facing ANSI render are co-equal first-class outputs of the SAME state \u2014 neither is a second-class afterthought; a test exercises both from one state and asserts they describe the same screen"
+    },
+    {
+      "id": "c3",
+      "kind": "after_state",
+      "text": "From a single agentfront App config, a tool author gets a TAUI surface: the same state renders to a human ANSI/TUI terminal, a readable markdown view, and an agent-facing JSON mirror with stable ids + selectors + available_actions; an agent drives the exact UI a human uses via selector-dispatched actions and an event log"
+    },
+    {
+      "id": "h3",
+      "kind": "honesty",
+      "text": "An agent's selector-dispatched action and a human's keystroke fold through the SAME reducer into the SAME next state \u2014 no agent-only or human-only state path; a test drives one flow both ways and asserts identical resulting state"
+    },
+    {
+      "id": "c4",
+      "kind": "why_it_matters",
+      "text": "Today an agent can use CLI/MCP/HTTP but cannot operate or test a tool's interactive terminal UI; colleague proved one-state/many-renders TAUI by hand but every consumer would re-build it. agentfront already renders 3 surfaces from one config \u2014 TAUI is the missing fourth, and lifting it into agentfront means consumers (colleague first) get it instead of hand-maintaining it"
+    },
+    {
+      "id": "h6",
+      "kind": "honesty",
+      "text": "Lifting TAUI into agentfront removes per-consumer reimplementation: colleague can delete its hand-built tui/ and import agentfront's instead with behavior preserved \u2014 colleague's lifted TAUI tests pass unchanged against agentfront's implementation"
+    },
+    {
+      "id": "c5",
+      "kind": "boundary",
+      "text": "Not a general-purpose TUI framework competing with textual/rich/blessed, not pixel/GUI rendering, and not a replacement for the CLI/MCP/HTTP surfaces \u2014 TAUI is additive. Scope is the agent-first contract: one state, deterministic renders, a JSON mirror with stable ids/selectors/available_actions, and selector-dispatched actions over an event reducer"
+    },
+    {
+      "id": "h7",
+      "kind": "honesty",
+      "text": "agentfront's base package gains NO third-party runtime dependency from TAUI (stdlib-only core + JSON mirror); any richer-renderer path is an opt-in extra, never a base dependency"
+    },
+    {
+      "id": "c6",
+      "kind": "success_signal",
+      "text": "An agent completes a multi-step interactive flow using ONLY the JSON mirror + selector dispatch that a human completes via keystrokes, and a deterministic test proves both paths reach byte-identical state (colleague's 'same state -> same frame' + tui_sim cross-check is the proof model); agentfront dogfoods its own TAUI; colleague can cite agentfront's TAUI instead of hand-maintaining tui/"
+    },
+    {
+      "id": "h4",
+      "kind": "honesty",
+      "text": "A diagnose-style cross-render invariant runs clean on every snapshot: the JSON, ANSI, and markdown mirrors agree on render/layout/focus/input-routing"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "t1",
+      "summary": "Add agentfront/taui/state.py: TAUIState dataclass tree (header, panels, zones, popups, status, work, focus) with to_dict/from_dict",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "from_dict(to_dict(s)) == s for a representative state and json.dumps(state.to_dict()) never raises (pure dict/list/str/int/float/bool/None)",
+        "every panel/popup/zone node carries a stable string id; state is the single source \u2014 no view-specific field exists"
+      ],
+      "deps": [],
+      "covers": [
+        "c1",
+        "h1"
+      ]
+    },
+    {
+      "id": "t2",
+      "summary": "Add agentfront/taui/events.py: event union (UserInput, KeyPress, SelectorAction, Tick, Dismiss) with JSONL dumps/loads and a from_dict dispatcher",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "loads_events(dumps_events(evs)) round-trips a representative event list; an unknown 'type' raises a structured ValueError",
+        "SelectorAction carries a selector string (+optional args); KeyPress carries a key name \u2014 both first-class"
+      ],
+      "deps": [],
+      "covers": []
+    },
+    {
+      "id": "t3",
+      "summary": "Add agentfront/taui/derive.py: registry-derived baseline TAUIState from an App (panels from ToolEntry.group; available_actions from app.list_tools()+app.list_commands(); selectors from dotted paths)",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "make_baseline(app) yields one panel per top-level group plus a root panel; every tool AND host command appears exactly once as an action with a dotted-path id (e.g. 'feedback.record')",
+        "aliases produce alternate selectors mapping to the same action id; App.name/version/description populate the header"
+      ],
+      "deps": [
+        "t1"
+      ],
+      "covers": [
+        "c3"
+      ]
+    },
+    {
+      "id": "t4",
+      "summary": "Add agentfront/taui/selectors.py: resolve(state, selector) -> node and all_selectors_resolve(state) -> bool",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "resolve() returns the node for every advertised selector; an unknown selector raises AgentfrontError(code=EXIT_USER_ERROR)",
+        "all_selectors_resolve(state) is True for a registry-derived baseline; a test asserts every advertised selector resolves"
+      ],
+      "deps": [
+        "t1"
+      ],
+      "covers": [
+        "h2"
+      ]
+    },
+    {
+      "id": "t5",
+      "summary": "Add agentfront/taui/reducer.py: reduce(state, event) -> state (pure) \u2014 the SINGLE fold for both agent SelectorAction and human KeyPress",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "a SelectorAction('x') and the KeyPress sequence selecting the same action produce an EQUAL resulting state (one reducer, no agent-only/human-only path)",
+        "reduce is pure: same (state,event) -> equal next state; the input state object is not mutated"
+      ],
+      "deps": [
+        "t1",
+        "t2"
+      ],
+      "covers": [
+        "h3"
+      ]
+    },
+    {
+      "id": "t6",
+      "summary": "Add agentfront/taui/render/ansi.py: render_ansi(state) -> str (stdlib-only, deterministic)",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "render_ansi is deterministic: same state -> byte-identical string; no clock/random; zero third-party imports",
+        "the frame shows header, panels, the focused-node marker, and the status line, all derived solely from state"
+      ],
+      "deps": [
+        "t1"
+      ],
+      "covers": [
+        "c1"
+      ]
+    },
+    {
+      "id": "t7",
+      "summary": "Add agentfront/taui/render/markdown.py: render_markdown(state) -> str (stdlib-only, deterministic)",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "render_markdown is deterministic and stdlib-only; same state -> identical markdown",
+        "markdown lists panels and available_actions in human-readable form derived solely from state"
+      ],
+      "deps": [
+        "t1"
+      ],
+      "covers": []
+    },
+    {
+      "id": "t8",
+      "summary": "Add agentfront/taui/mirror.py: serialize(state) -> JSON mirror dict with taui_version, stable ids, and available_actions DERIVED from the state tree",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "available_actions is built FROM the state tree (not a separate list); every action selector resolves via selectors.resolve \u2014 asserted for a baseline AND an extended state",
+        "the mirror dict is JSON-serializable and describes the SAME screen as render_ansi for the same state (co-equal outputs of one state)"
+      ],
+      "deps": [
+        "t1",
+        "t4"
+      ],
+      "covers": [
+        "h2",
+        "h5"
+      ]
+    },
+    {
+      "id": "t9",
+      "summary": "Add agentfront/taui/diagnose.py: cross-render invariant checker over (mirror, ansi, markdown) of one state",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "diagnose(state) passes when mirror/ANSI/markdown agree on panels/actions/focus from the same state; it FAILS a deliberately desynced fixture",
+        "diagnose runs clean on every tui_sim-style snapshot in the test suite"
+      ],
+      "deps": [
+        "t6",
+        "t7",
+        "t8"
+      ],
+      "covers": [
+        "h4"
+      ]
+    },
+    {
+      "id": "t10",
+      "summary": "Add agentfront/taui/driver.py: a thin reference TTY driver that folds keystrokes through reduce and repaints render_ansi",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "the driver reads a key, applies reduce(state, KeyPress), repaints render_ansi(state); unit-testable with a scripted key list (no real TTY)",
+        "thin reference only (no production live-loop): a scripted N-keystroke run yields the same final state as folding the same events via reduce directly"
+      ],
+      "deps": [
+        "t5",
+        "t8"
+      ],
+      "covers": []
+    },
+    {
+      "id": "t11",
+      "summary": "Wire app.taui()/taui_mirror()/taui_driver() accessors in agentfront/app.py (lazy imports, mirroring app.cli()/mcp_server()/http_app())",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "app.taui() returns the registry-derived baseline; app.taui_mirror() its JSON mirror; app.taui_driver() the reference driver \u2014 all lazy-imported like the other surfaces",
+        "accessors add NO import-time third-party dependency and work on an App with only @app.tool/add_command registrations"
+      ],
+      "deps": [
+        "t3",
+        "t8",
+        "t10"
+      ],
+      "covers": [
+        "c3"
+      ]
+    },
+    {
+      "id": "t12",
+      "summary": "Extend agentfront/serve.py (Surfaces/build_surfaces/surface_inventory/surfaces_agree) + the dogfood gate to include TAUI",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "surface_inventory(app) includes TAUI actions; surfaces_agree(app) returns False if TAUI available_actions selectors diverge from the registry tool/command paths",
+        "the existing dogfood gate runs the TAUI cross-render diagnose and passes for the dogfood App"
+      ],
+      "deps": [
+        "t11",
+        "t9"
+      ],
+      "covers": [
+        "h4"
+      ]
+    },
+    {
+      "id": "t13",
+      "summary": "Add a stdlib-only / boundary guard test (no third-party runtime dep from TAUI; not a general TUI framework)",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "a test imports agentfront.taui and asserts no third-party module (textual/rich/blessed) is imported; pyproject adds no new base dep and no [taui] extra",
+        "the package exposes only the agent-first contract (state/mirror/render/reduce/selector-dispatch); a test pins the public API surface"
+      ],
+      "deps": [
+        "t1"
+      ],
+      "covers": [
+        "c5",
+        "h7"
+      ]
+    },
+    {
+      "id": "t14",
+      "summary": "Add an end-to-end flow test: an agent completes a multi-step flow via mirror+selector dispatch; a human via keystrokes; assert identical final state",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "a scripted multi-step flow driven ONLY by reading taui_mirror + dispatching selectors reaches the SAME final state as the equivalent human keystroke sequence (byte-identical to_dict())",
+        "at each step the mirror's available_actions suffices for the agent to choose the next action without out-of-band knowledge"
+      ],
+      "deps": [
+        "t11"
+      ],
+      "covers": [
+        "c2",
+        "c6",
+        "h3",
+        "h5"
+      ]
+    },
+    {
+      "id": "t15",
+      "summary": "Add a colleague-parity conformance test: run colleague's TAUI behavioral tests unchanged against agentfront's implementation",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "ported colleague TAUI behavioral tests (state round-trip, mirror available_actions, reducer, diagnose) pass UNCHANGED against agentfront.taui",
+        "any colleague-specific shape that doesn't map is recorded as a follow-up risk, not silently dropped"
+      ],
+      "deps": [
+        "t11"
+      ],
+      "covers": [
+        "c4",
+        "h6"
+      ]
+    }
+  ],
+  "risks": [
+    {
+      "id": "r1",
+      "text": "colleague-side migration: colleague imports agentfront.taui and deletes its hand-built tui/ (separate repo \u2014 file an agentculture/colleague issue)",
+      "kind": "follow_up",
+      "task_id": null
+    },
+    {
+      "id": "r2",
+      "text": "complex param widgets deferred: derive_input_schema maps only base types; Optional/Union/generics fall back to string, so rich input forms are out of v1 scope",
+      "kind": "unknown_nonblocking",
+      "task_id": null
+    }
+  ]
+}

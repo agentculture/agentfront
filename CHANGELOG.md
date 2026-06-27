@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/). This project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.0] - 2026-06-27
+
+
+### Added
+
+- TAUI — agentfront's fourth generated surface: one TAUIState renders to a JSON mirror (agent baseline), ANSI/TUI (human terminal), and markdown (readable), with stable ids, dotted-path selectors, and a derived available_actions list so an agent drives the exact UI a human uses.
+- app.taui() / app.taui_mirror() / app.taui_driver() lazy accessors deriving a baseline cockpit from the App command registry (stdlib-only, no new dependency).
+- agentfront.taui package: state, events, reducer (a single fold for both agent SelectorAction and human KeyPress), selectors, derive, mirror, diagnose (cross-render invariant), render/ansi, render/markdown, and a thin reference driver.
+
+
+### Changed
+
+- serve.surfaces_agree / surface_inventory and the dogfood gate now include TAUI as a fourth surface and run the cross-render diagnose (agentfront dogfoods its own TAUI).
+
 ## [0.16.0] - 2026-06-27
 
 ### Added

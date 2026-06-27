@@ -17,6 +17,7 @@ from pathlib import Path
 from agentfront import App, __version__
 from agentfront.doctor_live import healthy, run_doctor
 from agentfront.serve import surface_inventory, surfaces_agree
+from agentfront.taui.diagnose import diagnose
 
 # The hand-written guide docs (not the generated specs/plans or Jekyll partials).
 _GUIDE_DOCS = ("agentculture", "agent-first", "rubric", "skill-sources")
@@ -58,15 +59,17 @@ app = build_app()
 
 
 def main() -> int:
-    """Boot all three surfaces and assert they agree — the dogfood CI gate."""
+    """Boot all four surfaces and assert they agree — the dogfood CI gate."""
     a = build_app()
     # building each surface must not raise
     a.http_app()
     a.mcp_server()
     a.cli()
+    a.taui()
     inv = surface_inventory(a)
     checks = run_doctor(a)
     agree = surfaces_agree(a)
+    diag = diagnose(a.taui())
     print(
         f"agentfront {a.version}: {len(inv['registry_docs'])} docs, "
         f"{len(inv['registry_tools'])} tools"
@@ -74,10 +77,11 @@ def main() -> int:
     print(f"  surfaces_agree: {agree}")
     for check in checks:
         print(f"  doctor[{check.name}]: {check.status}")
-    if not (agree and healthy(checks)):
+    print(f"  taui_diagnose: {diag.ok}")
+    if not (agree and healthy(checks) and diag.ok):
         print("DOGFOOD FAILED: surfaces disagree or doctor unhealthy", file=sys.stderr)
         return 1
-    print("DOGFOOD OK: agentfront serves its own three surfaces, and they agree")
+    print("DOGFOOD OK: agentfront serves its own four surfaces, and they agree")
     return 0
 
 

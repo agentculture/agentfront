@@ -1,0 +1,190 @@
+{
+  "slug": "agentfront-ships-taui-as-its-fourth-generated-surf",
+  "title": "agentfront ships TAUI as its fourth generated surface: one source of truth renders to JSON (the agent baseline), TUI/ANSI (the human terminal), and markdown (readable) \u2014 the JSON mirror exposes stable ids, selectors, and available_actions so an agent can drive and test the exact UI a human uses",
+  "schema_version": 1,
+  "status": "exported",
+  "created": "2026-06-27T10:42:03Z",
+  "updated": "2026-06-27T10:51:07Z",
+  "claims": [
+    {
+      "id": "c1",
+      "kind": "announcement",
+      "text": "agentfront ships TAUI as its fourth generated surface: one source of truth renders to JSON (the agent baseline), TUI/ANSI (the human terminal), and markdown (readable) \u2014 the JSON mirror exposes stable ids, selectors, and available_actions so an agent can drive and test the exact UI a human uses",
+      "origin": "user",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h1",
+          "text": "One state object is the sole source: the JSON mirror, the ANSI/TUI render, and the markdown render all derive from a single to_dict() \u2014 change state once and all three change; a test asserts no view-specific source of truth",
+          "status": "confirmed"
+        },
+        {
+          "id": "h2",
+          "text": "available_actions in the JSON mirror is DERIVED from the state tree (every advertised selector resolves to a real node) so it cannot drift from what the UI offers; a test asserts every selector resolves",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [
+        {
+          "id": "q1",
+          "text": "RENDERING DEP: stdlib-only hand-rolled ANSI (colleague's precedent; honors AgentCulture outside-org dep policy; agentfront stays pure-stdlib) vs the textual/rich PyPI library behind an opt-in [taui] extra (richer interactivity, heavy outside-org dep needing approval)?",
+          "resolved": true,
+          "blocking": true
+        }
+      ],
+      "links": []
+    },
+    {
+      "id": "c2",
+      "kind": "audience",
+      "text": "AI agents consuming a tool's interface (primary) and the humans operating the same tool (co-equal); plus tool authors who define one App config and want a fourth surface for free",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h5",
+          "text": "The agent-facing JSON mirror and the human-facing ANSI render are co-equal first-class outputs of the SAME state \u2014 neither is a second-class afterthought; a test exercises both from one state and asserts they describe the same screen",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c3",
+      "kind": "after_state",
+      "text": "From a single agentfront App config, a tool author gets a TAUI surface: the same state renders to a human ANSI/TUI terminal, a readable markdown view, and an agent-facing JSON mirror with stable ids + selectors + available_actions; an agent drives the exact UI a human uses via selector-dispatched actions and an event log",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h3",
+          "text": "An agent's selector-dispatched action and a human's keystroke fold through the SAME reducer into the SAME next state \u2014 no agent-only or human-only state path; a test drives one flow both ways and asserts identical resulting state",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [
+        {
+          "id": "q2",
+          "text": "STATE PROVENANCE: registry-derived (agentfront auto-generates a baseline cockpit from the same App command registry that drives CLI/MCP/HTTP) vs author-supplied (author defines the state model; agentfront supplies render/mirror/selector-dispatch/reducer) vs hybrid (generated baseline + author extension)?",
+          "resolved": true,
+          "blocking": true
+        }
+      ],
+      "links": []
+    },
+    {
+      "id": "c4",
+      "kind": "why_it_matters",
+      "text": "Today an agent can use CLI/MCP/HTTP but cannot operate or test a tool's interactive terminal UI; colleague proved one-state/many-renders TAUI by hand but every consumer would re-build it. agentfront already renders 3 surfaces from one config \u2014 TAUI is the missing fourth, and lifting it into agentfront means consumers (colleague first) get it instead of hand-maintaining it",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h6",
+          "text": "Lifting TAUI into agentfront removes per-consumer reimplementation: colleague can delete its hand-built tui/ and import agentfront's instead with behavior preserved \u2014 colleague's lifted TAUI tests pass unchanged against agentfront's implementation",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [
+        {
+          "id": "q4",
+          "text": "risk: Lift-and-generalize colleague's existing tui/ into agentfront (colleague then cites it back, deletes its copy) vs design fresh in agentfront and migrate colleague later \u2014 extraction vs greenfield",
+          "resolved": true,
+          "blocking": false
+        }
+      ],
+      "links": []
+    },
+    {
+      "id": "c5",
+      "kind": "boundary",
+      "text": "Not a general-purpose TUI framework competing with textual/rich/blessed, not pixel/GUI rendering, and not a replacement for the CLI/MCP/HTTP surfaces \u2014 TAUI is additive. Scope is the agent-first contract: one state, deterministic renders, a JSON mirror with stable ids/selectors/available_actions, and selector-dispatched actions over an event reducer",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h7",
+          "text": "agentfront's base package gains NO third-party runtime dependency from TAUI (stdlib-only core + JSON mirror); any richer-renderer path is an opt-in extra, never a base dependency",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [
+        {
+          "id": "q3",
+          "text": "V1 SCOPE: ship a LIVE interactive terminal driver (real TTY event loop) vs only the pure deterministic CORE (state+reduce+render+JSON mirror+selector dispatch+replay/snapshot) plus a thin reference driver \u2014 colleague found live-wiring the most error-prone part (inert popup buttons / quit-traps)?",
+          "resolved": true,
+          "blocking": true
+        }
+      ],
+      "links": []
+    },
+    {
+      "id": "c6",
+      "kind": "success_signal",
+      "text": "An agent completes a multi-step interactive flow using ONLY the JSON mirror + selector dispatch that a human completes via keystrokes, and a deterministic test proves both paths reach byte-identical state (colleague's 'same state -> same frame' + tui_sim cross-check is the proof model); agentfront dogfoods its own TAUI; colleague can cite agentfront's TAUI instead of hand-maintaining tui/",
+      "origin": "llm",
+      "status": "confirmed",
+      "honesty_conditions": [
+        {
+          "id": "h4",
+          "text": "A diagnose-style cross-render invariant runs clean on every snapshot: the JSON, ANSI, and markdown mirrors agree on render/layout/focus/input-routing",
+          "status": "confirmed"
+        }
+      ],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c7",
+      "kind": "decision",
+      "text": "DELIVERY MODEL = IMPORT, NOT SCAFFOLD: agentfront is an importable runtime library that RENDERS the TAUI surface at runtime from the App config (e.g. app.taui()/app.taui_mirror()/app.taui_driver()), exactly like app.cli()/app.mcp_server()/the HTTP site. It does NOT scaffold TAUI source files into the consumer for them to own. This is the scalable method per the runtime pivot.",
+      "origin": "user",
+      "status": "confirmed",
+      "honesty_conditions": [],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c8",
+      "kind": "decision",
+      "text": "RENDERING DEP = STDLIB-ONLY ANSI: hand-rolled pure-Python ANSI/markdown renderers, zero third-party (colleague's precedent). Honors AgentCulture's outside-org dep policy; the JSON mirror (agent baseline) needs no UI lib. Resolves q1.",
+      "origin": "user",
+      "status": "confirmed",
+      "honesty_conditions": [],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c9",
+      "kind": "decision",
+      "text": "STATE PROVENANCE = HYBRID: agentfront auto-derives a BASELINE cockpit from the App command registry (commands -> panels/actions/selectors), and the author can EXTEND it with UI-specific structure (popups, zones, custom panels, work feeds). Resolves q2.",
+      "origin": "user",
+      "status": "confirmed",
+      "honesty_conditions": [],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c10",
+      "kind": "decision",
+      "text": "V1 SCOPE = PURE CORE + THIN REFERENCE DRIVER: ship state+reduce+render-tiers+JSON mirror+selector dispatch+replay/snapshot + a thin reference TTY driver; defer a production-grade live loop (colleague found live-wiring the most error-prone). Resolves q3.",
+      "origin": "user",
+      "status": "confirmed",
+      "honesty_conditions": [],
+      "hard_questions": [],
+      "links": []
+    },
+    {
+      "id": "c11",
+      "kind": "decision",
+      "text": "COLLEAGUE TIE-IN = LIFT & GENERALIZE: extract colleague's proven tui/ (state, events, reducer, taui mirror, selectors, render tiers, diagnose) into agentfront, generalize to the registry-derived/import model; colleague then imports agentfront's TAUI and deletes its copy. Resolves q4 (risk).",
+      "origin": "user",
+      "status": "confirmed",
+      "honesty_conditions": [],
+      "hard_questions": [],
+      "links": []
+    }
+  ],
+  "open_vagueness": []
+}
