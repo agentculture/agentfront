@@ -3,8 +3,35 @@
 from __future__ import annotations
 
 import sys
+from contextlib import contextmanager
+from typing import Iterator
 
 from agentfront import App
+
+
+@contextmanager
+def _evicted_taui_modules() -> Iterator[None]:
+    """Evict every loaded ``agentfront.taui*`` module, restoring originals on exit.
+
+    The lazy-import tests need the taui submodules genuinely absent from
+    ``sys.modules`` so they can assert the accessor triggers the import. But if
+    a freshly re-imported module were left behind, the rest of the suite would
+    see a SECOND copy of e.g. ``PanelItem`` (a new class object) — breaking
+    ``isinstance`` checks in unrelated tests, since modules imported at
+    collection time (``make_baseline``) still reference the original class.
+    Snapshot the evicted modules and restore the originals on exit so module
+    identity stays stable suite-wide.
+    """
+    saved = {name: mod for name, mod in sys.modules.items() if name.startswith("agentfront.taui")}
+    for name in saved:
+        del sys.modules[name]
+    try:
+        yield
+    finally:
+        # Drop any freshly re-imported taui modules, then restore the originals.
+        for name in [n for n in sys.modules if n.startswith("agentfront.taui")]:
+            del sys.modules[name]
+        sys.modules.update(saved)
 
 
 def _make_fixture() -> App:
@@ -31,45 +58,35 @@ def _make_fixture() -> App:
 
 def test_taui_accessor_is_lazy() -> None:
     """agentfront.taui.derive must NOT be imported until app.taui() is called."""
-    # Ensure the module is not pre-loaded.
-    for mod in list(sys.modules.keys()):
-        if mod.startswith("agentfront.taui"):
-            del sys.modules[mod]
+    with _evicted_taui_modules():
+        app = App(name="Lazy", version="0.0.1")
+        assert "agentfront.taui.derive" not in sys.modules
 
-    app = App(name="Lazy", version="0.0.1")
-    assert "agentfront.taui.derive" not in sys.modules
+        app.taui()
 
-    app.taui()
-
-    assert "agentfront.taui.derive" in sys.modules
+        assert "agentfront.taui.derive" in sys.modules
 
 
 def test_taui_mirror_accessor_is_lazy() -> None:
     """agentfront.taui.mirror must NOT be imported until app.taui_mirror() is called."""
-    for mod in list(sys.modules.keys()):
-        if mod.startswith("agentfront.taui"):
-            del sys.modules[mod]
+    with _evicted_taui_modules():
+        app = App(name="LazyMirror", version="0.0.1")
+        assert "agentfront.taui.mirror" not in sys.modules
 
-    app = App(name="LazyMirror", version="0.0.1")
-    assert "agentfront.taui.mirror" not in sys.modules
+        app.taui_mirror()
 
-    app.taui_mirror()
-
-    assert "agentfront.taui.mirror" in sys.modules
+        assert "agentfront.taui.mirror" in sys.modules
 
 
 def test_taui_driver_accessor_is_lazy() -> None:
     """agentfront.taui.driver must NOT be imported until app.taui_driver() is called."""
-    for mod in list(sys.modules.keys()):
-        if mod.startswith("agentfront.taui"):
-            del sys.modules[mod]
+    with _evicted_taui_modules():
+        app = App(name="LazyDriver", version="0.0.1")
+        assert "agentfront.taui.driver" not in sys.modules
 
-    app = App(name="LazyDriver", version="0.0.1")
-    assert "agentfront.taui.driver" not in sys.modules
+        app.taui_driver()
 
-    app.taui_driver()
-
-    assert "agentfront.taui.driver" in sys.modules
+        assert "agentfront.taui.driver" in sys.modules
 
 
 # ---------------------------------------------------------------------------
