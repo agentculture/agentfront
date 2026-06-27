@@ -284,6 +284,24 @@ class App:
 
         return make_cli(self)
 
+    def taui(self) -> Any:
+        """Return the registry-derived baseline TAUI state for this App."""
+        from agentfront.taui.derive import make_baseline
+
+        return make_baseline(self)
+
+    def taui_mirror(self) -> Any:
+        """Return the JSON mirror of this App's baseline TAUI state."""
+        from agentfront.taui.mirror import serialize
+
+        return serialize(self.taui())
+
+    def taui_driver(self) -> Any:
+        """Return a thin reference driver over this App's baseline TAUI state."""
+        from agentfront.taui.driver import Driver
+
+        return Driver(self.taui())
+
 
 class _GroupRegistrar:
     """Sub-registrar that prefixes tool registrations with a group path.
