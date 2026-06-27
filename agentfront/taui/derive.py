@@ -33,9 +33,9 @@ def make_baseline(app: App) -> TAUIState:
     for entry in app.list_tools():
         group = entry.group
         if group:
-            panel_id = group[0]
+            panel_key = group[0]
         else:
-            panel_id = "root"
+            panel_key = "root"
 
         dotted = ".".join(group + (entry.name,))
         label = entry.description or entry.name
@@ -45,22 +45,24 @@ def make_baseline(app: App) -> TAUIState:
             alias_path = ".".join(group + (alias,))
             tags.append(f"alias:{alias_path}")
 
-        panels.setdefault(panel_id, []).append(
+        panels.setdefault(panel_key, []).append(
             PanelItem(id=dotted, label=label, status="available", tags=tags)
         )
 
     # --- host commands ---------------------------------------------------
     for cmd in app.list_commands():
-        tags = [f"alias:{a}" for a in cmd.aliases]
+        tags = [f"alias:cmd.{a}" for a in cmd.aliases]
         panels.setdefault("root", []).append(
-            PanelItem(id=cmd.name, label=cmd.help or cmd.name, tags=tags)
+            PanelItem(id=f"cmd.{cmd.name}", label=cmd.help or cmd.name, tags=tags)
         )
 
-    # Build sorted Panel list.
+    # Build sorted Panel list. Panel ids are namespaced with "panel." so they
+    # cannot collide with tool or command selectors.
     panel_list: list[Panel] = []
-    for pid in sorted(panels):
-        items = sorted(panels[pid], key=lambda i: i.id)
-        title = pid if pid != "root" else ""
-        panel_list.append(Panel(id=pid, title=title, items=items))
+    for pkey in sorted(panels):
+        items = sorted(panels[pkey], key=lambda i: i.id)
+        panel_id = f"panel.{pkey}"
+        title = pkey if pkey != "root" else ""
+        panel_list.append(Panel(id=panel_id, title=title, items=items))
 
     return TAUIState(header=header, panels=panel_list)

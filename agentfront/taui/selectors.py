@@ -18,8 +18,39 @@ from typing import Any
 from agentfront.errors import EXIT_USER_ERROR, AgentfrontError
 from agentfront.taui.state import TAUIState
 
+# Module constants (SonarCloud S1192).
+_INPUT_PROMPT = "input.prompt"
+_ALIAS_PREFIX = "alias:"
+
 # Sentinel returned for the standing selector "input.prompt".
-_INPUT_SENTINEL: dict[str, str] = {"kind": "input", "selector": "input.prompt"}
+_INPUT_SENTINEL: dict[str, str] = {"kind": "input", "selector": _INPUT_PROMPT}
+
+
+def _resolve_in_panels(state: TAUIState, selector: str) -> Any:
+    """Return the matching Panel, PanelItem, or None from *state.panels*."""
+    for panel in state.panels:
+        if panel.id == selector:
+            return panel
+        for item in panel.items:
+            if item.id == selector:
+                return item
+            for tag in item.tags:
+                if tag.startswith(_ALIAS_PREFIX):
+                    alias_path = tag[len(_ALIAS_PREFIX) :]
+                    if alias_path == selector:
+                        return item
+    return None
+
+
+def _resolve_in_popups(state: TAUIState, selector: str) -> Any:
+    """Return the matching Popup, Action, or None from *state.popups*."""
+    for popup in state.popups:
+        if popup.id == selector:
+            return popup
+        for action in popup.actions:
+            if action.selector == selector:
+                return action
+    return None
 
 
 def resolve(state: TAUIState, selector: str) -> Any:
@@ -32,32 +63,18 @@ def resolve(state: TAUIState, selector: str) -> Any:
     ``code == EXIT_USER_ERROR`` when the selector is unknown.
     """
     # Standing selector.
-    if selector == "input.prompt":
+    if selector == _INPUT_PROMPT:
         return _INPUT_SENTINEL
 
-    # Panels.
-    for panel in state.panels:
-        if panel.id == selector:
-            return panel
-        # Panel items (dotted ids like "feedback.record").
-        for item in panel.items:
-            if item.id == selector:
-                return item
-            # Alias tags: "alias:<path>" -> resolve by <path>.
-            for tag in item.tags:
-                if tag.startswith("alias:"):
-                    alias_path = tag[len("alias:") :]
-                    if alias_path == selector:
-                        return item
+    # Panels (panels -> items -> aliases).
+    node = _resolve_in_panels(state, selector)
+    if node is not None:
+        return node
 
-    # Popups.
-    for popup in state.popups:
-        if popup.id == selector:
-            return popup
-        # Popup actions.
-        for action in popup.actions:
-            if action.selector == selector:
-                return action
+    # Popups (popups -> actions).
+    node = _resolve_in_popups(state, selector)
+    if node is not None:
+        return node
 
     raise AgentfrontError(
         code=EXIT_USER_ERROR,
@@ -80,8 +97,8 @@ def advertised_selectors(state: TAUIState) -> list[str]:
             selectors.append(item.id)
             # Alias paths.
             for tag in item.tags:
-                if tag.startswith("alias:"):
-                    selectors.append(tag[len("alias:") :])
+                if tag.startswith(_ALIAS_PREFIX):
+                    selectors.append(tag[len(_ALIAS_PREFIX) :])
 
     # Popup ids.
     for popup in state.popups:
@@ -91,7 +108,7 @@ def advertised_selectors(state: TAUIState) -> list[str]:
             selectors.append(action.selector)
 
     # Standing selector.
-    selectors.append("input.prompt")
+    selectors.append(_INPUT_PROMPT)
 
     return selectors
 

@@ -63,17 +63,17 @@ def test_panel_ids() -> None:
     app = _make_fixture()
     state = make_baseline(app)
     panel_ids = [p.id for p in state.panels]
-    # "feedback", "root", "search" — sorted
-    assert panel_ids == ["feedback", "root", "search"]
+    # namespaced: "panel.feedback", "panel.root", "panel.search" — sorted
+    assert panel_ids == ["panel.feedback", "panel.root", "panel.search"]
 
 
 def test_panel_titles() -> None:
     app = _make_fixture()
     state = make_baseline(app)
     titles = {p.id: p.title for p in state.panels}
-    assert titles["feedback"] == "feedback"
-    assert titles["search"] == "search"
-    assert titles["root"] == ""
+    assert titles["panel.feedback"] == "feedback"
+    assert titles["panel.search"] == "search"
+    assert titles["panel.root"] == ""
 
 
 # ---------------------------------------------------------------------------
@@ -89,10 +89,11 @@ def test_all_items_present() -> None:
         item_ids.extend(i.id for i in panel.items)
 
     # Sorted by id within each panel, panels sorted by id
+    # Host commands now use "cmd." prefix
     assert item_ids == [
         "feedback.list_items",
         "feedback.record",
-        "deploy",
+        "cmd.deploy",
         "status",
         "search.query",
     ]
@@ -137,8 +138,8 @@ def test_alias_tags_on_search_tool() -> None:
 def test_alias_tags_on_host_command() -> None:
     app = _make_fixture()
     state = make_baseline(app)
-    deploy_item = next(i for p in state.panels for i in p.items if i.id == "deploy")
-    assert "alias:d" in deploy_item.tags
+    deploy_item = next(i for p in state.panels for i in p.items if i.id == "cmd.deploy")
+    assert "alias:cmd.d" in deploy_item.tags
 
 
 def test_no_duplicate_items_for_aliases() -> None:
@@ -178,7 +179,7 @@ def test_tool_status_available() -> None:
 def test_host_command_label_uses_help() -> None:
     app = _make_fixture()
     state = make_baseline(app)
-    deploy_item = next(i for p in state.panels for i in p.items if i.id == "deploy")
+    deploy_item = next(i for p in state.panels for i in p.items if i.id == "cmd.deploy")
     assert deploy_item.label == "Deploy the app"
 
 
@@ -190,7 +191,7 @@ def test_host_command_label_uses_help() -> None:
 def test_ungrouped_tool_in_root() -> None:
     app = _make_fixture()
     state = make_baseline(app)
-    root_panel = next(p for p in state.panels if p.id == "root")
+    root_panel = next(p for p in state.panels if p.id == "panel.root")
     root_ids = [i.id for i in root_panel.items]
     assert "status" in root_ids
 
@@ -205,3 +206,46 @@ def test_empty_app() -> None:
     state = make_baseline(app)
     assert state.header.title == "Empty"
     assert state.panels == []
+
+
+# ---------------------------------------------------------------------------
+# Regression: selector collision (Qodo bug)
+# ---------------------------------------------------------------------------
+
+
+def test_selector_collision_panel_does_not_shadow_tool() -> None:
+    """Regression: a group name must not shadow an ungrouped tool with the same name.
+
+    When an app has group ("feedback",) holding a tool AND an ungrouped tool
+    named "feedback", the bare selector "feedback" must resolve to the
+    PanelItem (the action), NOT the Panel.
+    """
+    from agentfront.taui.selectors import resolve
+    from agentfront.taui.state import PanelItem
+
+    app = App(name="CollisionTest", version="0.1.0")
+
+    @app.tool(group=("feedback",))
+    def record(msg: str) -> str:
+        """Record feedback."""
+        return msg
+
+    @app.tool
+    def feedback() -> str:
+        """Ungrouped tool named feedback."""
+        return "ok"
+
+    state = make_baseline(app)
+
+    # Panel id must be namespaced
+    panel_ids = [p.id for p in state.panels]
+    assert "panel.feedback" in panel_ids
+
+    # The ungrouped tool item id stays bare
+    item_ids = [i.id for p in state.panels for i in p.items]
+    assert "feedback" in item_ids
+
+    # Resolving "feedback" must return the PanelItem, NOT the Panel
+    node = resolve(state, "feedback")
+    assert isinstance(node, PanelItem)
+    assert node.id == "feedback"
