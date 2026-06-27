@@ -201,9 +201,6 @@ def test_render_markdown_stdlib_only() -> None:
         "pip",
         "setuptools",
         "wheel",
-        "typing",
-        "dataclasses",
-        "enum",
         "inspect",
         "ast",
     }
