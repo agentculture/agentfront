@@ -261,3 +261,58 @@ def test_choices_flag_rejects_out_of_set_value_json(capsys) -> None:
     assert payload["code"] == 1
     assert "message" in payload
     assert "remediation" in payload
+
+
+# --- merged flags: explicit Flag replaces signature-derived arg ----------
+
+
+def _approve_app() -> App:
+    """An App where ``--algo`` is both a signature param and an explicit Flag."""
+    a = App(name="t", version="1.0")
+
+    @a.tool(
+        name="approve",
+        flags=(Flag(names=("--algo",), choices=("sha256", "md5"), dest="algo"),),
+    )
+    def approve(name: str, algo: str = "sha256") -> str:
+        return "approved " + name + " algo=" + algo
+
+    return a
+
+
+def test_merged_flag_no_conflict(capsys) -> None:
+    """Building the app must NOT raise 'conflicting option string'."""
+    rc = run_cli(_approve_app(), ["approve", "x", "--algo", "md5"])
+    assert rc == 0
+    out, _ = capsys.readouterr()
+    assert "algo=md5" in out
+
+
+def test_merged_flag_omission_yields_signature_default(capsys) -> None:
+    """Omitting --algo falls back to the signature default (sha256)."""
+    rc = run_cli(_approve_app(), ["approve", "x"])
+    assert rc == 0
+    out, _ = capsys.readouterr()
+    assert "algo=sha256" in out
+
+
+def test_merged_flag_rejects_out_of_set_value_text(capsys) -> None:
+    """An out-of-set value is rejected at parse time (text mode)."""
+    rc = run_cli(_approve_app(), ["approve", "x", "--algo", "crc32"])
+    assert rc == 1
+    stdout, stderr = capsys.readouterr()
+    assert stdout == "", f"stdout should be clean, got: {stdout!r}"
+    assert "error:" in stderr
+    assert "hint:" in stderr
+
+
+def test_merged_flag_rejects_out_of_set_value_json(capsys) -> None:
+    """The same rejection renders as structured JSON under --json."""
+    rc = run_cli(_approve_app(), ["approve", "x", "--algo", "crc32", "--json"])
+    assert rc == 1
+    stdout, stderr = capsys.readouterr()
+    assert stdout == "", f"stdout should be clean, got: {stdout!r}"
+    payload = json.loads(stderr)
+    assert payload["code"] == 1
+    assert "message" in payload
+    assert "remediation" in payload
