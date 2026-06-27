@@ -168,3 +168,51 @@ def test_conversation_small_width_preserves_long_line_content():
     stripped = "".join(ch for ch in out if ch.isalnum())
     for chunk_char in long_text:
         assert chunk_char in stripped
+
+
+# ---------------------------------------------------------------------------
+# Boxed widgets — pathological width does not crash (degraded-but-valid)
+# ---------------------------------------------------------------------------
+
+
+def test_boxed_widgets_pathological_width_no_crash():
+    from agentfront.taui.state import Action, Popup
+    from agentfront.taui.widgets.command_palette import render_command_palette
+    from agentfront.taui.widgets.popup_layer import render_popup_layer
+    from agentfront.taui.widgets.skill_panel import render_skill_panel
+
+    state = TAUIState(
+        panels=[
+            Panel(id="skills", title="S", visible=True, items=[PanelItem(id="a", label="x")]),
+            Panel(id="commands", title="C", visible=True, items=[PanelItem(id="t", label="y")]),
+        ],
+        popups=[
+            Popup(
+                id="p",
+                kind="error",
+                visible=True,
+                message="boom",
+                actions=[Action("p.dismiss", "key", "Dismiss")],
+            ),
+        ],
+    )
+    # width=1 is below MIN_WIDTH and never hit in normal use, but each renderer
+    # must degrade gracefully (return a str) rather than crash or hang.
+    for width in (1, 2):
+        assert isinstance(render_skill_panel(state, width=width), str)
+        assert isinstance(render_command_palette(state, width=width), str)
+        assert isinstance(render_popup_layer(state, width=width), str)
+
+
+# ---------------------------------------------------------------------------
+# Shared clip() helper (deduplicated into render.layout)
+# ---------------------------------------------------------------------------
+
+
+def test_clip_shared_helper():
+    from agentfront.taui.render.layout import clip
+
+    assert clip("hello", 80) == "hello"  # fits → unchanged
+    assert clip("hello", 3) == "he…"  # truncated with ellipsis
+    assert clip("hello", 0) == "hello"  # width <= 0 → no truncation
+    assert clip("hello", -5) == "hello"

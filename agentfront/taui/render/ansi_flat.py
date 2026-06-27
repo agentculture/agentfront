@@ -33,7 +33,7 @@ from __future__ import annotations
 from typing import Any
 
 from agentfront.taui.mirror import serialize
-from agentfront.taui.render.layout import DEFAULT_WIDTH
+from agentfront.taui.render.layout import DEFAULT_WIDTH, clip
 from agentfront.taui.state import TAUIState
 from agentfront.taui.widgets.prompt_input import render_prompt_input
 from agentfront.taui.widgets.slash_autocomplete import format_tags
@@ -59,13 +59,6 @@ def _state_glyph(taui: dict[str, Any]) -> str:
         return _WORK_FRAMES[int(work.get("step_count", 0)) % len(_WORK_FRAMES)]
     severity = str(taui.get("status", {}).get("severity", "info"))
     return _IDLE_GLYPH.get(severity, "🟢")
-
-
-def _clip(text: str, width: int) -> str:
-    """Truncate *text* to *width* display columns (approximate; borderless)."""
-    if width > 0 and len(text) > width:
-        return text[: max(1, width - 1)] + "…"
-    return text
 
 
 def _heading(title: str) -> str:
@@ -129,7 +122,7 @@ def _panel_block(
         text = f"{label} — {status}" if status and status != "available" else label
         if tags:
             text = f"{text}  {tags}"
-        lines.append(f"  {_DIM}{bullet}{_RESET} {_clip(text, max(1, width - 4))}")
+        lines.append(f"  {_DIM}{bullet}{_RESET} {clip(text, max(1, width - 4))}")
     return lines
 
 
@@ -152,7 +145,7 @@ def _conversation_block(conversation: list[dict[str, Any]]) -> list[str]:
 def _popup_block(popup: dict[str, Any], width: int) -> list[str]:
     """Render a visible popup (e.g. a failed-step error) as a flagged block."""
     message = str(popup.get("message", ""))
-    lines = [f"⚠️  {_BOLD}{_clip(message, width)}{_RESET}"]
+    lines = [f"⚠️  {_BOLD}{clip(message, width)}{_RESET}"]
     for action in popup.get("actions", []):
         desc = str(action.get("description", "")) or str(action.get("input", ""))
         lines.append(f"  {_DIM}↳ {action.get('selector', '')} — {desc}{_RESET}")

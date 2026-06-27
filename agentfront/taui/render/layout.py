@@ -45,3 +45,16 @@ def detect_width() -> int:
     """
     cols = shutil.get_terminal_size(fallback=(DEFAULT_WIDTH, 24)).columns
     return max(MIN_WIDTH, cols)
+
+
+def clip(text: str, width: int) -> str:
+    """Truncate *text* to *width* display columns with a trailing ellipsis.
+
+    Approximate (borderless) — counts code points, not display cells.  Returns
+    *text* unchanged when ``width <= 0`` (no truncation) or when it already fits.
+    The single home for the borderless-truncation rule the flat renderer and the
+    slash-autocomplete widget share, so the two cannot drift.
+    """
+    if width > 0 and len(text) > width:
+        return text[: max(1, width - 1)] + "…"
+    return text

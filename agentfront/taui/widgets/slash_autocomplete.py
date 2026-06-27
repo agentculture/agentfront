@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from typing import Protocol, Sequence
 
-from agentfront.taui.render.layout import DEFAULT_WIDTH
+from agentfront.taui.render.layout import DEFAULT_WIDTH, clip
 
 _RESET = "\x1b[0m"
 _REVERSE = "\x1b[7m"
@@ -122,17 +122,10 @@ def format_tags(
     return " ".join(_tag_text.get(t, f"[{t}]") for t in tags)
 
 
-def _clip(text: str, width: int) -> str:
-    """Truncate *text* to *width* display columns (approximate; borderless)."""
-    if width > 0 and len(text) > width:
-        return text[: max(1, width - 1)] + "…"
-    return text
-
-
 def _line(text: str, width: int, *, sgr: str = "") -> str:
     """One borderless popup line: *text* clipped to *width*, optionally wrapped in
     an SGR code (reverse for the selection, bold for a header, dim for a summary)."""
-    clipped = _clip(text, width)
+    clipped = clip(text, width)
     return f"{sgr}{clipped}{_RESET}" if sgr else clipped
 
 
