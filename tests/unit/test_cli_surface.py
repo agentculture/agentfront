@@ -261,3 +261,112 @@ def test_choices_flag_rejects_out_of_set_value_json(capsys) -> None:
     assert payload["code"] == 1
     assert "message" in payload
     assert "remediation" in payload
+
+
+# --- merged flags: explicit Flag replaces signature-derived arg ----------
+
+
+def _approve_app() -> App:
+    """An App where ``--algo`` is both a signature param and an explicit Flag."""
+    a = App(name="t", version="1.0")
+
+    @a.tool(
+        name="approve",
+        flags=(Flag(names=("--algo",), choices=("sha256", "md5"), dest="algo"),),
+    )
+    def approve(name: str, algo: str = "sha256") -> str:
+        return "approved " + name + " algo=" + algo
+
+    return a
+
+
+def test_merged_flag_no_conflict(capsys) -> None:
+    """Building the app must NOT raise 'conflicting option string'."""
+    rc = run_cli(_approve_app(), ["approve", "x", "--algo", "md5"])
+    assert rc == 0
+    out, _ = capsys.readouterr()
+    assert "algo=md5" in out
+
+
+def test_merged_flag_omission_yields_signature_default(capsys) -> None:
+    """Omitting --algo falls back to the signature default (sha256)."""
+    rc = run_cli(_approve_app(), ["approve", "x"])
+    assert rc == 0
+    out, _ = capsys.readouterr()
+    assert "algo=sha256" in out
+
+
+def test_merged_flag_rejects_out_of_set_value_text(capsys) -> None:
+    """An out-of-set value is rejected at parse time (text mode)."""
+    rc = run_cli(_approve_app(), ["approve", "x", "--algo", "crc32"])
+    assert rc == 1
+    stdout, stderr = capsys.readouterr()
+    assert stdout == "", f"stdout should be clean, got: {stdout!r}"
+    assert "error:" in stderr
+    assert "hint:" in stderr
+
+
+def test_merged_flag_rejects_out_of_set_value_json(capsys) -> None:
+    """The same rejection renders as structured JSON under --json."""
+    rc = run_cli(_approve_app(), ["approve", "x", "--algo", "crc32", "--json"])
+    assert rc == 1
+    stdout, stderr = capsys.readouterr()
+    assert stdout == "", f"stdout should be clean, got: {stdout!r}"
+    payload = json.loads(stderr)
+    assert payload["code"] == 1
+    assert "message" in payload
+    assert "remediation" in payload
+
+
+# --- a REQUIRED covered param keeps its parse-time enforcement (PR #41 review) ---
+
+
+def _required_covered_app() -> App:
+    """A required param ``name`` is also referenced by an explicit Flag.
+
+    Only a *defaulted* param derives a colliding ``--name`` option; a required
+    param derives a positional, so it must NOT be dropped by the covering Flag.
+    """
+    a = App(name="t", version="1.0")
+
+    @a.tool(name="run", flags=(Flag(names=("--name",), help="the name"),))
+    def run(name: str) -> str:  # required: no default
+        return "ran " + name
+
+    return a
+
+
+def test_required_covered_param_still_enforced(capsys) -> None:
+    """Omitting a required-but-covered param is rejected, not silently None."""
+    rc = run_cli(_required_covered_app(), ["run"])
+    assert rc == 1
+    stdout, stderr = capsys.readouterr()
+    assert stdout == "", f"stdout should be clean, got: {stdout!r}"
+    assert "error:" in stderr
+    assert "hint:" in stderr
+
+
+def test_required_covered_param_forwards_value(capsys) -> None:
+    """The required positional still flows to the function."""
+    rc = run_cli(_required_covered_app(), ["run", "x"])
+    assert rc == 0
+    out, _ = capsys.readouterr()
+    assert "ran x" in out
+
+
+# --- backfill restores the signature default even past an implicit argparse default ---
+
+
+def test_backfill_over_store_true_implicit_default(capsys) -> None:
+    """A covering store_true flag (implicit default False) must not clobber the
+    signature default on omission — the function's own default wins."""
+    a = App(name="t", version="1.0")
+
+    @a.tool(name="go", flags=(Flag(names=("--flag",), action="store_true"),))
+    def go(flag: bool = True) -> str:  # signature default True, not store_true's False
+        return "flag=" + str(flag)
+
+    rc = run_cli(a, ["go"])  # omit --flag
+    assert rc == 0
+    out, _ = capsys.readouterr()
+    assert "flag=True" in out
