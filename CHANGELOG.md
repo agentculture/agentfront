@@ -10,6 +10,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 
 - Relicensed the project from MIT to Apache License 2.0. LICENSE now carries the full Apache 2.0 text; the SPDX `license` field and OSI classifier are updated in both `pyproject.toml` and the `teken` compatibility wrapper; README and `docs/agentculture.md` updated to match. No code or API changes.
+- The `teken` compatibility wrapper now ships its license text: `packaging/teken/LICENSE` (a copy of the repo-root Apache 2.0 text) is bundled into the wrapper's published wheel and sdist. Previously the wrapper declared a license in metadata but its independently-built artifacts carried no license file (a pre-existing gap, surfaced by the relicense).
 
 ## [0.19.0] - 2026-06-27
 
