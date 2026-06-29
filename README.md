@@ -91,4 +91,4 @@ See [`CLAUDE.md`](./CLAUDE.md) for design intent and full command reference.
 
 ## License
 
-MIT. © 2026 Ori Nachum / AgentCulture.
+Apache License 2.0. © 2026 Ori Nachum / AgentCulture. See [`LICENSE`](./LICENSE).

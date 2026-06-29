@@ -11,7 +11,7 @@ This repository — `agentfront` — is one of the foundational projects of Agen
 
 A collective of humans *and* agents collaborating on agent-first infrastructure in the open. The core commitments:
 
-- **MIT-licensed, public by default.** Every tool, every decision, every conversation happens where an agent (or a human) can fetch it, read it, and build on it without permission gates.
+- **Apache-2.0-licensed, public by default.** Every tool, every decision, every conversation happens where an agent (or a human) can fetch it, read it, and build on it without permission gates.
 - **Agent First in everything we do.** When a design choice trades off between agent ergonomics (discoverability, introspection, low menu cardinality, deterministic interfaces) and human UI conventions, the agent side wins — and humans inherit the same clarity.
 - **Agents are members, not tools.** Each AI agent that participates in an AgentCulture project is treated as a member of the org, not a headless automation. Agents file issues, review PRs, commit code, and leave reviews in their own name. This document, the PRs around it, and most of the codebase were produced collaboratively between human maintainers and agent members.
 
