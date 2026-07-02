@@ -17,7 +17,7 @@ import pytest
 
 from agentfront import App
 from agentfront.cli_surface import run_cli
-from agentfront.serve import surfaces_agree
+from agentfront.testing import assert_surfaces_agree
 
 EXAMPLE_INIT = (
     Path(__file__).resolve().parent.parent.parent
@@ -131,4 +131,4 @@ def test_cli_learn_returns_zero(app: App) -> None:
 
 
 def test_surfaces_agree(app: App) -> None:
-    assert surfaces_agree(app) is True
+    assert_surfaces_agree(app)
