@@ -50,3 +50,4 @@ def test_dogfood_main_gate_passes(capsys):
     out = capsys.readouterr().out
     assert rc == 0
     assert "DOGFOOD OK" in out
+    assert "http_front_agrees: True" in out

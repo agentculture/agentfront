@@ -16,7 +16,7 @@ from pathlib import Path
 
 from agentfront import App, __version__
 from agentfront.doctor_live import healthy, run_doctor
-from agentfront.serve import surface_inventory, surfaces_agree
+from agentfront.serve import http_front_agrees, surface_inventory, surfaces_agree
 from agentfront.taui.diagnose import diagnose
 
 # The hand-written guide docs (not the generated specs/plans or Jekyll partials).
@@ -69,19 +69,27 @@ def main() -> int:
     inv = surface_inventory(a)
     checks = run_doctor(a)
     agree = surfaces_agree(a)
+    front_agrees = http_front_agrees(a)
     diag = diagnose(a.taui())
     print(
         f"agentfront {a.version}: {len(inv['registry_docs'])} docs, "
         f"{len(inv['registry_tools'])} tools"
     )
     print(f"  surfaces_agree: {agree}")
+    print(f"  http_front_agrees: {front_agrees}")
     for check in checks:
         print(f"  doctor[{check.name}]: {check.status}")
     print(f"  taui_diagnose: {diag.ok}")
-    if not (agree and healthy(checks) and diag.ok):
-        print("DOGFOOD FAILED: surfaces disagree or doctor unhealthy", file=sys.stderr)
+    if not (agree and front_agrees and healthy(checks) and diag.ok):
+        print(
+            "DOGFOOD FAILED: surfaces (incl. the HTTP front) disagree or doctor unhealthy",
+            file=sys.stderr,
+        )
         return 1
-    print("DOGFOOD OK: agentfront serves its own four surfaces, and they agree")
+    print(
+        "DOGFOOD OK: agentfront serves its own four surfaces, the HTTP front "
+        "agrees with the TAUI markdown tier, and they all agree"
+    )
     return 0
 
 
