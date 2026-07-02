@@ -1,0 +1,467 @@
+{
+  "slug": "agentfront-sharpens-into-a-testable-collaborative",
+  "title": "AgentFront sharpens into a testable, collaborative front: a service imports it and one App definition natively exposes every agent-facing surface \u2014 structured CLI, MCP, and TAUI (JSON for bots and scripts, Markdown for agents, TUI for humans) \u2014 plus a public testing harness so agents and humans verify, replay, and collaborate on the same state.",
+  "frame_slug": "agentfront-sharpens-into-a-testable-collaborative",
+  "schema_version": 1,
+  "status": "exported",
+  "created": "2026-07-02T04:02:41Z",
+  "updated": "2026-07-02T04:06:54Z",
+  "targets": [
+    {
+      "id": "c1",
+      "kind": "announcement",
+      "text": "AgentFront sharpens into a testable, collaborative front: a service imports it and one App definition natively exposes every agent-facing surface \u2014 structured CLI, MCP, and TAUI (JSON for bots and scripts, Markdown for agents, TUI for humans) \u2014 plus a public testing harness so agents and humans verify, replay, and collaborate on the same state."
+    },
+    {
+      "id": "h5",
+      "kind": "honesty",
+      "text": "One App definition is genuinely the single source: registering a tool once makes it appear on every mounted surface (CLI, MCP, TAUI mirror/markdown/TUI) with no per-surface code, and the public surface-agreement assertion proves it for consumers, not just for agentfront itself."
+    },
+    {
+      "id": "c2",
+      "kind": "audience",
+      "text": "Service authors (human devs) who want their tool consumable by agents; AI agents that operate the generated fronts; and human operators using the TUI \u2014 all three consume the same App."
+    },
+    {
+      "id": "h9",
+      "kind": "honesty",
+      "text": "Each audience has a concrete surface it exercises in the shipped result: service authors define the App and run the harness in CI, agents drive JSON/markdown/MCP, humans use the TUI \u2014 no audience is aspirational."
+    },
+    {
+      "id": "c3",
+      "kind": "before_state",
+      "text": "agentfront 0.19.x already renders four surfaces (CLI, MCP, HTTP, TAUI) from one App, but the testability story is internal-only: surfaces_agree/_dogfood is agentfront's own gate, tests use private in-process helpers, and consumers get no published harness; TAUI v1 is navigation-only (no tool execution via SelectorAction.args), and the conceptual story still says 'four surfaces' rather than the sharpened 'JSON for bots, Markdown for agents, TUI for humans' framing."
+    },
+    {
+      "id": "h10",
+      "kind": "honesty",
+      "text": "The named gaps are real in 0.19.x and verifiable against the repo: __all__ exports only App/AgentfrontError (no testing toolkit), surfaces_agree is not documented for consumers, and SelectorAction carries no args/execution path."
+    },
+    {
+      "id": "c4",
+      "kind": "after_state",
+      "text": "A consumer can (a) define one App, (b) mount it as CLI, MCP, and TAUI with agents driving the same reducer humans do, and (c) import a public agentfront.testing harness to assert in their own CI that their surfaces agree, drive any surface in-process, and snapshot/replay sessions \u2014 making agent work reviewable by humans and human intent replayable by agents."
+    },
+    {
+      "id": "h1",
+      "kind": "honesty",
+      "text": "Proven by the harness itself: for the same intent, agent path (SelectorAction through the JSON mirror) and human path (KeyPress) fold to identical state, asserted via a PUBLIC helper; and at least one external consumer CI (colleague) runs the surface-agreement assertion."
+    },
+    {
+      "id": "c5",
+      "kind": "why_it_matters",
+      "text": "Agent-human collaboration needs a shared, verifiable substrate: if the agent's JSON path and the human's TUI path fold through one reducer AND the consumer can prove surface agreement in their own CI, then a human can trust, review, and replay what an agent did \u2014 and vice versa \u2014 without bespoke glue."
+    },
+    {
+      "id": "h11",
+      "kind": "honesty",
+      "text": "The trust chain is testable, not rhetorical: the harness assertions (surface agreement, agent/human path parity, replay equivalence) are exactly the properties the collaboration story depends on."
+    },
+    {
+      "id": "c6",
+      "kind": "boundary",
+      "text": "Not a web-UI framework and not an agent orchestrator: TAUI stays stdlib-only ANSI/markdown/JSON, collaboration means shared verifiable state (snapshots, replay, one reducer) rather than a message bus or multi-agent runtime, and no new base dependencies are introduced."
+    },
+    {
+      "id": "h12",
+      "kind": "honesty",
+      "text": "The shipped diff adds no new base dependency (the existing dep-guard/boundary test stays green) and introduces no message-bus or orchestrator module."
+    },
+    {
+      "id": "c7",
+      "kind": "success_signal",
+      "text": "A consumer repo (colleague is the live candidate) imports the public testing harness and asserts surface agreement in its own CI; and one session artifact round-trips: an agent drives a task through the TAUI JSON mirror, a human reviews/replays the identical session in the TUI, states match."
+    },
+    {
+      "id": "h13",
+      "kind": "honesty",
+      "text": "Both signals are observable events: a colleague CI run invoking the public harness, and one recorded session artifact replayed to state-equality across the agent and human paths."
+    },
+    {
+      "id": "c8",
+      "kind": "requirement",
+      "text": "Ship a public agentfront.testing module: in-process CLI runner, MCP single-run-tool dispatch helper, TAUI driver (fold events/selector-actions and read the mirror), snapshot/replay helpers, and a one-line surface-agreement assertion consumers run in their own CI."
+    },
+    {
+      "id": "h2",
+      "kind": "honesty",
+      "text": "agentfront.testing is documented public API, stdlib-only, and dogfooded: agentfront's own suite migrates to it for CLI/TAUI driving so the harness cannot drift from what internal tests exercise."
+    },
+    {
+      "id": "c9",
+      "kind": "requirement",
+      "text": "Close TAUI's navigation-only gap: SelectorAction carries args and dispatches registered tools through the reducer, so an agent can execute work (not just navigate) via the JSON mirror \u2014 the same execution path a human keystroke flow reaches."
+    },
+    {
+      "id": "h3",
+      "kind": "honesty",
+      "text": "Executing the same tool via SelectorAction.args, via the CLI, and via the MCP run tool yields the same result or the same structured AgentfrontError {code,message,remediation}; TAUI execution failures land in the mirror as state (popup/problem), never a crash."
+    },
+    {
+      "id": "c10",
+      "kind": "requirement",
+      "text": "Sharpen the conceptual story in docs: one canonical 'how it works' page mapping each rendering to its consumer (JSON = bots/scripts, Markdown = agents, ANSI/TUI = humans, CLI = agents+humans, MCP = agents), replacing the flat 'four surfaces' framing."
+    },
+    {
+      "id": "h4",
+      "kind": "honesty",
+      "text": "The story doc's surface-to-consumer table is checked against the live registry/surface inventory by a test (extend the dogfood gate), so the sharpened story cannot silently drift from the code."
+    },
+    {
+      "id": "c16",
+      "kind": "requirement",
+      "text": "HTTP serves the front as markdown on request: beyond docs (already text/markdown), add an endpoint exposing the app's TAUI markdown rendering \u2014 panels, available actions, state \u2014 so a fetch-only agent reads the same markdown view of the tool a terminal agent gets."
+    },
+    {
+      "id": "h6",
+      "kind": "honesty",
+      "text": "The HTTP markdown-front endpoint renders from the same mirror serialization the TAUI markdown tier uses (one code path, not a parallel renderer), and the surface-agreement gate extends to cover it."
+    },
+    {
+      "id": "c17",
+      "kind": "requirement",
+      "text": "Handoff via mirror: a session serialized to the mirror/snapshot can be resumed \u2014 restore state, continue folding events \u2014 so an agent can pause and a human picks up (and vice versa) with nothing lost."
+    },
+    {
+      "id": "h7",
+      "kind": "honesty",
+      "text": "Round-trip proven: serialize -> resume -> fold remaining events yields state identical to an unbroken session (replay equivalence), asserted by a public testing-harness helper."
+    },
+    {
+      "id": "c18",
+      "kind": "requirement",
+      "text": "Live shared session v1 is single-process: one process owns TAUI state and renders the human TUI; the agent participates through that process's dispatch (selector actions), all mutations folding through the one reducer (single writer). Cross-process transport (socket/file) is a follow-up, not this iteration."
+    },
+    {
+      "id": "h8",
+      "kind": "honesty",
+      "text": "Single-writer holds under test: interleaved agent selector-actions and human keypresses in a live session fold through one reducer with no torn renders; the previously-identified live-loop failure modes (inert popup buttons, quit-traps) have explicit regression tests."
+    }
+  ],
+  "tasks": [
+    {
+      "id": "t1",
+      "summary": "Public agentfront.testing package skeleton: promote the in-process CLI runner and expose assert_surfaces_agree (files: agentfront/testing/*)",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "from agentfront.testing import run_cli, assert_surfaces_agree works; run_cli(app, argv) returns exit code + captured output with no subprocess",
+        "assert_surfaces_agree(app) passes on the quickstart example app and raises AssertionError naming the disagreeing surface + missing entries when one surface lacks a tool"
+      ],
+      "deps": [],
+      "covers": [
+        "c8",
+        "c3",
+        "h10"
+      ]
+    },
+    {
+      "id": "t2",
+      "summary": "Sharpened story doc: docs/how-it-works.md maps each rendering to its consumer, with a registry drift-check test (files: docs/, tests/integration/test_story_drift.py)",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "Doc contains the surface-to-consumer table: JSON=bots/scripts, Markdown=agents, ANSI/TUI=humans, CLI=agents+humans, MCP=agents, HTTP=peer fetch surface",
+        "A test derives the live surface inventory from an App and fails if the doc's table drifts from the surfaces that actually exist"
+      ],
+      "deps": [],
+      "covers": [
+        "c10",
+        "h4"
+      ]
+    },
+    {
+      "id": "t3",
+      "summary": "TAUI execution events: SelectorAction gains args; add ToolInvoked/ToolResult events and state fields representing execution outcomes (files: taui/events.py, taui/state.py)",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "SelectorAction accepts an args mapping; it serializes and round-trips through mirror and snapshot",
+        "New events are frozen dataclasses, stdlib-only, replayable via replay()"
+      ],
+      "deps": [],
+      "covers": [
+        "c9",
+        "h10"
+      ]
+    },
+    {
+      "id": "t4",
+      "summary": "HTTP markdown front endpoint: serve the app's TAUI markdown rendering (panels, actions, state) over HTTP (files: agentfront/http_surface.py)",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "GET /front returns text/markdown rendered from the same mirror serialization the TAUI markdown tier uses \u2014 shared code path asserted by test, not a parallel renderer",
+        "The endpoint is linked from the HTTP index/sitemap; unknown paths still 404"
+      ],
+      "deps": [],
+      "covers": [
+        "c16",
+        "h6"
+      ]
+    },
+    {
+      "id": "t5",
+      "summary": "Reducer folds execution: ToolInvoked/ToolResult reduce into state; failures become a structured-error popup/problem (files: taui/reducer.py)",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "Folding a failed ToolResult yields a popup/problem carrying code, message, and remediation; the reducer never raises",
+        "Reducer stays pure \u2014 no tool dispatch inside reduce(); replaying an event list is deterministic"
+      ],
+      "deps": [
+        "t3"
+      ],
+      "covers": [
+        "c9",
+        "h3"
+      ]
+    },
+    {
+      "id": "t6",
+      "summary": "Single-process TAUI session: owns state, dispatches SelectorAction.args to registered tools via the App registry, folds results through the one reducer \u2014 single writer (files: taui/session.py, new)",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "session.dispatch(SelectorAction with args) executes the registered tool and folds ToolInvoked + ToolResult; resulting state is visible via session.mirror()",
+        "Interleaved agent selector-actions and human keypresses fold through one reducer; a test proves single-writer ordering (no torn state)"
+      ],
+      "deps": [
+        "t3",
+        "t5"
+      ],
+      "covers": [
+        "c18",
+        "h8",
+        "c9"
+      ]
+    },
+    {
+      "id": "t7",
+      "summary": "MCP dispatch helper in agentfront.testing: call the single run tool in-process (files: agentfront/testing/mcp.py)",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "call_mcp(app, command_path, args) returns the same payload the MCP run tool returns, with no server process and no [mcp] extra required for the helper itself"
+      ],
+      "deps": [
+        "t1"
+      ],
+      "covers": [
+        "c8",
+        "h2"
+      ]
+    },
+    {
+      "id": "t8",
+      "summary": "Extend the agreement gates: surfaces_agree covers the HTTP markdown front; boundary test asserts no new base dependency and no orchestrator module (files: agentfront/serve.py, agentfront/_dogfood.py, tests)",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "surfaces_agree(app) fails if the HTTP front endpoint disagrees with the TAUI markdown tier",
+        "Boundary test: a base install imports agentfront.testing and agentfront.taui using stdlib only; the dep-guard stays green"
+      ],
+      "deps": [
+        "t4",
+        "t1"
+      ],
+      "covers": [
+        "h5",
+        "c1",
+        "c6",
+        "h12"
+      ]
+    },
+    {
+      "id": "t9",
+      "summary": "Live-loop driver v1: human TUI and agent dispatch share the single-process session (files: taui/driver.py)",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "Driver renders from session state and routes keypresses through the session fold; an agent dispatch during a live session appears in the next render",
+        "Regression tests cover the known live-loop failure modes: popup buttons act (not inert) and quit paths exit cleanly (no quit-trap)"
+      ],
+      "deps": [
+        "t6"
+      ],
+      "covers": [
+        "c18",
+        "h8"
+      ]
+    },
+    {
+      "id": "t10",
+      "summary": "Handoff via mirror: resume a session from a serialized snapshot/mirror and continue folding (files: taui/snapshot.py resume entry point)",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "resume(snapshot) followed by folding the remaining events yields state identical to the unbroken session \u2014 replay-equivalence test"
+      ],
+      "deps": [
+        "t6"
+      ],
+      "covers": [
+        "c17",
+        "h7"
+      ]
+    },
+    {
+      "id": "t11",
+      "summary": "TAUI helpers in agentfront.testing: drive sessions, snapshot/replay, and parity assertions as public API (files: agentfront/testing/taui.py)",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "drive(app, actions_or_events) returns final state + mirror; snapshot/replay helpers are re-exported publicly",
+        "assert_agent_human_parity(app, intent) proves the SelectorAction path and the KeyPress path fold to identical state"
+      ],
+      "deps": [
+        "t1",
+        "t6"
+      ],
+      "covers": [
+        "c8",
+        "h2",
+        "h1",
+        "c4"
+      ]
+    },
+    {
+      "id": "t12",
+      "summary": "Cross-surface execution parity: the same tool via TAUI session, CLI, and MCP run tool yields the same result or the same structured AgentfrontError (files: tests/integration/test_execution_parity.py)",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "An integration test executes one tool through all three paths and asserts payload equality on success and code/message/remediation equality on failure"
+      ],
+      "deps": [
+        "t6",
+        "t7"
+      ],
+      "covers": [
+        "h3",
+        "c9",
+        "c5",
+        "h11"
+      ]
+    },
+    {
+      "id": "t13",
+      "summary": "Dogfood the harness: migrate agentfront's own suite to agentfront.testing for CLI/TAUI driving (files: tests/*)",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "Internal tests import the public harness for promoted functionality \u2014 no private duplicate helpers remain; the full suite is green"
+      ],
+      "deps": [
+        "t11"
+      ],
+      "covers": [
+        "h2",
+        "c8"
+      ]
+    },
+    {
+      "id": "t14",
+      "summary": "E2E collaboration round-trip: an agent drives a task via the JSON mirror, a human replays the identical session in the TUI, states match (files: tests/integration/test_collab_e2e.py)",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "One recorded session artifact (snapshot quad) produced by the agent path replays through the human path to state-equality",
+        "The test exercises all three audiences' surfaces: harness assertion (author), mirror-driven execution (agent), TUI render + keypress replay (human)"
+      ],
+      "deps": [
+        "t9",
+        "t10",
+        "t11"
+      ],
+      "covers": [
+        "c7",
+        "h13",
+        "c4",
+        "h1",
+        "c2",
+        "h9",
+        "c5",
+        "h11"
+      ]
+    },
+    {
+      "id": "t15",
+      "summary": "Consumer docs: testing-harness guide with runnable examples and a consumer-CI recipe (files: docs/testing.md, README pointer)",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "Docs cover run_cli, call_mcp, drive, and assert_surfaces_agree with runnable examples; a consumer CI recipe shows the one-line agreement assertion"
+      ],
+      "deps": [
+        "t11"
+      ],
+      "covers": [
+        "c8",
+        "h2",
+        "c2",
+        "h9"
+      ]
+    },
+    {
+      "id": "t16",
+      "summary": "Colleague adoption: file the agentculture/colleague issue with the ready-to-paste CI snippet \u2014 the external half of the success signal",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "Issue filed on agentculture/colleague linking the harness docs and containing the CI snippet; referenced from this repo's tracking issue/PR"
+      ],
+      "deps": [
+        "t15"
+      ],
+      "covers": [
+        "h1",
+        "c7",
+        "h13"
+      ]
+    },
+    {
+      "id": "t17",
+      "summary": "Release mechanics: minor version bump, CHANGELOG entry, teken wrapper lockstep",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "version-check CI job passes; the teken wrapper pin matches the new version; CHANGELOG documents the public testing harness, TAUI execution, HTTP front, and collaboration features"
+      ],
+      "deps": [
+        "t8",
+        "t12",
+        "t13",
+        "t14",
+        "t15"
+      ],
+      "covers": []
+    }
+  ],
+  "risks": [
+    {
+      "id": "r1",
+      "text": "Colleague CI adoption is cross-repo: the external success signal cannot be closed inside this repo; t16 files the issue, colleague lands it on its own track",
+      "kind": "follow_up",
+      "task_id": "t16"
+    },
+    {
+      "id": "r2",
+      "text": "Complex parameter widgets: derive_input_schema maps base types only, so TAUI execution UX for rich params (Optional/Union/generics) stays limited this iteration",
+      "kind": "unknown_nonblocking",
+      "task_id": "t6"
+    },
+    {
+      "id": "r3",
+      "text": "Cross-process live-session transport (agent process <-> human TUI process) deferred by design; v1 live session is single-process",
+      "kind": "follow_up",
+      "task_id": "t9"
+    },
+    {
+      "id": "r4",
+      "text": "Reducer purity vs tool side effects: dispatch lives in the session layer and the reducer folds result events, so replay equivalence holds for TAUI state \u2014 a tool that mutates the external world will not be re-executed on replay (documented semantics, not silent behavior)",
+      "kind": "unknown_nonblocking",
+      "task_id": "t10"
+    }
+  ]
+}
