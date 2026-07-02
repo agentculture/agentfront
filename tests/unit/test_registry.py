@@ -75,6 +75,14 @@ def test_duplicate_tool_rejected():
         reg.add_tool(lambda x: x, name="t")
 
 
+def test_tool_name_with_dot_rejected():
+    """'.' is the TAUI selector separator; a dotted name would be unresolvable
+    by session.py's ``selector.split(".")`` dispatch, so reject it up front."""
+    reg = Registry()
+    with pytest.raises(ValueError, match=r"may not contain '\.'"):
+        reg.add_tool(lambda x: x, name="foo.bar")
+
+
 def test_derive_input_schema_types_and_required():
     def fn(a: str, b: int = 3, c: bool = False):
         return None

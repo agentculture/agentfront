@@ -1,5 +1,7 @@
 """Unit tests for tool alias resolution (t6)."""
 
+import pytest
+
 from agentfront._registry import Registry
 
 
@@ -74,6 +76,19 @@ def test_alias_not_registered_as_separate_key():
     reg.remove_tool(("backends",))
     assert reg.get_tool("backends") is None
     assert reg.get_tool("wheels") is None
+
+
+def test_alias_with_dot_rejected():
+    """A dotted alias would advertise a TAUI selector that session.py's
+    ``selector.split(".")`` dispatch can never resolve back, so it must be
+    rejected at registration time rather than silently no-op'ing at dispatch."""
+
+    def backends_fn():
+        return "ok"
+
+    reg = Registry()
+    with pytest.raises(ValueError, match=r"may not contain '\.'"):
+        reg.add_tool(backends_fn, name="backends", aliases=("wheels.tires",))
 
 
 def test_no_aliases_default():
