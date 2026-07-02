@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/). This project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.0] - 2026-07-02
+
+
+### Added
+
+- Public `agentfront.testing` harness: `run_cli`/`CliResult`, `call_mcp`, `drive`, `assert_surfaces_agree`, `assert_agent_human_parity`, `assert_replay_equivalent`, plus snapshot/replay/`resume` re-exports — the same gate agentfront runs on itself, importable by consumers for their own CI.
+- TAUI tool execution: `SelectorAction.args` dispatches registered tools through the new single-writer `Session` (`agentfront.taui.session`) — `ToolInvoked`/`ToolResult` events fold through the pure reducer; failures surface as a structured `popup.tool-error` + problems entry, never a crash.
+- `LiveDriver` (`agentfront.taui.driver`): human keys and agent dispatch share one live session — popup dismiss/tool actions act, `q` always quits, scan-then-act runs under the session lock.
+- Session handoff: `resume(stem_or_snapshot, app)` reconstructs a live session from a snapshot quad; replay-equivalence proven for fresh and resumed sessions.
+- HTTP `/front` endpoint: the TAUI markdown front over HTTP (same render path as the markdown tier), linked from the index and `/llms.txt`.
+- Docs: `docs/how-it-works.md` (surface-to-consumer story, drift-gated by test) and `docs/testing.md` (consumer testing guide with runnable examples + CI recipe).
+
+
+### Changed
+
+- `surfaces_agree` now also verifies the HTTP `/front` body agrees with the TAUI markdown tier (`http_front_agrees`); the dogfood gate reports it.
+- MCP surface: a tool raising `AgentfrontError` now surfaces its own `{code,message,remediation}` via the shared `_run_dispatch` helpers (previously the generic error shape); explicit JSON `null` args normalize to no-args across all dispatch surfaces.
+- Internal test suite dogfoods `agentfront.testing` where it is a drop-in.
+
 ## [0.19.1] - 2026-06-29
 
 ### Changed
