@@ -9,6 +9,7 @@ The diff for this change is ALREADY PROVIDED below the instructions (filtered +
 capped). Read specific files only if you need more context.
 
 Rules:
+
 - READ-ONLY. Do NOT modify, create, or delete any file. Only read and run
   read-only commands.
 - Review by READING, not by executing. Reason about correctness from the diff
@@ -26,6 +27,7 @@ Rules:
   call `finish`. Err on the side of finishing early.
 
 When you are done, call finish with a structured review:
+
 1. Correctness risks / likely bugs (with file:line).
 2. Design, clarity, or maintainability concerns.
 3. Concrete, actionable suggestions (ranked; most important first).

@@ -214,6 +214,20 @@ class Registry:
         tool_name = name or getattr(func, "__name__", None)
         if not tool_name or tool_name == "<lambda>":
             raise ValueError("tool needs a name (pass name= for a lambda/partial)")
+
+        def _check_no_dot(seg: str) -> None:
+            if "." in seg:
+                raise ValueError(
+                    f"tool name/segment may not contain '.': {seg!r} — "
+                    "'.' is the TAUI selector separator"
+                )
+
+        _check_no_dot(tool_name)
+        for seg in group:
+            _check_no_dot(seg)
+        for alias in aliases:
+            _check_no_dot(alias)
+
         full_path: tuple[str, ...] = group + (tool_name,)
         if full_path in self._tools:
             raise DuplicateError(f"tool path already registered: {full_path!r}")

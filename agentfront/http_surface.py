@@ -33,6 +33,10 @@ def make_http_app(app: App) -> Any:
       - ``GET /<slug>`` → doc body (``text/markdown``), 404 if unknown.
       - ``GET /sitemap.xml`` → XML ``<urlset>`` with one ``<url>`` per doc.
       - ``GET /`` → markdown index linking to each ``/<slug>``.
+      - ``GET /front`` → the TAUI markdown tier for this App (same code path
+        as the snapshot/render pipeline). Intentionally NOT a doc: it is not
+        listed in ``/sitemap.xml``, which the cross-surface agreement gate
+        parses as docs-only.
     """
 
     def application(environ: dict[str, Any], start_response: Any) -> list[bytes]:
@@ -42,6 +46,8 @@ def make_http_app(app: App) -> Any:
             status, headers, body = _sitemap(app)
         elif path == "/llms.txt":
             status, headers, body = _llms_txt(app)
+        elif path == "/front":
+            status, headers, body = _front(app)
         elif path == "/":
             status, headers, body = _index(app)
         else:
@@ -76,11 +82,31 @@ def _index(app: App) -> tuple[str, list[tuple[str, str]], bytes]:
     lines: list[str] = ["# Documentation"]
     for entry in app.list_docs():
         lines.append(f"- [{entry.title}](/{entry.slug})")
+    lines.append("- [Front](/front)")
     body = "\n".join(lines) + "\n"
     return (
         _STATUS_OK,
         [("Content-Type", _CT_MARKDOWN)],
         body.encode("utf-8"),
+    )
+
+
+def _front(app: App) -> tuple[str, list[tuple[str, str]], bytes]:
+    """Render the TAUI markdown tier for *app* — the ``/front`` view.
+
+    Lazy imports keep this module's import light: the TAUI render/derive
+    stack is only pulled in when ``/front`` is actually requested. This is
+    the SAME code path as the TAUI markdown tier (snapshot/render pipeline)
+    — no parallel renderer.
+    """
+    from agentfront.taui.derive import make_baseline
+    from agentfront.taui.render.markdown import render_markdown
+
+    body = render_markdown(make_baseline(app)).encode("utf-8")
+    return (
+        _STATUS_OK,
+        [("Content-Type", _CT_MARKDOWN)],
+        body,
     )
 
 
@@ -99,6 +125,7 @@ def _llms_txt(app: App) -> tuple[str, list[tuple[str, str]], bytes]:
     lines += ["", "## Tools"]
     for tool in app.list_tools():
         lines.append(f"- {tool.name}: {tool.description}")
+    lines += ["", "## Front", "- [Front](/front) — the live-cockpit view as markdown"]
     body = "\n".join(lines) + "\n"
     return (
         _STATUS_OK,

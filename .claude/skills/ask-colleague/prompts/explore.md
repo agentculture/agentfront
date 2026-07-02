@@ -6,6 +6,7 @@ Investigate the following and report what you find:
 $ARGUMENTS
 
 Rules:
+
 - This is READ-ONLY. Use read_file, list_dir, and read-only run_command only
   (e.g. `git log`, `git grep`, `ls`, `rg`). Do NOT create, modify, or delete any
   file, and do NOT run any command that changes state.
@@ -24,6 +25,7 @@ Rules:
   returning its findings), then synthesize their results into your report.
 
 When you are done, call finish with a structured findings report:
+
 1. What it is / how it works (with file:line references).
 2. Notable details, edge cases, or surprises.
 3. Open questions or risks worth a closer look.

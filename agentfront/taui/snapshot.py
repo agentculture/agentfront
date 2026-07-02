@@ -1,11 +1,20 @@
-"""TAUI snapshot quad — write/read <stem>.taui.json/.ansi/.events.jsonl/.md + faithfulness."""
+"""TAUI snapshot quad — write/read <stem>.taui.json/.ansi/.events.jsonl/.md + faithfulness.
+
+``resume`` is the HANDOFF primitive built on top of the quad: an agent
+pauses a live session with ``write_snapshot`` (or hands over an in-memory
+``Snapshot`` directly), and a human — or another agent — picks it back up
+with ``resume`` (typically feeding the result straight into a
+:class:`~agentfront.taui.driver.LiveDriver`), or vice versa: a human pauses
+and an agent resumes. Either audience can be on either end of the handoff;
+nothing on the event trail is lost.
+"""
 
 from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from agentfront.taui.events import Event, dumps_events, loads_events
 from agentfront.taui.mirror import serialize
@@ -13,6 +22,10 @@ from agentfront.taui.reducer import replay  # noqa: F401 — re-exported for cal
 from agentfront.taui.render.ansi import render_ansi
 from agentfront.taui.render.markdown import render_markdown
 from agentfront.taui.state import TAUIState
+
+if TYPE_CHECKING:  # pragma: no cover - typing only, avoids an import cycle at runtime
+    from agentfront.app import App
+    from agentfront.taui.session import Session
 
 # ---------------------------------------------------------------------------
 # Module constants (SonarCloud S1192 — avoid repeated string literals).
@@ -122,6 +135,42 @@ def read_snapshot(stem: str | Path) -> Snapshot:
     events_text = paths[_KEY_EVENTS].read_text(encoding="utf-8")
     events = loads_events(events_text)
     return Snapshot(state=state, ansi=ansi, markdown=markdown, events=events)
+
+
+# ---------------------------------------------------------------------------
+# resume — the handoff primitive
+# ---------------------------------------------------------------------------
+
+
+def resume(source: str | Path | Snapshot, app: App) -> Session:
+    """Resume a live :class:`~agentfront.taui.session.Session` from a snapshot.
+
+    This is the HANDOFF primitive: whoever paused the session (agent or
+    human) captured it with :func:`write_snapshot`; whoever picks it back up
+    (human or agent — either direction) calls ``resume`` to get a live
+    ``Session`` continuing from exactly that point, then drives it onward
+    (an agent via ``session.dispatch``/``session.fold``, a human typically
+    via :class:`~agentfront.taui.driver.LiveDriver`). Nothing on the event
+    trail is lost across the handoff.
+
+    *source* is either a snapshot *stem* (resolved via :func:`read_snapshot`)
+    or an already-loaded :class:`Snapshot` (no file I/O in that case — e.g.
+    a snapshot handed over in-memory rather than serialized to disk).
+
+    The returned session's ``state`` is the snapshotted state, its
+    ``events`` are the snapshotted trail, its ``initial`` equals that same
+    state, and its ``replay_base_index`` equals ``len(events)`` — the
+    session provides these semantics (see
+    :class:`agentfront.taui.session.Session`); this function does not
+    reimplement them, it just supplies the constructor arguments.
+    """
+    # Lazy import: agentfront.taui.session imports agentfront.app.App, and
+    # keeping that import out of this module's top level avoids a cycle
+    # between snapshot.py and session.py.
+    from agentfront.taui.session import Session as _Session
+
+    snap = source if isinstance(source, Snapshot) else read_snapshot(source)
+    return _Session(app, state=snap.state, events=list(snap.events))
 
 
 # ---------------------------------------------------------------------------

@@ -10,7 +10,7 @@
 # version-bump skill and a CI guard.
 [project]
 name = "teken"
-version = "0.19.1"
+version = "0.20.0"
 description = "Deprecated alias for agentfront — installs agentfront (the renamed Agent First Interface CLI)."
 readme = "README.md"
 license = "Apache-2.0"
@@ -21,14 +21,14 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "License :: OSI Approved :: Apache Software License",
 ]
-dependencies = ["agentfront==0.19.1"]
+dependencies = ["agentfront==0.20.0"]
 
 [project.optional-dependencies]
 # Parity with agentfront's `mcp` extra: `uv tool install "teken[mcp]"` pulls
 # `agentfront[mcp]`, so the wrapper exposes the MCP server surface too. This pin
 # is kept in lockstep with the root version by the version-bump skill and the CI
 # guard, exactly like the base `agentfront==` pin above.
-mcp = ["agentfront[mcp]==0.19.1"]
+mcp = ["agentfront[mcp]==0.20.0"]
 
 [project.urls]
 Homepage = "https://github.com/agentculture/agentfront"

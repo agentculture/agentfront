@@ -23,6 +23,7 @@ from typing import Any
 from mcp import Tool
 from mcp.server import Server
 
+from agentfront._run_dispatch import error_payload, result_payload, validate_and_lookup
 from agentfront.app import App
 
 __all__ = ["make_mcp_server", "serve_stdio"]
@@ -122,49 +123,23 @@ def make_mcp_server(app: App) -> Server:
 
         command = arguments.get("command", [])
         args = arguments.get("args", {})
+        if args is None:
+            # An explicit JSON null means "no args" — normalize exactly like
+            # agentfront.testing.call_mcp so the surfaces stay payload-identical.
+            args = {}
 
-        if not isinstance(command, list):
-            return {
-                "error": {
-                    "code": 1,
-                    "message": "'command' must be an array of strings",
-                    "remediation": "pass command as ['noun', 'verb']",
-                }
-            }
-
-        if not all(isinstance(x, str) for x in command):
-            return {
-                "error": {
-                    "code": 1,
-                    "message": "'command' items must be strings",
-                    "remediation": "pass command as ['noun', 'verb']",
-                }
-            }
-
-        path = tuple(command)
-        entry = app.get_by_path(path)
-        if entry is None:
-            return {
-                "error": {
-                    "code": 1,
-                    "message": f"unknown command: {' '.join(command)}",
-                    "remediation": "check available commands in the 'run' tool description",
-                }
-            }
+        entry_or_error = validate_and_lookup(app, command)
+        if isinstance(entry_or_error, dict):
+            return entry_or_error
+        entry = entry_or_error
 
         try:
             result = entry.func(**args)
             if inspect.isawaitable(result):
                 result = await result
-            return {"result": result}
+            return result_payload(result)
         except Exception as exc:
-            return {
-                "error": {
-                    "code": 1,
-                    "message": f"{exc.__class__.__name__}: {exc}",
-                    "remediation": "check command arguments",
-                }
-            }
+            return error_payload(exc)
 
     return server
 

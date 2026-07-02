@@ -11,3 +11,26 @@
 {"ts":"2026-05-29T15:18:01.416319+00:00","type":"pr_review_triggered","pr":26,"command":"/agentic_review"}
 {"ts":"2026-05-29T15:19:05.059286+00:00","type":"readiness_arrived","pr":26,"waited_secs":60}
 {"ts":"2026-05-29T15:19:10.407256+00:00","type":"pr_read","pr":26,"comment_count":4,"threads_unresolved":0,"ci_state":"ok"}
+{"ts":"2026-06-27T14:30:12.716903+00:00","type":"readiness_arrived","pr":42,"waited_secs":0}
+{"ts":"2026-06-27T14:30:17.177513+00:00","type":"pr_read","pr":42,"comment_count":7,"threads_unresolved":0,"ci_state":"ok"}
+{"ts":"2026-06-27T14:35:55.955901+00:00","type":"readiness_arrived","pr":42,"waited_secs":0}
+{"ts":"2026-06-27T14:36:00.853911+00:00","type":"pr_read","pr":42,"comment_count":8,"threads_unresolved":0,"ci_state":"ok"}
+{"ts":"2026-06-27T14:40:24.569001+00:00","type":"readiness_arrived","pr":42,"waited_secs":0}
+{"ts":"2026-06-27T14:40:29.133342+00:00","type":"pr_read","pr":42,"comment_count":8,"threads_unresolved":0,"ci_state":"ok"}
+{"ts":"2026-06-27T17:53:41.720826+00:00","type":"pr_read","pr":44,"comment_count":5,"threads_unresolved":2,"ci_state":"ok"}
+{"ts":"2026-06-27T18:01:27.630107+00:00","type":"pr_reply","pr":44,"thread_id":null,"in_reply_to":null}
+{"ts":"2026-06-27T18:01:29.149080+00:00","type":"pr_reply","pr":44,"thread_id":"PRRT_kwDOSGEynM6MvOJ-","in_reply_to":3486497799}
+{"ts":"2026-06-27T18:01:30.979324+00:00","type":"pr_reply","pr":44,"thread_id":"PRRT_kwDOSGEynM6MvOKB","in_reply_to":3486497803}
+{"ts":"2026-06-27T18:01:31.422245+00:00","type":"pr_batch_replied","pr":44,"count":3,"resolved":2}
+{"ts":"2026-06-27T18:01:32.219393+00:00","type":"pr_webhook_posted","pr":44,"event":"pr_replied"}
+{"ts":"2026-06-27T19:03:33.504271+00:00","type":"pr_opened","pr":46,"title":"feat(taui): bring up the live-cockpit UI layer (flat renderer, widgets, colors, layout) (closes #45)"}
+{"ts":"2026-06-27T19:03:35.067081+00:00","type":"pr_review_triggered","pr":46,"command":"/agentic_review"}
+{"ts":"2026-06-27T19:03:35.863322+00:00","type":"pr_webhook_posted","pr":46,"event":"pr_opened"}
+{"ts":"2026-06-27T19:04:38.915541+00:00","type":"readiness_arrived","pr":46,"waited_secs":60}
+{"ts":"2026-06-27T19:04:43.699815+00:00","type":"pr_read","pr":46,"comment_count":4,"threads_unresolved":0,"ci_state":"ok"}
+{"ts":"2026-06-29T17:24:33.473375+00:00","type":"pr_opened","pr":47,"title":"docs: relicense from MIT to Apache 2.0 (v0.19.1)"}
+{"ts":"2026-06-29T17:24:34.936530+00:00","type":"pr_review_triggered","pr":47,"command":"/agentic_review"}
+{"ts":"2026-06-29T17:24:35.688877+00:00","type":"pr_webhook_posted","pr":47,"event":"pr_opened"}
+{"ts":"2026-06-29T17:25:38.802710+00:00","type":"readiness_arrived","pr":47,"waited_secs":60}
+{"ts":"2026-06-29T17:25:43.528362+00:00","type":"pr_read","pr":47,"comment_count":4,"threads_unresolved":0,"ci_state":"ok"}
+{"ts":"2026-06-29T17:28:32.176621+00:00","type":"pr_read","pr":47,"comment_count":4,"threads_unresolved":0,"ci_state":"ok"}

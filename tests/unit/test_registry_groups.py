@@ -134,6 +134,19 @@ def test_registry_get_by_path_missing_returns_none():
     assert reg.get_by_path(("feedback", "ping")) is None
 
 
+def test_registry_add_tool_group_segment_with_dot_rejected():
+    """A group segment containing '.' would make the TAUI selector
+    (group joined with the tool name via '.') unresolvable when session.py
+    splits it back on '.', so reject it at registration time."""
+    reg = Registry()
+
+    def f():
+        return 1
+
+    with pytest.raises(ValueError, match=r"may not contain '\.'"):
+        reg.add_tool(f, name="ping", group=("feed.back",))
+
+
 def test_registry_duplicate_path_rejected():
     reg = Registry()
 

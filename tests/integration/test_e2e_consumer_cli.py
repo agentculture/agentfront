@@ -8,7 +8,7 @@ CONJUNCTION of all success signals:
   - host add_command launcher verb is invocable alongside generated verbs
   - explain <path> returns the op's doc; overview lists nouns; learn enumerates ops
   - the SAME app yields mcp_server() (single-dispatch) and http_app()
-  - surfaces_agree(app) is True
+  - assert_surfaces_agree(app) passes
   - BEFORE→AFTER contrast: empty App exposes only learn/doctor; populated App
     exposes the full nested tree
 """
@@ -22,7 +22,8 @@ from agentfront import App
 from agentfront._registry import Flag
 from agentfront.cli_surface import run_cli
 from agentfront.errors import AgentfrontError
-from agentfront.serve import surfaces_agree
+from agentfront.testing import assert_surfaces_agree
+from agentfront.testing import run_cli as harness_run_cli
 
 # ---------------------------------------------------------------------------
 # Build the consumer App purely by registration
@@ -260,7 +261,7 @@ class TestSurfaces:
     def test_surfaces_agree(self) -> None:
         app = _build_app()
         app.add_doc(slug="intro", title="Intro", text="# Intro\nhello")
-        assert surfaces_agree(app) is True
+        assert_surfaces_agree(app)
 
 
 class TestBeforeAfterContrast:
@@ -310,18 +311,8 @@ class TestBeforeAfterContrast:
         assert len(populated.list_tools()) >= 6
 
         # learn --json reflects the difference
-        import io
-        from contextlib import redirect_stdout
-
-        buf_empty = io.StringIO()
-        with redirect_stdout(buf_empty):
-            run_cli(empty, ["learn", "--json"])
-        empty_payload = json.loads(buf_empty.getvalue())
-
-        buf_pop = io.StringIO()
-        with redirect_stdout(buf_pop):
-            run_cli(populated, ["learn", "--json"])
-        pop_payload = json.loads(buf_pop.getvalue())
+        empty_payload = json.loads(harness_run_cli(empty, ["learn", "--json"]).stdout)
+        pop_payload = json.loads(harness_run_cli(populated, ["learn", "--json"]).stdout)
 
         assert len(empty_payload["tools"]) == 0
         assert len(pop_payload["tools"]) >= 6

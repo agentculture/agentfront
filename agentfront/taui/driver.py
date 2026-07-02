@@ -1,18 +1,30 @@
-"""TAUI driver — a thin reference TTY driver.
+"""TAUI driver — a thin reference TTY driver, plus the live shared-session driver.
 
 Folds keystrokes through :func:`reduce` and repaints via :func:`render_ansi`.
 Pure w.r.t. the external world: no real terminal I/O, fully unit-testable
 from a Python list of keys.
+
+:class:`LiveDriver` is the human+agent front end over a single live
+:class:`~agentfront.taui.session.Session` (see ``agentfront/taui/session.py``,
+t6): the human side folds ``KeyPress``/popup actions through
+``session.feed_key`` / ``session.dispatch``, the agent side calls
+``session.dispatch`` directly, and BOTH write through the session's one
+``fold`` — so a human watching a live TUI and an agent driving the same
+process via ``dispatch`` see and produce the exact same event trail and
+state. This is distinct from the plain :class:`Driver` above, which owns its
+own disconnected ``TAUIState`` and has no concept of tool dispatch or a
+shared session.
 """
 
 from __future__ import annotations
 
-from typing import Callable
+from typing import Callable, Optional, Tuple
 
-from agentfront.taui.events import KeyPress
+from agentfront.taui.events import Dismiss, KeyPress, SelectorAction
 from agentfront.taui.reducer import reduce
 from agentfront.taui.render.ansi import render_ansi
-from agentfront.taui.state import TAUIState
+from agentfront.taui.session import Session
+from agentfront.taui.state import Action, Popup, TAUIState
 
 
 class Driver:
@@ -58,3 +70,121 @@ def drive(state: TAUIState, keys: list[str]) -> TAUIState:
     driver = Driver(state)
     driver.run(keys)
     return driver.state
+
+
+class LiveDriver:
+    """The human+agent front end over one live :class:`Session`.
+
+    Both audiences share the SAME session: the human side folds keys (and
+    popup button presses) via :meth:`feed_key`; the agent side calls
+    :meth:`dispatch` directly. Because both routes end up in
+    ``session.fold`` under the session's single lock, the next repaint
+    (:meth:`render`, or the return value of the next :meth:`feed_key`)
+    always reflects whichever side acted most recently — there is no
+    separate copy of the state for either audience.
+
+    Popup buttons route through the session rather than being ignored: when a
+    *visible* popup has an :class:`~agentfront.taui.state.Action` whose
+    ``input`` matches the key pressed, that action fires instead of ordinary
+    key navigation. A ``.dismiss``-suffixed selector folds
+    ``Dismiss(target=<popup.id>)`` (closing exactly that popup) and a popup
+    button wired to a registered tool executes it — those actions visibly
+    ACT. Any other selector folds through the session as a
+    ``SelectorAction``: it lands in the event trail (auditable, replayable)
+    but is a state no-op until the reducer gives that selector a semantic
+    (e.g. ``popup.skill-suggested.accept`` has none in this version). When
+    more than one visible popup has an action bound to the same key, the
+    TOPMOST popup — the last one in ``session.state.popups``, matching the
+    reducer's own topmost-wins dismiss convention — wins. The scan-then-act
+    routing runs under ``session.locked()`` so the decision can't act on a
+    popup a concurrent writer already dismissed.
+
+    ``"q"`` always quits: ``feed_key("q")`` sets :attr:`running` to
+    ``False`` and returns immediately, even with a blocking popup visible.
+    There is no quit-trap — folding nothing for the key itself is a
+    deliberate choice (quitting is a driver-local concern, not a
+    session-visible event).
+    """
+
+    def __init__(
+        self,
+        session: Session,
+        render: Callable[[TAUIState], str] = render_ansi,
+    ) -> None:
+        self.session = session
+        self.running = True
+        self._render = render
+
+    def render(self) -> str:
+        """Repaint the session's current state with this driver's render callable."""
+        return self._render(self.session.state)
+
+    def _matching_popup_action(self, key: str) -> Optional[Tuple[Popup, Action]]:
+        """Return the (popup, action) for the topmost visible popup bound to *key*.
+
+        Iterates ``session.state.popups`` from the end (topmost) so that
+        when multiple visible popups bind the same key, the most recently
+        opened one wins.
+        """
+        for popup in reversed(self.session.state.popups):
+            if not popup.visible:
+                continue
+            for action in popup.actions:
+                if action.input == key:
+                    return popup, action
+        return None
+
+    def feed_key(self, key: str) -> str:
+        """Route a human key press: quit, popup action, or plain navigation.
+
+        1. ``key == "q"`` — set :attr:`running` to ``False`` and return the
+           current render. Always wins, even over a blocking popup.
+        2. Otherwise, if a visible popup binds *key* to an action, that
+           action fires (dismiss or dispatch — see the class docstring).
+        3. Otherwise the key routes through ``session.feed_key`` unchanged.
+
+        Returns ``render(session.state)`` after the routing above.
+        """
+        if key == "q":
+            self.running = False
+            return self.render()
+
+        # Hold the session lock across the scan-then-act sequence so a
+        # concurrent writer (another driver, an agent dispatch) can't dismiss
+        # or replace the matched popup between the read and the act — the
+        # lock is re-entrant, so the fold/dispatch below re-acquires safely.
+        with self.session.locked():
+            matched = self._matching_popup_action(key)
+            if matched is not None:
+                popup, action = matched
+                if action.selector.endswith(".dismiss"):
+                    self.session.fold(Dismiss(target=popup.id))
+                else:
+                    self.session.dispatch(SelectorAction(selector=action.selector))
+            else:
+                self.session.feed_key(key)
+
+        return self.render()
+
+    def dispatch(self, action: SelectorAction) -> TAUIState:
+        """Agent-side dispatch: proxies straight to ``session.dispatch``.
+
+        The next :meth:`render` (or the frame returned by the next
+        :meth:`feed_key`) reflects the outcome, since both sides read the
+        same ``session.state``.
+        """
+        return self.session.dispatch(action)
+
+    def run(self, keys: list[str]) -> list[str]:
+        """Feed *keys* in order, collecting frames.
+
+        Stops early — no further keys are processed — once :attr:`running`
+        goes ``False`` (i.e. after a ``"q"`` key), so the returned list may
+        be shorter than *keys*.
+        """
+        frames: list[str] = []
+        for key in keys:
+            frames.append(self.feed_key(key))
+            if not self.running:
+                break
+        return frames
