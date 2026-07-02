@@ -76,6 +76,25 @@ agentfront cli overview [path]         # read-only descriptive snapshot of a CLI
 
 `agentfront cli doctor` is a **hybrid** auditor: static checks for repo structure (`pyproject.toml`, `tests/`) and black-box subprocess probes for behavior (`learn`, `--json`, error discipline, `explain`). Every failure includes a concrete `remediation` pointer. (`agentfront cli verify` remains as a deprecated alias for `cli doctor`.)
 
+## Testing your front
+
+Every surface agentfront derives from your `App` is built from the same
+registry, so they cannot disagree — and that claim isn't just asserted, it's
+checked by a function you can call from your own test suite:
+
+```python
+from agentfront.testing import assert_surfaces_agree
+
+def test_surfaces_agree():
+    assert_surfaces_agree(app)   # raises AssertionError naming the drift
+```
+
+`agentfront.testing` also ships `run_cli` (in-process CLI invocation),
+`call_mcp` (the MCP `run` payload without a server), and TAUI helpers
+(`drive`, `assert_agent_human_parity`, snapshot/resume) for testing the
+agent- and human-driven cockpit. See [`docs/testing.md`](./docs/testing.md)
+for the full guide, with runnable examples for each.
+
 ## Develop
 
 ```bash
