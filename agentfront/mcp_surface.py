@@ -128,7 +128,7 @@ def make_mcp_server(app: App) -> Server:
             # agentfront.testing.call_mcp so the surfaces stay payload-identical.
             args = {}
 
-        entry_or_error = validate_and_lookup(app, command, args)
+        entry_or_error = validate_and_lookup(app, command)
         if isinstance(entry_or_error, dict):
             return entry_or_error
         entry = entry_or_error

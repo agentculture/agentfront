@@ -235,7 +235,8 @@ class Session:
             if inspect.isawaitable(value):
                 value = asyncio.run(value)
             return result_payload(value)
-        except Exception as exc:  # noqa: BLE001 - dispatch boundary, mapped not re-raised
+        # dispatch boundary — exception mapped to a payload, not re-raised
+        except Exception as exc:  # noqa: BLE001
             return error_payload(exc)
 
     @staticmethod

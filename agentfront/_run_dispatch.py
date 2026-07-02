@@ -13,7 +13,7 @@ live inline in ``mcp_surface.call_tool``.
 
 from __future__ import annotations
 
-from typing import Any, Union
+from typing import Any
 
 from agentfront._registry import ToolEntry
 from agentfront.app import App
@@ -22,14 +22,12 @@ from agentfront.errors import AgentfrontError
 __all__ = ["validate_and_lookup", "result_payload", "error_payload"]
 
 
-def validate_and_lookup(app: App, command: Any, args: Any) -> Union[ToolEntry, dict[str, Any]]:
+def validate_and_lookup(app: App, command: Any) -> ToolEntry | dict[str, Any]:
     """Validate *command* and resolve it to a :class:`ToolEntry` on *app*.
 
     Returns the matching entry on success, or the exact ``{"error": ...}``
     payload the MCP surface has always emitted for a non-list ``command``, a
-    ``command`` with non-string items, or an unknown command path. *args* is
-    accepted (not validated here) so callers have one place to pass both
-    inputs through.
+    ``command`` with non-string items, or an unknown command path.
     """
     if not isinstance(command, list):
         return {

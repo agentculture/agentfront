@@ -38,7 +38,7 @@ def call_mcp(app: App, command: list[str], args: Optional[dict[str, Any]] = None
     if args is None:
         args = {}
 
-    entry_or_error = validate_and_lookup(app, command, args)
+    entry_or_error = validate_and_lookup(app, command)
     if isinstance(entry_or_error, dict):
         return entry_or_error
     entry = entry_or_error
@@ -48,5 +48,6 @@ def call_mcp(app: App, command: list[str], args: Optional[dict[str, Any]] = None
         if inspect.isawaitable(result):
             result = asyncio.run(result)
         return result_payload(result)
-    except Exception as exc:  # noqa: BLE001 - dispatch boundary, mapped not re-raised
+    # dispatch boundary — exception mapped to a payload, not re-raised
+    except Exception as exc:  # noqa: BLE001
         return error_payload(exc)
