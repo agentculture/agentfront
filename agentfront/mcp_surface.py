@@ -123,6 +123,10 @@ def make_mcp_server(app: App) -> Server:
 
         command = arguments.get("command", [])
         args = arguments.get("args", {})
+        if args is None:
+            # An explicit JSON null means "no args" — normalize exactly like
+            # agentfront.testing.call_mcp so the surfaces stay payload-identical.
+            args = {}
 
         entry_or_error = validate_and_lookup(app, command, args)
         if isinstance(entry_or_error, dict):

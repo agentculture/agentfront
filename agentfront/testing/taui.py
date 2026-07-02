@@ -98,7 +98,21 @@ def assert_agent_human_parity(app: App, selector: str) -> None:
     of ``KeyPress`` events) so their event trails will differ — what must
     match is the resulting STATE (dataclass equality), not the trail. Raises
     ``AssertionError`` naming both final ``focused`` values on mismatch.
+
+    *selector* must be pure navigation on the agent side too: a selector that
+    resolves to a REGISTERED TOOL executes on dispatch and has no
+    human-navigation equivalent, so it is rejected up front with a dedicated
+    ``AssertionError`` (pick a non-tool panel item, e.g. a host command's
+    ``cmd.<name>`` selector).
     """
+    if app.get_by_path(tuple(selector.split("."))) is not None:
+        raise AssertionError(
+            f"selector {selector!r} resolves to a registered tool: dispatching it"
+            " EXECUTES the tool on the agent path, which has no human-navigation"
+            " equivalent — pass a pure-navigation selector instead (e.g. a host"
+            " command's 'cmd.<name>' panel item)"
+        )
+
     agent_session = Session(app)
     agent_state = agent_session.dispatch(SelectorAction(selector=selector))
 

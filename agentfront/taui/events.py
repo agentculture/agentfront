@@ -59,7 +59,7 @@ class SelectorAction:
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> SelectorAction:
-        return cls(selector=d["selector"], args=dict(d.get("args", {})))
+        return cls(selector=d["selector"], args=dict(d.get("args") or {}))
 
 
 @dataclass(frozen=True)
@@ -105,7 +105,7 @@ class ToolInvoked:
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> ToolInvoked:
-        return cls(selector=d["selector"], args=dict(d.get("args", {})))
+        return cls(selector=d["selector"], args=dict(d.get("args") or {}))
 
 
 @dataclass(frozen=True)
@@ -133,7 +133,7 @@ class ToolResult:
             selector=d["selector"],
             ok=d.get("ok", True),
             result=d.get("result", ""),
-            error=dict(d.get("error", {})),
+            error=dict(d.get("error") or {}),
         )
 
 

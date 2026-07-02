@@ -2,7 +2,8 @@
 
 ``/front`` serves the SAME TAUI markdown tier used by the snapshot/render
 pipeline — ``render_markdown(make_baseline(app))`` — over HTTP, so any agent
-with a fetch tool gets the live-cockpit view without a bespoke client.
+with a fetch tool gets the registry-derived cockpit view (a fresh baseline
+per request, not any Session's in-flight state) without a bespoke client.
 
 Drive ``make_http_app`` directly with a WSGI environ dict (no real socket),
 matching the technique in ``agentfront.serve._http_doc_slugs`` and the

@@ -188,13 +188,31 @@ class Session:
             if entry is None:
                 return self.fold(action)
 
-            self.fold(ToolInvoked(selector=action.selector, args=dict(action.args)))
-            payload = self._execute(entry.func, action.args)
+            # Normalize args the same way call_mcp does: an explicit None means
+            # "no args" (a JSON null from an agent payload); any other non-dict
+            # value flows into _execute so it maps to the SAME error payload the
+            # other dispatch surfaces produce, instead of crashing the dispatch.
+            args: Any = {} if action.args is None else action.args
+            event_args = dict(args) if isinstance(args, dict) else {}
+            self.fold(ToolInvoked(selector=action.selector, args=event_args))
+            payload = self._execute(entry.func, args)
             self._last_result = payload
             return self.fold(self._tool_result(action.selector, payload))
 
+    def locked(self) -> Any:
+        """The session's re-entrant lock, for atomic read-then-act sequences.
+
+        ``with session.locked(): ...`` makes a scan of ``session.state`` and
+        the follow-up ``fold``/``dispatch`` one critical section — the lock is
+        re-entrant, so folds inside the block don't deadlock. Use it whenever
+        a decision is derived from the state and then acted on (e.g. a driver
+        matching a popup action to a key), so no other writer can slip between
+        the read and the act.
+        """
+        return self._lock
+
     @staticmethod
-    def _execute(func: Any, args: dict[str, Any]) -> dict[str, Any]:
+    def _execute(func: Any, args: Any) -> dict[str, Any]:
         """Call *func* with *args*, resolving an awaitable result, as an MCP payload.
 
         Every exception the tool raises is caught and mapped to the

@@ -75,10 +75,12 @@ everyone shares?
 - **HTTP is the peer fetch surface** — a WSGI app serving markdown pages plus
   a `/sitemap.xml`, so any agent with a fetch tool (another agent, a peer
   service, a CI job) can crawl your docs without a bespoke client. `/front`
-  is the one dynamic page on that surface: it renders the *live* TAUI state
-  as markdown, so a peer fetching `/front` sees the same cockpit an agent
-  driving TAUI directly would see — docs and live state through one fetch
-  protocol.
+  renders the app's registry-derived TAUI front as markdown — the same body
+  `render_markdown(app.taui())` produces — so a peer fetching `/front` reads
+  the same cockpit view an agent opening a fresh TAUI session gets: docs and
+  the front through one fetch protocol. (It is derived per-request from the
+  registry baseline; it is not wired to any live `Session`'s in-flight state
+  — cross-process live sharing is an explicit follow-up.)
 
 ## One reducer, two audiences
 
@@ -129,6 +131,11 @@ harness grows matching helpers for the other two: an MCP dispatcher
 real server, and TAUI helpers (`drive`, `assert_agent_human_parity`,
 snapshot/resume) so a consumer can assert that an agent path and a human
 path through the cockpit really do converge, per the reducer parity above.
+(`assert_agent_human_parity` checks the *navigation* parity, so it takes a
+pure-navigation selector — a selector that resolves to a registered tool
+*executes* on the agent path, which keyboard navigation alone can't mirror;
+execution parity across surfaces is what `drive`/`call_mcp`/`run_cli`
+assert instead.)
 The point is the same in every case: the proof that "one App, every surface,
 no drift" holds isn't something you take on faith — it's a function you can
 call from your own test suite.

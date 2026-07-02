@@ -83,17 +83,21 @@ class LiveDriver:
     always reflects whichever side acted most recently — there is no
     separate copy of the state for either audience.
 
-    Popup buttons ACT rather than being inert: when a *visible* popup has an
-    :class:`~agentfront.taui.state.Action` whose ``input`` matches the key
-    pressed, that action fires instead of ordinary key navigation. A
-    ``.dismiss``-suffixed selector folds ``Dismiss(target=<popup.id>)``
-    (closing exactly that popup); any other selector dispatches through the
-    session as a ``SelectorAction`` (so a popup button wired to a real tool
-    executes it, and a non-tool selector degrades to the session's normal
-    navigation fallback). When more than one visible popup has an action
-    bound to the same key, the TOPMOST popup — the last one in
-    ``session.state.popups``, matching the reducer's own topmost-wins
-    dismiss convention — wins.
+    Popup buttons route through the session rather than being ignored: when a
+    *visible* popup has an :class:`~agentfront.taui.state.Action` whose
+    ``input`` matches the key pressed, that action fires instead of ordinary
+    key navigation. A ``.dismiss``-suffixed selector folds
+    ``Dismiss(target=<popup.id>)`` (closing exactly that popup) and a popup
+    button wired to a registered tool executes it — those actions visibly
+    ACT. Any other selector folds through the session as a
+    ``SelectorAction``: it lands in the event trail (auditable, replayable)
+    but is a state no-op until the reducer gives that selector a semantic
+    (e.g. ``popup.skill-suggested.accept`` has none in this version). When
+    more than one visible popup has an action bound to the same key, the
+    TOPMOST popup — the last one in ``session.state.popups``, matching the
+    reducer's own topmost-wins dismiss convention — wins. The scan-then-act
+    routing runs under ``session.locked()`` so the decision can't act on a
+    popup a concurrent writer already dismissed.
 
     ``"q"`` always quits: ``feed_key("q")`` sets :attr:`running` to
     ``False`` and returns immediately, even with a blocking popup visible.
@@ -145,15 +149,20 @@ class LiveDriver:
             self.running = False
             return self.render()
 
-        matched = self._matching_popup_action(key)
-        if matched is not None:
-            popup, action = matched
-            if action.selector.endswith(".dismiss"):
-                self.session.fold(Dismiss(target=popup.id))
+        # Hold the session lock across the scan-then-act sequence so a
+        # concurrent writer (another driver, an agent dispatch) can't dismiss
+        # or replace the matched popup between the read and the act — the
+        # lock is re-entrant, so the fold/dispatch below re-acquires safely.
+        with self.session.locked():
+            matched = self._matching_popup_action(key)
+            if matched is not None:
+                popup, action = matched
+                if action.selector.endswith(".dismiss"):
+                    self.session.fold(Dismiss(target=popup.id))
+                else:
+                    self.session.dispatch(SelectorAction(selector=action.selector))
             else:
-                self.session.dispatch(SelectorAction(selector=action.selector))
-        else:
-            self.session.feed_key(key)
+                self.session.feed_key(key)
 
         return self.render()
 
