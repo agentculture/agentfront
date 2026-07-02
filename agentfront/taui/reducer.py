@@ -18,10 +18,12 @@ from agentfront.taui.events import (
     SelectorAction,
     SkillSuggested,
     Tick,
+    ToolInvoked,
+    ToolResult,
     UserInput,
     WorkStep,
 )
-from agentfront.taui.state import Action, ConversationLine, Popup, TAUIState
+from agentfront.taui.state import Action, ConversationLine, Popup, TAUIState, WorkItem
 
 # ---------------------------------------------------------------------------
 # Module constants (SonarCloud S1192 — avoid repeated string literals).
@@ -36,6 +38,13 @@ _SEL_WORK_ERROR_DISMISS = "popup.work-error.dismiss"
 _KIND_ERROR = "error"
 _REASON_WORK_STEP_FAILED = "work_step_failed"
 _MSG_WORK_STEP_FAILED_DEFAULT = "Work step failed"
+_ID_TOOL_ERROR = "popup.tool-error"
+_SEL_TOOL_ERROR_DISMISS = "popup.tool-error.dismiss"
+_REASON_TOOL_FAILED = "tool_failed"
+_MSG_TOOL_FAILED_DEFAULT = "Tool failed"
+_PREFIX_TOOL_INVOKED = "→ "
+_PREFIX_TOOL_OK = "✓ "
+_PREFIX_TOOL_FAILED = "✗ "
 
 
 def _replace(state: TAUIState, **changes: Any) -> TAUIState:
@@ -74,12 +83,19 @@ def reduce(state: TAUIState, event: Event) -> TAUIState:
 
     Never mutates *state*; always returns a (possibly equal) new instance.
 
-    v1 scope is **navigation parity**: this single fold moves focus and toggles
-    popup visibility, and an agent ``SelectorAction(sel)`` reaches the same
-    state as the human ``KeyPress`` navigation to ``sel``. Tool *execution*
-    (via ``SelectorAction.args``) and keyboard-reachable popup actions are
-    deferred to the live-driver work, so the agent/human equivalence here is
-    over the navigation/visibility fold, not invocation.
+    Navigation parity: this fold moves focus and toggles popup visibility,
+    and an agent ``SelectorAction(sel)`` reaches the same state as the human
+    ``KeyPress`` navigation to ``sel``.
+
+    The v1 "navigation-only" scope note is now CLOSED: execution events fold
+    too. ``ToolInvoked`` logs a "→ selector" line and starts/advances the
+    work item; ``ToolResult`` logs a "✓"/"✗" line, stops the work item, and
+    (on failure) upserts a blocking ``popup.tool-error`` popup plus a
+    ``problems`` entry. Tool *dispatch* — actually calling the tool function
+    — still lives OUTSIDE the reducer, in the session layer
+    (``agentfront.taui.session``): ``reduce()`` only folds the
+    ``ToolInvoked``/``ToolResult`` events it is handed and never performs
+    dispatch itself.
     """
     if isinstance(event, KeyPress):
         return _reduce_key(state, event.key)
@@ -95,6 +111,10 @@ def reduce(state: TAUIState, event: Event) -> TAUIState:
         return _reduce_skill_suggested(state, event)
     if isinstance(event, WorkStep):
         return _reduce_work_step(state, event)
+    if isinstance(event, ToolInvoked):
+        return _reduce_tool_invoked(state, event)
+    if isinstance(event, ToolResult):
+        return _reduce_tool_result(state, event)
     # Unknown event → no-op
     return state
 
@@ -187,6 +207,69 @@ def _reduce_work_step(state: TAUIState, event: WorkStep) -> TAUIState:
         )
         popups = _upsert_popup(popups, err)
     return _replace(state, conversation=conv, work_item=work, popups=popups)
+
+
+# ---------------------------------------------------------------------------
+# ToolInvoked / ToolResult handlers
+# ---------------------------------------------------------------------------
+
+
+def _reduce_tool_invoked(state: TAUIState, event: ToolInvoked) -> TAUIState:
+    """Log the invocation and start/advance the work item.
+
+    An existing work item is advanced in place (``step_count + 1``,
+    ``running=True``) — its ``task_id`` is left untouched. With no work item
+    yet, one is started for *event.selector*.
+    """
+    conv = append_conversation(state.conversation, _PREFIX_TOOL_INVOKED + event.selector)
+    work = state.work_item
+    if work is not None:
+        work = replace(work, step_count=work.step_count + 1, running=True)
+    else:
+        work = WorkItem(task_id=event.selector, running=True)
+    return _replace(state, conversation=conv, work_item=work)
+
+
+def _sanitized_tool_error(event: ToolResult) -> dict[str, Any]:
+    """Return *event.error* as a plain dict, degrading malformed payloads.
+
+    A non-dict ``error`` (e.g. ``None`` from a hand-edited or malformed
+    trail) degrades to an empty dict rather than crashing the fold, mirroring
+    ``_reduce_tick``'s malformed-delta guard.
+    """
+    return event.error if isinstance(event.error, dict) else {}
+
+
+def _reduce_tool_result(state: TAUIState, event: ToolResult) -> TAUIState:
+    """Log the outcome, stop the work item, and surface an error on failure."""
+    work = state.work_item
+    if work is not None:
+        work = replace(work, running=False)
+
+    if event.ok:
+        text = _PREFIX_TOOL_OK + event.selector
+        if event.result:
+            text += f": {event.result}"
+        conv = append_conversation(state.conversation, text)
+        return _replace(state, conversation=conv, work_item=work)
+
+    error = _sanitized_tool_error(event)
+    popup = Popup(
+        id=_ID_TOOL_ERROR,
+        kind=_KIND_ERROR,
+        visible=True,
+        blocking=True,
+        opened_by="system",
+        reason=_REASON_TOOL_FAILED,
+        message=(error.get("message") or _MSG_TOOL_FAILED_DEFAULT),
+        actions=[
+            Action(selector=_SEL_TOOL_ERROR_DISMISS, input="esc", description="Dismiss"),
+        ],
+    )
+    popups = _upsert_popup(state.popups, popup)
+    problems = [*state.problems, {"selector": event.selector, **error}]
+    conv = append_conversation(state.conversation, _PREFIX_TOOL_FAILED + event.selector)
+    return _replace(state, conversation=conv, work_item=work, popups=popups, problems=problems)
 
 
 # ---------------------------------------------------------------------------
