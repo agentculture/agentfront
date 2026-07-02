@@ -11,27 +11,21 @@ a session's own event trail, replayed from its own starting state, reproduces
 its own current state — the "the trail is the ground truth" invariant
 :class:`Session` is built on.
 
-The snapshot quad (``write_snapshot``, ``read_snapshot``, ``Snapshot``) and
-``replay`` are re-exported here eagerly, so a consumer test suite only ever
-needs one import line (``from agentfront.testing import ...``). ``resume``
-(``agentfront.taui.snapshot.resume``) is re-exported LAZILY via a
-module-level ``__getattr__`` (PEP 562): a sibling task adds ``resume`` to
-``agentfront.taui.snapshot`` independently, so importing this module must not
-hard-fail while that lands — the attribute simply becomes available the first
-time it is accessed, once the sibling module has it.
+The snapshot quad (``write_snapshot``, ``read_snapshot``, ``Snapshot``),
+``replay``, and ``resume`` are re-exported here eagerly, so a consumer test
+suite only ever needs one import line
+(``from agentfront.testing import ...``).
 """
 
 from __future__ import annotations
-
-from typing import Any
 
 from agentfront.app import App
 from agentfront.taui.events import Event, SelectorAction
 from agentfront.taui.reducer import focus_order, replay
 from agentfront.taui.session import Session
-from agentfront.taui.snapshot import Snapshot, read_snapshot, write_snapshot
+from agentfront.taui.snapshot import Snapshot, read_snapshot, resume, write_snapshot
 
-__all__ = [  # noqa: F822 — "resume" is a lazy PEP 562 attribute, resolved by __getattr__ below
+__all__ = [
     "drive",
     "assert_agent_human_parity",
     "assert_replay_equivalent",
@@ -160,20 +154,3 @@ def assert_replay_equivalent(session: Session) -> None:
             f"  replayed: {replayed!r}\n"
             f"  actual:   {session.state!r}"
         )
-
-
-def __getattr__(name: str) -> Any:
-    """PEP 562 lazy module attribute — see the module docstring for why.
-
-    Resolved via plain attribute access on the imported module (not
-    ``from agentfront.taui.snapshot import resume``) so that, while the
-    sibling task has not landed ``resume`` yet, the failure surfaces as a
-    plain ``AttributeError`` naming ``resume`` — the same exception shape
-    ``__getattr__`` raises for any other unknown name — rather than an
-    ``ImportError`` from the ``from ... import`` form.
-    """
-    if name == "resume":
-        from agentfront.taui import snapshot as _snapshot
-
-        return _snapshot.resume
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

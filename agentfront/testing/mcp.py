@@ -29,6 +29,11 @@ def call_mcp(app: App, command: list[str], args: Optional[dict[str, Any]] = None
     tool functions are resolved via ``asyncio.run``. Any exception the tool
     raises (including :class:`agentfront.errors.AgentfrontError`) is caught
     and mapped to the canonical error payload — never propagated.
+
+    Because ``asyncio.run`` cannot be called from inside a running event
+    loop, calling ``call_mcp`` on an ASYNC tool from an async test maps that
+    ``RuntimeError`` into the error payload instead of executing the tool —
+    call it from sync code when the tool is async.
     """
     if args is None:
         args = {}

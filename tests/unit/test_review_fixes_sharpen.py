@@ -131,3 +131,21 @@ def test_parity_helper_rejects_registered_tool_selector() -> None:
 def test_parity_helper_still_passes_for_host_command_selector() -> None:
     app = _build_app()
     assert_agent_human_parity(app, "cmd.status")
+
+
+# --- colleague finding: public gate must include the HTTP front check -------
+
+
+def test_assert_surfaces_agree_covers_http_front(monkeypatch) -> None:
+    """The public harness must be exactly as strong as serve.surfaces_agree:
+    a /front body that drifts from the TAUI markdown tier must fail the
+    public assertion too, not just the internal gate."""
+    from agentfront import serve
+    from agentfront.testing import assert_surfaces_agree
+
+    app = _build_app()
+    assert_surfaces_agree(app)  # baseline: agrees
+
+    monkeypatch.setattr(serve, "http_front_agrees", lambda _app: False)
+    with pytest.raises(AssertionError, match="http_front disagrees"):
+        assert_surfaces_agree(app)

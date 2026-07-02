@@ -23,7 +23,13 @@ _TOOL_SURFACES: tuple[str, ...] = ("registry_tools", "cli_tools", "mcp_tools", "
 def assert_surfaces_agree(app: App) -> None:
     """Assert every surface of *app* enumerates the same docs/tools as the registry.
 
-    Raises ``AssertionError`` on the first disagreeing pair found, naming both
+    The public form of :func:`agentfront.serve.surfaces_agree` — it checks
+    everything the internal gate checks: the doc/tool inventory sets AND that
+    the HTTP ``/front`` body agrees with the TAUI markdown tier
+    (:func:`agentfront.serve.http_front_agrees`), so a consumer's CI is never
+    weaker than agentfront's own dogfood gate.
+
+    Raises ``AssertionError`` on the first disagreement found, naming both
     surfaces and the set differences (entries missing from / extra in the
     non-registry surface), e.g.
     ``"cli_tools missing vs registry_tools: {'a/b'}"``.
@@ -31,6 +37,11 @@ def assert_surfaces_agree(app: App) -> None:
     inventory = serve.surface_inventory(app)
     _assert_group_agrees(inventory, _DOC_SURFACES)
     _assert_group_agrees(inventory, _TOOL_SURFACES)
+    if not serve.http_front_agrees(app):
+        raise AssertionError(
+            "http_front disagrees: GET /front body != render_markdown(app.taui())"
+            " — the HTTP markdown front must render from the TAUI markdown tier"
+        )
 
 
 def _assert_group_agrees(inventory: dict[str, set[str]], surface_names: tuple[str, ...]) -> None:

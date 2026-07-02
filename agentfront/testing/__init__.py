@@ -8,17 +8,12 @@ assertion, and TAUI drive/parity/replay helpers, so a consumer's own test
 suite can prove its surfaces never drift apart and that its agent and human
 audiences see the same world.
 
-``resume`` (``agentfront.taui.snapshot.resume``) is re-exported LAZILY via a
-module-level ``__getattr__`` (PEP 562), forwarding to
-:mod:`agentfront.testing.taui`'s own lazy re-export — see that module's
-docstring. Everything else here is imported eagerly.
+Everything is imported eagerly — one import line serves a consumer's whole
+test suite.
 """
 
 from __future__ import annotations
 
-from typing import Any
-
-from agentfront.testing import taui as _taui
 from agentfront.testing.agreement import assert_surfaces_agree
 from agentfront.testing.cli import CliResult, run_cli
 from agentfront.testing.mcp import call_mcp
@@ -29,10 +24,11 @@ from agentfront.testing.taui import (
     drive,
     read_snapshot,
     replay,
+    resume,
     write_snapshot,
 )
 
-__all__ = [  # noqa: F822 — "resume" is a lazy PEP 562 attribute, resolved by __getattr__ below
+__all__ = [
     "CliResult",
     "run_cli",
     "assert_surfaces_agree",
@@ -46,10 +42,3 @@ __all__ = [  # noqa: F822 — "resume" is a lazy PEP 562 attribute, resolved by 
     "Snapshot",
     "resume",
 ]
-
-
-def __getattr__(name: str) -> Any:
-    """PEP 562 lazy module attribute — forwards to ``agentfront.testing.taui``."""
-    if name == "resume":
-        return _taui.resume
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

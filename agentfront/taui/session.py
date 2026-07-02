@@ -110,7 +110,12 @@ class Session:
 
     @property
     def state(self) -> TAUIState:
-        """The current folded state."""
+        """The current folded state.
+
+        Returned by reference, never mutated in place — the reducer replaces
+        the whole (frozen) tree on every fold. Treat it as immutable: never
+        modify its inner lists; a stale reference stays internally consistent.
+        """
         with self._lock:
             return self._state
 
@@ -218,6 +223,12 @@ class Session:
         Every exception the tool raises is caught and mapped to the
         canonical error payload (never propagated) — the same rule
         ``agentfront.testing.call_mcp`` and the real MCP surface follow.
+
+        Awaitable results resolve via ``asyncio.run``, which cannot be called
+        from inside a running event loop: dispatching an ASYNC tool from an
+        async caller maps that ``RuntimeError`` into the error payload rather
+        than executing the tool — dispatch from sync code (or a worker
+        thread) when the tool is async.
         """
         try:
             value = func(**args)

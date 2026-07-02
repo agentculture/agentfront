@@ -22,9 +22,11 @@ app.http_app()     # markdown pages + sitemap + /front
 app.taui()         # the live-cockpit TAUI state (agent- and human-drivable)
 ```
 
-Four calls, one registry, four surfaces. Add a doc or a tool once and it is
-live everywhere in the same commit — there is no second place to remember
-to update.
+Four calls, one registry, four surfaces — fanning out into six
+consumer-facing renderings (the TAUI surface alone renders three ways; the
+table below maps each rendering to its consumer). Add a doc or a tool once
+and it is live everywhere in the same commit — there is no second place to
+remember to update.
 
 ## Renderings and their consumers
 
@@ -57,10 +59,10 @@ everyone shares?
 - **Markdown is for agents.** An LLM-based agent reads structured prose well
   and doesn't need machine-exact keys — it needs headings, lists, and a
   `**(focused)**` marker it can reason about in context. `render_markdown`
-  produces that, and it's the same body the HTTP surface serves at `/front`
-  and the same body `agentfront.testing.taui.drive` helpers exercise, so an
-  agent fetching the doc site and an agent driving TAUI programmatically see
-  the identical page.
+  produces that, and it's the same body the HTTP surface serves at `/front`;
+  the `agentfront.testing.taui.drive` helper folds the same `TAUIState` those
+  bodies render from, so an agent fetching the doc site and an agent driving
+  TAUI programmatically reason over the identical cockpit.
 - **ANSI/TUI is for humans.** A person watching a terminal wants a frame —
   panels, a focus caret, a status line — not a data structure. `render_ansi`
   renders that frame deterministically (no clock, no randomness) from the

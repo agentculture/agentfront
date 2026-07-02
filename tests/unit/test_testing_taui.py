@@ -5,9 +5,8 @@ Covers the "t11 — testing TAUI helpers" spec in the design contract:
 events via ``Session.dispatch``), ``assert_agent_human_parity`` (agent
 selector-dispatch vs. human down-key navigation reach the same state),
 ``assert_replay_equivalent`` (a session's trail replays to its own state),
-and the LAZY ``resume`` re-export (PEP 562 ``__getattr__``) that tolerates
-``agentfront.taui.snapshot.resume`` not existing yet in this worktree — a
-sibling task (t10) adds it in parallel.
+and the eager re-exports (snapshot quad, ``replay``, ``resume`` — the lazy
+PEP 562 shim used while t10 landed in parallel was removed once it merged).
 """
 
 from __future__ import annotations
@@ -196,7 +195,7 @@ def test_assert_replay_equivalent_raises_on_mismatch(app: App) -> None:
 
 
 # ---------------------------------------------------------------------------
-# 4. Re-exports (eager) + lazy resume (PEP 562)
+# 4. Re-exports (all eager, resume included)
 # ---------------------------------------------------------------------------
 
 
@@ -212,17 +211,16 @@ def test_eager_reexports_are_the_same_objects_as_their_source() -> None:
     assert replay is reducer_replay
 
 
-def test_lazy_resume_reexport_behavior_matches_sibling_availability() -> None:
-    """resume is importable once agentfront.taui.snapshot grows it (t10, in
-    parallel); until then, accessing it raises a clear AttributeError."""
-    if hasattr(taui_snapshot, "resume"):
-        assert testing_taui.resume is taui_snapshot.resume
-        assert testing_pkg.resume is taui_snapshot.resume
-    else:
-        with pytest.raises(AttributeError, match="resume"):
-            _ = testing_taui.resume
-        with pytest.raises(AttributeError, match="resume"):
-            _ = testing_pkg.resume
+def test_resume_reexport_is_eager_and_visible() -> None:
+    """resume re-exports eagerly (the lazy PEP 562 shim was removed once t10
+    landed): it is the same object as the source, appears in dir(), and works
+    via a plain ``from agentfront.testing import resume``."""
+    assert testing_taui.resume is taui_snapshot.resume
+    assert testing_pkg.resume is taui_snapshot.resume
+    assert "resume" in dir(testing_pkg)
+    from agentfront.testing import resume as imported_resume
+
+    assert imported_resume is taui_snapshot.resume
 
 
 def test_unknown_attribute_still_raises_attribute_error() -> None:
