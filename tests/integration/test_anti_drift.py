@@ -11,8 +11,8 @@ from __future__ import annotations
 import xml.etree.ElementTree as ET  # noqa: S405 - parsing our own sitemap
 
 from agentfront import App
-from agentfront.cli_surface import run_cli
 from agentfront.serve import surface_inventory
+from agentfront.testing import run_cli
 
 
 def _app() -> App:
@@ -62,13 +62,8 @@ def test_unregistered_item_absent_from_every_surface():
     # MCP: an unregistered command path is not in the catalog
     assert "never_registered" not in _mcp_command_paths(app)
     # CLI: an unregistered name is not in the learn listing
-    import io
-    from contextlib import redirect_stdout
-
-    buf = io.StringIO()
-    with redirect_stdout(buf):
-        run_cli(app, ["learn"])
-    assert "never_registered" not in buf.getvalue()
+    result = run_cli(app, ["learn"])
+    assert "never_registered" not in result.stdout
 
 
 def test_removing_from_registry_drops_from_all_surfaces():
