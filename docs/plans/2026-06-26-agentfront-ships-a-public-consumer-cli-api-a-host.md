@@ -12,7 +12,7 @@ slug: `agentfront-ships-a-public-consumer-cli-api-a-host` · status: `exported` 
   - agentfront.errors.AgentfrontError imports without importing argparse; to_dict() yields {code,message,remediation}; agentfront.cli._errors re-exports the same type; a test imports it from the public path
   - a grep/CI guard asserts no occurrence of the retired-prefix error-class identifier remains in the codebase (the rename is complete, not aliased)
 
-### t2 — Shared CLI core machinery: extract emit_result/emit_error/emit_diagnostic + a structured-error ArgumentParser (parser_class override routing parse errors to {code,message,remediation}, pre-parse raw-argv --json peek) + a dispatch loop (KeyboardInterrupt->130, wrap unexpected exceptions, no traceback) into a shared internal module parameterized by prog/version/issues_url out of _brand
+### t2 — Shared CLI core machinery: extract emit_result/emit_error/emit_diagnostic + a structured-error ArgumentParser (parser_class override routing parse errors to {code,message,remediation}, pre-parse raw-argv --json peek) + a dispatch loop (KeyboardInterrupt->130, wrap unexpected exceptions, no traceback) into a shared internal module parameterized by prog/version/issues_url out of_brand
 
 - depends on: t1
 - covers: c27, c31, h17, h21

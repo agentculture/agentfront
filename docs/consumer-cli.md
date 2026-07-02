@@ -101,12 +101,12 @@ if __name__ == "__main__":
 This yields:
 
 ```
-$ mytool feedback record "great tool"    # generated verb
-$ mytool feedback show 42                # generated verb
-$ mytool tui                              # host-owned launcher
-$ mytool learn                             # agent-facing summary
-$ mytool doctor                            # readiness check
-$ mytool overview                          # list available commands
+mytool feedback record "great tool"    # generated verb
+mytool feedback show 42                # generated verb
+mytool tui                              # host-owned launcher
+mytool learn                             # agent-facing summary
+mytool doctor                            # readiness check
+mytool overview                          # list available commands
 ```
 
 The `tui` verb is **not** generated from a `@app.tool` — it's registered via
