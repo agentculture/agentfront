@@ -93,6 +93,51 @@ class Dismiss:
 
 
 @dataclass(frozen=True)
+class ToolInvoked:
+    """The agent (or the reducer's execution layer) invoked a tool selector."""
+
+    type: ClassVar[str] = "tool_invoked"
+    selector: str
+    args: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"type": self.type, "selector": self.selector, "args": dict(self.args)}
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> ToolInvoked:
+        return cls(selector=d["selector"], args=dict(d.get("args", {})))
+
+
+@dataclass(frozen=True)
+class ToolResult:
+    """The outcome of a previously-invoked tool selector."""
+
+    type: ClassVar[str] = "tool_result"
+    selector: str
+    ok: bool = True
+    result: str = ""
+    error: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "type": self.type,
+            "selector": self.selector,
+            "ok": self.ok,
+            "result": self.result,
+            "error": dict(self.error),
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> ToolResult:
+        return cls(
+            selector=d["selector"],
+            ok=d.get("ok", True),
+            result=d.get("result", ""),
+            error=dict(d.get("error", {})),
+        )
+
+
+@dataclass(frozen=True)
 class SkillSuggested:
     """The system recommends a stronger or more specific skill."""
 
@@ -151,7 +196,17 @@ class WorkStep:
 # Registry & dispatch
 # ---------------------------------------------------------------------------
 
-Event = UserInput | KeyPress | SelectorAction | Tick | Dismiss | SkillSuggested | WorkStep
+Event = (
+    UserInput
+    | KeyPress
+    | SelectorAction
+    | Tick
+    | Dismiss
+    | SkillSuggested
+    | WorkStep
+    | ToolInvoked
+    | ToolResult
+)
 
 _REGISTRY: dict[str, type[Event]] = {
     "user_input": UserInput,
@@ -161,6 +216,8 @@ _REGISTRY: dict[str, type[Event]] = {
     "dismiss": Dismiss,
     "skill_suggested": SkillSuggested,
     "work_step": WorkStep,
+    "tool_invoked": ToolInvoked,
+    "tool_result": ToolResult,
 }
 
 
