@@ -4,11 +4,22 @@ This test enforces the agent-first boundary for the agentfront.taui package:
 every .py file must import only stdlib or agentfront modules, pyproject.toml
 must not introduce a [taui] extra or any third-party dependency, and the
 documented public callables must import cleanly.
+
+It also runs a fresh-subprocess ``sys.modules`` scan (t8): a clean interpreter
+imports ``agentfront.testing`` and every ``agentfront.taui`` submodule
+discovered via ``pkgutil.iter_modules`` (recursively, so nested packages like
+``render/`` and ``widgets/`` are covered, and a future module — e.g.
+``session.py`` landing in a later wave — is picked up automatically without
+editing this test) and must load no third-party package.
 """
 
 from __future__ import annotations
 
 import ast
+import importlib
+import json
+import pkgutil
+import subprocess  # noqa: S404 - integration test needs subprocess
 import sys
 import tomllib
 from pathlib import Path
@@ -144,3 +155,66 @@ def test_taui_public_api_imports():
             Driver,
         )
     )
+
+
+# ---------------------------------------------------------------------------
+# Test 4: fresh-subprocess sys.modules scan (t8)
+# ---------------------------------------------------------------------------
+
+
+def _discover_taui_submodules() -> list[str]:
+    """Every ``agentfront.taui`` module/subpackage, discovered via
+    ``pkgutil.iter_modules`` (recursing into subpackages ourselves so nested
+    packages like ``render/`` and ``widgets/`` are covered). A future module
+    landing directly under ``agentfront/taui/`` — or under a new subpackage —
+    is picked up automatically without editing this test.
+    """
+
+    def _walk(package_name: str) -> list[str]:
+        package = importlib.import_module(package_name)
+        found = [package_name]
+        for info in pkgutil.iter_modules(package.__path__, prefix=f"{package_name}."):
+            if info.ispkg:
+                found.extend(_walk(info.name))
+            else:
+                found.append(info.name)
+        return found
+
+    return sorted(_walk("agentfront.taui"))
+
+
+def test_taui_and_testing_subprocess_import_is_stdlib_only() -> None:
+    """A fresh interpreter imports ``agentfront.testing`` plus every
+    discovered ``agentfront.taui`` submodule; the resulting ``sys.modules``
+    delta must contain no third-party top-level package.
+
+    Runs in a genuinely clean subprocess (rather than an in-process
+    ``sys.modules`` delta) so the check is not muddied by whatever pytest's
+    own process already has loaded.
+    """
+    modules = _discover_taui_submodules()
+    script = (
+        "import sys\n"
+        "before = set(sys.modules)\n"
+        "import agentfront.testing\n"
+        f"for name in {modules!r}:\n"
+        "    __import__(name)\n"
+        "after = set(sys.modules)\n"
+        "import json\n"
+        "print(json.dumps(sorted(after - before)))\n"
+    )
+    result = subprocess.run(  # noqa: S603
+        [sys.executable, "-c", script],
+        cwd=_REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=60,
+    )
+    new_modules = json.loads(result.stdout.strip().splitlines()[-1])
+    stdlib = _stdlib_names()
+    top_level = {mod.split(".")[0] for mod in new_modules}
+    violations = {
+        mod for mod in top_level if mod not in stdlib and not mod.startswith("agentfront")
+    }
+    assert not violations, f"Third-party modules loaded in subprocess: {sorted(violations)}"

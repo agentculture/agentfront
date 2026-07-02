@@ -27,7 +27,13 @@ from typing import Any
 
 from agentfront.app import App
 
-__all__ = ["Surfaces", "build_surfaces", "surface_inventory", "surfaces_agree"]
+__all__ = [
+    "Surfaces",
+    "build_surfaces",
+    "surface_inventory",
+    "surfaces_agree",
+    "http_front_agrees",
+]
 
 
 @dataclass(frozen=True)
@@ -111,9 +117,27 @@ def surface_inventory(app: App) -> dict[str, set[str]]:
     }
 
 
+def http_front_agrees(app: App) -> bool:
+    """True iff the HTTP ``/front`` body equals the TAUI markdown tier.
+
+    Performs a WSGI ``GET /front`` (same technique as :func:`_http_doc_slugs`)
+    and compares the decoded body to ``render_markdown(app.taui())`` — the
+    exact code path the snapshot/render pipeline uses. Equality means the
+    HTTP front and the TAUI markdown tier agree, not just that both return
+    *some* markdown.
+    """
+    from agentfront.taui.render.markdown import render_markdown
+
+    wsgi = app.http_app()
+    environ = {"REQUEST_METHOD": "GET", "PATH_INFO": "/front"}
+    body = b"".join(wsgi(environ, lambda status, headers: None))
+    return body.decode("utf-8") == render_markdown(app.taui())
+
+
 def surfaces_agree(app: App) -> bool:
-    """True iff all surfaces enumerate the same docs/tools as the registry."""
+    """True iff all surfaces enumerate the same docs/tools as the registry,
+    and the HTTP ``/front`` markdown agrees with the TAUI markdown tier."""
     inv = surface_inventory(app)
     docs_agree = inv["registry_docs"] == inv["http_docs"] == inv["cli_docs"]
     tools_agree = inv["registry_tools"] == inv["cli_tools"] == inv["mcp_tools"] == inv["taui_tools"]
-    return docs_agree and tools_agree
+    return docs_agree and tools_agree and http_front_agrees(app)
