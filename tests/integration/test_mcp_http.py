@@ -500,3 +500,141 @@ def test_relative_path_strips_root_path_only_as_a_prefix():
     # A sibling that merely shares the prefix string is not under the mount.
     assert _relative_path({"path": "/apix/mcp", "root_path": "/api"}) == "/apix/mcp"
     assert _relative_path({"path": "/api", "root_path": "/api"}) == "/"
+
+
+# --- lifecycle (#1 #2 #3) -----------------------------------------------------
+
+_INITIALIZE = json.dumps(
+    {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2025-06-18",
+            "capabilities": {},
+            "clientInfo": {"name": "probe", "version": "0"},
+        },
+    }
+).encode()
+
+
+async def _asgi_post(asgi: Any, body: bytes = _INITIALIZE, path: str = "/mcp") -> tuple[int, dict]:
+    """Drive one in-memory ASGI POST; return (status, decoded JSON body)."""
+    sent: list[dict] = []
+    pending = [{"type": "http.request", "body": body, "more_body": False}]
+
+    async def receive() -> dict:
+        if pending:
+            return pending.pop()
+        await asyncio.Event().wait()  # never disconnects
+        raise AssertionError("unreachable")
+
+    async def send(message: dict) -> None:
+        sent.append(message)
+
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "http_version": "1.1",
+        "method": "POST",
+        "scheme": "http",
+        "path": path,
+        "raw_path": path.encode(),
+        "root_path": "",
+        "query_string": b"",
+        "headers": [
+            (b"accept", b"application/json, text/event-stream"),
+            (b"content-type", b"application/json"),
+        ],
+        "client": (LOOPBACK, 50000),
+        "server": (LOOPBACK, 80),
+    }
+    await asgi(scope, receive, send)
+    raw = b"".join(m.get("body", b"") for m in sent if m["type"] == "http.response.body")
+    return sent[0]["status"], json.loads(raw)
+
+
+def _live_runners() -> list[asyncio.Task]:
+    return [
+        t for t in asyncio.all_tasks() if t.get_name() == "agentfront-mcp-http" and not t.done()
+    ]
+
+
+def test_request_after_stop_is_503_and_never_restarts():
+    """#1: once stopping/stopped, refuse with 503 — never lazily start again."""
+    from agentfront.mcp_http import McpHttpApp
+
+    async def scenario():
+        asgi = McpHttpApp(_app(), path="/mcp")
+        status_running, _ = await _asgi_post(asgi)  # lazy start, served
+        stopping = asyncio.create_task(asgi.stop())
+        await asyncio.sleep(0)  # stop() has begun, not finished
+        during = await _asgi_post(asgi)
+        await stopping
+        after = await _asgi_post(asgi)
+        with pytest.raises(RuntimeError):
+            await asgi.start()
+        return status_running, during, after, asgi.running, _live_runners()
+
+    status_running, during, after, running, runners = asyncio.run(scenario())
+    assert status_running == 200
+    for status, payload in (during, after):
+        assert status == 503
+        assert set(payload["error"]) == {"code", "message", "remediation"}
+        assert payload["error"]["code"] == 503
+    assert running is False
+    assert runners == []
+
+
+def test_cancelled_start_leaves_no_orphan_runner():
+    """#2: cancelling the task that called start() must not orphan the runner."""
+    from agentfront.mcp_http import McpHttpApp
+
+    async def scenario():
+        asgi = McpHttpApp(_app())
+        starting = asyncio.create_task(asgi.start())
+        await asyncio.sleep(0)  # start() is now waiting for the manager to be ready
+        starting.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await starting
+        await asyncio.sleep(0.05)
+        orphans = _live_runners()
+        # The app is still usable, and concurrent lazy starts share one manager.
+        first, second = await asyncio.gather(asgi.start(), asgi.start())
+        live = len(_live_runners())
+        await asgi.stop()
+        return orphans, first is second, live, _live_runners()
+
+    orphans, shared, live, after_stop = asyncio.run(scenario())
+    assert orphans == []
+    assert shared and live == 1
+    assert after_stop == []
+
+
+def test_runner_crash_after_startup_is_detected_and_restarts_lazily():
+    """#3: a manager that dies after startup is cleared; the next request starts a
+    fresh one, and stop() does not re-raise the old failure into host cleanup."""
+    from agentfront.mcp_http import McpHttpApp
+
+    async def _boom() -> None:
+        raise RuntimeError("session manager crashed")
+
+    async def scenario():
+        asgi = McpHttpApp(_app())
+        dead = await asgi.start()
+        dead._task_group.start_soon(_boom)  # pylint: disable=protected-access
+        await asyncio.sleep(0.05)
+        running_after_crash = asgi.running
+        status, _ = await _asgi_post(asgi, path="/anything")
+        fresh = asgi._manager  # pylint: disable=protected-access
+        # Crash again, then stop without any request in between: no re-raise.
+        fresh._task_group.start_soon(_boom)  # pylint: disable=protected-access
+        await asyncio.sleep(0.05)
+        await asgi.stop()
+        return running_after_crash, status, fresh is not dead, _live_runners()
+
+    running_after_crash, status, restarted, runners = asyncio.run(scenario())
+    assert running_after_crash is False
+    assert status == 200
+    assert restarted
+    assert runners == []

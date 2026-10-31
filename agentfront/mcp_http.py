@@ -155,6 +155,18 @@ _NOT_FOUND = _error_body(
     "use the MCP endpoint path this server advertises",
 )
 
+_STOPPED = _error_body(
+    503,
+    "unavailable: this MCP endpoint is shutting down or stopped",
+    "retry later, against a running instance of this endpoint",
+)
+
+_START_FAILED = _error_body(
+    503,
+    "unavailable: the MCP session manager failed to start",
+    "retry the request; report it if it persists",
+)
+
 _NO_RESPONSE = _error_body(
     500,
     "MCP transport produced no response",
@@ -215,6 +227,15 @@ def _check_header_value(name: str, value: Optional[str]) -> Optional[str]:
     return value
 
 
+async def _wait_ready(runner: asyncio.Task, ready: asyncio.Event) -> None:
+    """Wait until *ready* is set or *runner* finishes, leaking no helper task."""
+    ready_wait = asyncio.ensure_future(ready.wait())
+    try:
+        await asyncio.wait({runner, ready_wait}, return_when=asyncio.FIRST_COMPLETED)
+    finally:
+        ready_wait.cancel()
+
+
 async def _send_json(
     send: Callable[..., Awaitable[None]],
     status: int,
@@ -269,54 +290,121 @@ class McpHttpApp:
         self._manager: Optional[StreamableHTTPSessionManager] = None
         self._runner: Optional[asyncio.Task] = None
         self._stop_event: Optional[asyncio.Event] = None
+        self._stopped = False
         self._start_lock = asyncio.Lock()
 
     # --- lifecycle --------------------------------------------------------
+    #
+    # States: idle (no manager yet) -> running -> stopped (final). A crash of
+    # the session manager after startup drops back to idle, so the next
+    # request starts a fresh manager; stop() is final — after it (and while
+    # it runs) requests are refused with 503 and start() raises.
+
     @property
     def running(self) -> bool:
-        """True while the MCP session manager is started."""
-        return self._manager is not None
+        """True while the MCP session manager is started and alive."""
+        return self._manager is not None and self._runner is not None and not self._runner.done()
+
+    @property
+    def stopped(self) -> bool:
+        """True once :meth:`stop` has been called; a stopped app never restarts."""
+        return self._stopped
 
     async def start(self) -> StreamableHTTPSessionManager:
-        """Start the MCP session manager (idempotent); return the running manager."""
+        """Start the MCP session manager (idempotent); return the running manager.
+
+        Concurrent calls are serialised and share one manager. Cancelling the
+        caller while it waits for startup tears the half-started manager down
+        (nothing is orphaned). Raises :class:`RuntimeError` once the app has
+        been stopped.
+        """
+        self._raise_if_stopped()
         async with self._start_lock:
-            if self._manager is not None:
+            self._raise_if_stopped()
+            if self.running and self._manager is not None:
                 return self._manager
-            manager = StreamableHTTPSessionManager(
-                app=self.server,
-                json_response=self._json_response,
-                stateless=self._stateless,
-                security_settings=self._security_settings,
+            return await self._start_locked()
+
+    async def _start_locked(self) -> StreamableHTTPSessionManager:
+        manager = StreamableHTTPSessionManager(
+            app=self.server,
+            json_response=self._json_response,
+            stateless=self._stateless,
+            security_settings=self._security_settings,
+        )
+        ready = asyncio.Event()
+        stop_event = asyncio.Event()
+
+        async def _run() -> None:
+            async with manager.run():
+                ready.set()
+                await stop_event.wait()
+
+        runner = asyncio.create_task(_run(), name="agentfront-mcp-http")
+        # Owned from the moment it exists, so stop() — or this start() being
+        # cancelled — can always reach and end it.
+        self._manager, self._runner, self._stop_event = None, runner, stop_event
+        runner.add_done_callback(self._on_runner_done)
+        try:
+            await _wait_ready(runner, ready)
+        except BaseException:
+            await self._discard(runner, stop_event)
+            raise
+        if self._stopped:  # stop() ran while we waited
+            await self._discard(runner, stop_event)
+            self._raise_if_stopped()
+        if not ready.is_set() or runner.done():
+            await self._discard(runner, stop_event)
+            exc = None if runner.cancelled() else runner.exception()
+            if exc is not None:
+                raise exc
+            raise RuntimeError("MCP session manager exited during startup")
+        self._manager = manager
+        return manager
+
+    def _raise_if_stopped(self) -> None:
+        if self._stopped:
+            raise RuntimeError("this MCP endpoint has been stopped; it does not restart")
+
+    async def _discard(self, runner: asyncio.Task, stop_event: asyncio.Event) -> None:
+        """End a runner that never became (or is no longer) the live one."""
+        if self._runner is runner:
+            self._manager = self._runner = self._stop_event = None
+        stop_event.set()
+        runner.cancel()
+        await asyncio.wait({runner})
+
+    def _on_runner_done(self, runner: asyncio.Task) -> None:
+        """Clear the state of a manager that exited; log it if it crashed live."""
+        was_live = runner is self._runner and self._manager is not None
+        if runner is self._runner:
+            self._manager = self._runner = self._stop_event = None
+        # Always retrieve the outcome so asyncio never reports it as unhandled.
+        exc = None if runner.cancelled() else runner.exception()
+        if was_live and not self._stopped:
+            logger.error(
+                "agentfront MCP session manager exited unexpectedly; "
+                "a fresh one starts on the next request",
+                exc_info=exc,
             )
-            ready = asyncio.Event()
-            stop_event = asyncio.Event()
-
-            async def _run() -> None:
-                async with manager.run():
-                    ready.set()
-                    await stop_event.wait()
-
-            runner = asyncio.create_task(_run(), name="agentfront-mcp-http")
-            ready_wait = asyncio.create_task(ready.wait())
-            await asyncio.wait({runner, ready_wait}, return_when=asyncio.FIRST_COMPLETED)
-            if not ready.is_set():
-                ready_wait.cancel()
-                runner.result()  # re-raise the startup failure
-                raise RuntimeError("MCP session manager exited during startup")
-            self._manager, self._runner, self._stop_event = manager, runner, stop_event
-            return manager
 
     async def stop(self) -> None:
         """Stop the session manager, cancelling in-flight sessions (idempotent).
 
-        A stopped app can be started again; each start uses a fresh manager.
+        Final: afterwards (and while it runs) requests are answered ``503`` and
+        :meth:`start` raises. A failure inside the manager's shutdown, or an
+        earlier crash, is logged — never raised into the host's cleanup.
         """
+        self._stopped = True
         runner, stop_event = self._runner, self._stop_event
         self._manager = self._runner = self._stop_event = None
         if runner is None or stop_event is None:
             return
         stop_event.set()
-        await runner
+        await asyncio.wait({runner})
+        exc = None if runner.cancelled() else runner.exception()
+        if exc is not None:
+            logger.warning("agentfront MCP session manager raised while stopping", exc_info=exc)
 
     # --- ASGI -------------------------------------------------------------
     async def __call__(self, scope: dict, receive: Callable, send: Callable) -> None:
@@ -333,12 +421,24 @@ class McpHttpApp:
             await _send_json(send, 404, _NOT_FOUND)
             return
 
+        if self._stopped:
+            await _send_json(send, 503, _STOPPED)
+            return
+
         principal = await self._authenticated_principal(scope)
         if principal is _REFUSED:
             await _send_json(send, 401, _UNAUTHORIZED, self._unauthorized_headers)
             return
 
-        manager = self._manager or await self.start()
+        try:
+            manager = self._manager if self.running else None
+            if manager is None:
+                manager = await self.start()
+        except Exception:  # noqa: BLE001 - answered 503, never a crash
+            if not self._stopped:
+                logger.exception("agentfront MCP session manager failed to start")
+            await _send_json(send, 503, _STOPPED if self._stopped else _START_FAILED)
+            return
         await manager.handle_request({**scope, CALLER_SCOPE_KEY: principal}, receive, send)
 
     async def _authenticated_principal(self, scope: Mapping[str, Any]) -> Any:
