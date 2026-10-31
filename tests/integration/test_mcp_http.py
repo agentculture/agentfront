@@ -698,3 +698,109 @@ def test_aiohttp_bridge_delivers_disconnect_and_ends_sse_stream(monkeypatch):
     assert init_status == 200 and note_status == 202
     assert opened == 200 and still_open
     assert ended, "the bridged SSE stream did not end after the client disconnected"
+
+
+# --- stateful sessions are bound to their principal (#5) ---------------------
+
+
+async def _stateful_call(http: Any, url: str, token: str, sid: str, call_id: int) -> Any:
+    return await http.post(
+        url,
+        json={
+            "jsonrpc": "2.0",
+            "id": call_id,
+            "method": "tools/call",
+            "params": {"name": "run", "arguments": {"command": ["whoami"], "args": {}}},
+        },
+        headers={
+            "Accept": "application/json, text/event-stream",
+            "Authorization": f"Bearer {token}",
+            "mcp-session-id": sid,
+        },
+    )
+
+
+async def _stateful_open(http: Any, url: str, token: str) -> str:
+    headers = {
+        "Accept": "application/json, text/event-stream",
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {token}",
+    }
+    init = await http.post(url, content=_INITIALIZE, headers=headers)
+    assert init.status_code == 200, init.text
+    sid = init.headers["mcp-session-id"]
+    note = await http.post(
+        url,
+        json={"jsonrpc": "2.0", "method": "notifications/initialized"},
+        headers={**headers, "mcp-session-id": sid},
+    )
+    assert note.status_code == 202, note.text
+    return sid
+
+
+def test_stateful_session_refuses_a_different_principal():
+    """#5: a session id is bound to the principal that initialized it."""
+    app = _app()
+
+    async def scenario():
+        asgi = make_mcp_http_app(app, authenticate=_bearer_auth, stateless=False)
+        async with _uvicorn(asgi) as base:
+            url = f"{base}/mcp"
+            async with httpx.AsyncClient(timeout=10) as http:
+                sid = await _stateful_open(http, url, "token-a")
+                own = await _stateful_call(http, url, "token-a", sid, 2)
+                hijack = await _stateful_call(http, url, "token-admin", sid, 3)
+        return own, hijack
+
+    own, hijack = asyncio.run(scenario())
+    assert own.status_code == 200
+    assert own.json()["result"]["structuredContent"] == {"result": "agent-a"}
+    assert hijack.status_code == 403
+    assert hijack.json()["error"]["code"] == 403
+    assert set(hijack.json()["error"]) == {"code", "message", "remediation"}
+    assert app.calls == ["whoami"]  # type: ignore[attr-defined]
+
+
+def test_session_owner_key_is_consumer_overridable():
+    """#5: principals are opaque — the consumer chooses what makes two equal."""
+    issued = {"token-a": 0, "token-a2": 0}
+
+    def claims_auth(request: CallerRequest) -> Any:
+        token = request.headers.get("authorization", "").removeprefix("Bearer ")
+        if token not in issued:
+            return None
+        issued[token] += 1
+        # A fresh claims object per request; only "sub" identifies the caller.
+        return {"sub": "agent-a", "token": token, "n": issued[token]}
+
+    async def scenario():
+        asgi = make_mcp_http_app(
+            _app(),
+            authenticate=claims_auth,
+            stateless=False,
+            session_owner_key=lambda principal: principal["sub"],
+        )
+        async with _uvicorn(asgi) as base:
+            url = f"{base}/mcp"
+            async with httpx.AsyncClient(timeout=10) as http:
+                sid = await _stateful_open(http, url, "token-a")
+                return await _stateful_call(http, url, "token-a2", sid, 2)
+
+    resp = asyncio.run(scenario())
+    assert resp.status_code == 200
+    assert resp.json()["result"]["structuredContent"]["result"]["sub"] == "agent-a"
+
+
+def test_session_owner_key_that_raises_fails_closed():
+    def broken_key(_principal: Any) -> Any:
+        raise RuntimeError("bad key")
+
+    async def scenario():
+        asgi = make_mcp_http_app(_app(), stateless=False, session_owner_key=broken_key)
+        try:
+            return await _asgi_post(asgi)
+        finally:
+            await asgi.stop()
+
+    status, payload = asyncio.run(scenario())
+    assert status == 403 and payload["error"]["code"] == 403

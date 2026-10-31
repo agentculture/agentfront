@@ -73,6 +73,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Mapping, Optional, TypedDict, Union, Unpack
 
+from mcp.server.streamable_http import MCP_SESSION_ID_HEADER
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 
 from agentfront._run_dispatch import error_payload
@@ -124,6 +125,10 @@ class McpHttpOptions(TypedDict, total=False):
       passed to the SDK's session manager.
     * ``security_settings`` — passed to the SDK
       (:class:`mcp.server.transport_security.TransportSecuritySettings`).
+    * ``session_owner_key`` (default: the principal itself) — with
+      ``stateless=False``, maps a principal to the value that identifies its
+      owner; a request presenting an ``mcp-session-id`` is refused ``403``
+      unless ``session_owner_key(principal) == session_owner_key(creator)``.
     * ``www_authenticate`` (default ``"Bearer"``) — the ``WWW-Authenticate``
       challenge sent with every ``401`` (RFC 7235), e.g.
       ``'Bearer realm="tools"'``; ``None`` omits the header.
@@ -134,6 +139,7 @@ class McpHttpOptions(TypedDict, total=False):
     json_response: bool
     security_settings: Any
     www_authenticate: Optional[str]
+    session_owner_key: Callable[[Any], Any]
 
 
 def _error_body(code: int, message: str, remediation: str) -> dict[str, Any]:
@@ -153,6 +159,12 @@ _NOT_FOUND = _error_body(
     404,
     "not found: no MCP endpoint at this path",
     "use the MCP endpoint path this server advertises",
+)
+
+_FORBIDDEN_SESSION = _error_body(
+    403,
+    "forbidden: this MCP session belongs to a different caller",
+    "initialize your own session (send no mcp-session-id) with your own credentials",
 )
 
 _STOPPED = _error_body(
@@ -182,6 +194,18 @@ def _check_path(path: str) -> str:
     if not path.startswith("/"):
         raise ValueError(f"path must start with '/': {path!r}")
     return path.rstrip("/") or "/"
+
+
+def _same_principal(principal: Any) -> Any:
+    """Default ``session_owner_key``: principals are compared by equality."""
+    return principal
+
+
+def _header(scope: Mapping[str, Any], name: bytes) -> Optional[str]:
+    for key, value in scope.get("headers", []):
+        if key.lower() == name:
+            return value.decode("latin-1")
+    return None
 
 
 def _relative_path(scope: Mapping[str, Any]) -> str:
@@ -275,6 +299,7 @@ class McpHttpApp:
         json_response: bool = True,
         security_settings: Any = None,
         www_authenticate: Optional[str] = "Bearer",
+        session_owner_key: Callable[[Any], Any] = _same_principal,
     ) -> None:
         self.app = app
         self.server = make_mcp_server(app)
@@ -292,6 +317,9 @@ class McpHttpApp:
         self._stop_event: Optional[asyncio.Event] = None
         self._stopped = False
         self._start_lock = asyncio.Lock()
+        self._session_owner_key = session_owner_key
+        # Stateful mode: mcp-session-id -> session_owner_key(creating principal).
+        self._session_owners: dict[str, Any] = {}
 
     # --- lifecycle --------------------------------------------------------
     #
@@ -379,6 +407,7 @@ class McpHttpApp:
         was_live = runner is self._runner and self._manager is not None
         if runner is self._runner:
             self._manager = self._runner = self._stop_event = None
+            self._session_owners.clear()  # the manager's sessions died with it
         # Always retrieve the outcome so asyncio never reports it as unhandled.
         exc = None if runner.cancelled() else runner.exception()
         if was_live and not self._stopped:
@@ -398,6 +427,7 @@ class McpHttpApp:
         self._stopped = True
         runner, stop_event = self._runner, self._stop_event
         self._manager = self._runner = self._stop_event = None
+        self._session_owners.clear()
         if runner is None or stop_event is None:
             return
         stop_event.set()
@@ -439,7 +469,70 @@ class McpHttpApp:
                 logger.exception("agentfront MCP session manager failed to start")
             await _send_json(send, 503, _STOPPED if self._stopped else _START_FAILED)
             return
-        await manager.handle_request({**scope, CALLER_SCOPE_KEY: principal}, receive, send)
+        scope = {**scope, CALLER_SCOPE_KEY: principal}
+        if self._stateless:
+            await manager.handle_request(scope, receive, send)
+        else:
+            await self._handle_stateful(manager, scope, principal, receive, send)
+
+    async def _handle_stateful(
+        self,
+        manager: StreamableHTTPSessionManager,
+        scope: dict,
+        principal: Any,
+        receive: Callable,
+        send: Callable,
+    ) -> None:
+        """Bind each session to the principal that created it (stateful mode)."""
+        try:
+            owner_key = self._session_owner_key(principal)
+        except Exception:  # noqa: BLE001 - fail closed
+            logger.exception("agentfront MCP session_owner_key raised; refusing the request")
+            await _send_json(send, 403, _FORBIDDEN_SESSION)
+            return
+        session_id = _header(scope, MCP_SESSION_ID_HEADER.encode("latin-1"))
+        if session_id is not None:
+            if session_id in self._session_owners and not self._same_owner(
+                self._session_owners[session_id], owner_key
+            ):
+                await _send_json(send, 403, _FORBIDDEN_SESSION)
+                return
+            # Unknown ids fall through: the SDK answers them 404.
+            status: list[int] = []
+
+            async def track_end(message: dict) -> None:
+                if message["type"] == "http.response.start":
+                    status.append(message["status"])
+                await send(message)
+
+            await manager.handle_request(scope, receive, track_end)
+            if scope.get("method") == "DELETE" and status and 200 <= status[0] < 300:
+                self._session_owners.pop(session_id, None)
+            return
+
+        async def record_owner(message: dict) -> None:
+            if message["type"] == "http.response.start":
+                created = _header(message, MCP_SESSION_ID_HEADER.encode("latin-1"))
+                if created is not None:
+                    self._prune_session_owners(manager)
+                    self._session_owners[created] = owner_key
+            await send(message)
+
+        await manager.handle_request(scope, receive, record_owner)
+
+    @staticmethod
+    def _same_owner(recorded: Any, presented: Any) -> bool:
+        try:
+            return bool(recorded == presented)
+        except Exception:  # noqa: BLE001 - an uncomparable key is not a match
+            return False
+
+    def _prune_session_owners(self, manager: StreamableHTTPSessionManager) -> None:
+        """Forget owners of sessions the SDK no longer holds (ended, timed out)."""
+        live = getattr(manager, "_server_instances", None)
+        if isinstance(live, dict):
+            for session_id in [sid for sid in self._session_owners if sid not in live]:
+                del self._session_owners[session_id]
 
     async def _authenticated_principal(self, scope: Mapping[str, Any]) -> Any:
         if self._authenticate is None:
