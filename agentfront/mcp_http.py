@@ -84,6 +84,7 @@ are opaque, so "same caller" is ``session_owner_key(a) == session_owner_key(b)``
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import inspect
 import json
 import logging
@@ -157,6 +158,11 @@ class McpHttpOptions(TypedDict, total=False):
     security_settings: Any
     www_authenticate: Optional[str]
     session_owner_key: Callable[[Any], Any]
+
+
+# ASGI message types the transport emits and inspects.
+_RESPONSE_START = "http.response.start"
+_RESPONSE_BODY = "http.response.body"
 
 
 def _error_body(code: int, message: str, remediation: str) -> dict[str, Any]:
@@ -297,7 +303,7 @@ async def _send_json(
     body = json.dumps(payload).encode("utf-8")
     await send(
         {
-            "type": "http.response.start",
+            "type": _RESPONSE_START,
             "status": status,
             "headers": [
                 (b"content-type", b"application/json"),
@@ -306,7 +312,7 @@ async def _send_json(
             ],
         }
     )
-    await send({"type": "http.response.body", "body": body, "more_body": False})
+    await send({"type": _RESPONSE_BODY, "body": body, "more_body": False})
 
 
 class McpHttpApp:
@@ -469,12 +475,14 @@ class McpHttpApp:
         kind = scope.get("type")
         if kind == "lifespan":
             await self._lifespan(receive, send)
-            return
-        if kind != "http":
-            # Streamable HTTP has no websocket leg; refuse anything else.
-            if kind == "websocket":
-                await send({"type": "websocket.close", "code": 1000})
-            return
+        elif kind == "http":
+            await self._handle_http(scope, receive, send)
+        elif kind == "websocket":
+            # Streamable HTTP has no websocket leg; refuse it (and ignore
+            # any other scope type).
+            await send({"type": "websocket.close", "code": 1000})
+
+    async def _handle_http(self, scope: dict, receive: Callable, send: Callable) -> None:
         if self.path is not None and _relative_path(scope) != self.path:
             await _send_json(send, 404, _NOT_FOUND)
             return
@@ -488,20 +496,30 @@ class McpHttpApp:
             await _send_json(send, 401, _UNAUTHORIZED, self._unauthorized_headers)
             return
 
-        try:
-            manager = self._manager if self.running else None
-            if manager is None:
-                manager = await self.start()
-        except Exception:  # noqa: BLE001 - answered 503, never a crash
-            if not self._stopped:
-                logger.exception("agentfront MCP session manager failed to start")
-            await _send_json(send, 503, _STOPPED if self._stopped else _START_FAILED)
-            return
+        manager = await self._live_manager(send)
+        if manager is None:
+            return  # already answered 503
         scope = {**scope, CALLER_SCOPE_KEY: principal}
         if self._stateless:
             await manager.handle_request(scope, receive, send)
         else:
             await self._handle_stateful(manager, scope, principal, receive, send)
+
+    async def _live_manager(self, send: Callable) -> Optional[StreamableHTTPSessionManager]:
+        """Return the running manager, starting one if needed.
+
+        If it cannot be had, answer the request ``503`` and return ``None``.
+        """
+        try:
+            manager = self._manager if self.running else None
+            if manager is None:
+                manager = await self.start()
+        except Exception:  # noqa: BLE001 - answered 503 and never a crash
+            if not self._stopped:
+                logger.exception("agentfront MCP session manager failed to start")
+            await _send_json(send, 503, _STOPPED if self._stopped else _START_FAILED)
+            return None
+        return manager
 
     async def _handle_stateful(
         self,
@@ -519,27 +537,50 @@ class McpHttpApp:
             await _send_json(send, 403, _FORBIDDEN_SESSION)
             return
         session_id = _header(scope, MCP_SESSION_ID_HEADER.encode("latin-1"))
-        if session_id is not None:
-            if session_id in self._session_owners and not self._same_owner(
-                self._session_owners[session_id], owner_key
-            ):
-                await _send_json(send, 403, _FORBIDDEN_SESSION)
-                return
-            # Unknown ids fall through: the SDK answers them 404.
-            status: list[int] = []
+        if session_id is None:
+            await self._open_session(manager, scope, owner_key, receive, send)
+        else:
+            await self._resume_session(manager, scope, session_id, owner_key, receive, send)
 
-            async def track_end(message: dict) -> None:
-                if message["type"] == "http.response.start":
-                    status.append(message["status"])
-                await send(message)
-
-            await manager.handle_request(scope, receive, track_end)
-            if scope.get("method") == "DELETE" and status and 200 <= status[0] < 300:
-                self._session_owners.pop(session_id, None)
+    async def _resume_session(
+        self,
+        manager: StreamableHTTPSessionManager,
+        scope: dict,
+        session_id: str,
+        owner_key: Any,
+        receive: Callable,
+        send: Callable,
+    ) -> None:
+        """Serve a request naming a session; refuse it unless *owner_key* owns it."""
+        if session_id in self._session_owners and not self._same_owner(
+            self._session_owners[session_id], owner_key
+        ):
+            await _send_json(send, 403, _FORBIDDEN_SESSION)
             return
+        # Unknown ids fall through: the SDK answers them 404.
+        status: list[int] = []
+
+        async def track_end(message: dict) -> None:
+            if message["type"] == _RESPONSE_START:
+                status.append(message["status"])
+            await send(message)
+
+        await manager.handle_request(scope, receive, track_end)
+        if scope.get("method") == "DELETE" and status and 200 <= status[0] < 300:
+            self._session_owners.pop(session_id, None)
+
+    async def _open_session(
+        self,
+        manager: StreamableHTTPSessionManager,
+        scope: dict,
+        owner_key: Any,
+        receive: Callable,
+        send: Callable,
+    ) -> None:
+        """Serve a request naming no session; record the owner of one it creates."""
 
         async def record_owner(message: dict) -> None:
-            if message["type"] == "http.response.start":
+            if message["type"] == _RESPONSE_START:
                 created = _header(message, MCP_SESSION_ID_HEADER.encode("latin-1"))
                 if created is not None:
                     self._prune_session_owners(manager)
@@ -569,7 +610,7 @@ class McpHttpApp:
             principal = self._authenticate(_caller_request(scope))
             if inspect.isawaitable(principal):
                 principal = await principal
-        except Exception:  # noqa: BLE001 - fail closed, never run a command
+        except Exception:  # noqa: BLE001 - fail closed and never run a command
             logger.exception("agentfront MCP authenticator raised; refusing the request")
             return _REFUSED
         return _REFUSED if principal is None else principal
@@ -665,18 +706,12 @@ def _aiohttp_root_path(request_path: str, route_path: str) -> str:
     return ""
 
 
-async def _bridge_aiohttp_request(asgi_app: McpHttpApp, request: Any, route_path: str) -> Any:
-    """Run one aiohttp request through an ASGI app and return the aiohttp response.
-
-    *route_path* is the path the route was registered with on its (sub-)app.
-    """
-    from aiohttp import web
-
-    body = await request.read()
+def _aiohttp_asgi_scope(request: Any, route_path: str) -> dict:
+    """The ASGI ``http`` scope for one aiohttp *request* routed at *route_path*."""
     transport = request.transport
     peer = transport.get_extra_info("peername") if transport else None
     sock = transport.get_extra_info("sockname") if transport else None
-    scope = {
+    return {
         "type": "http",
         "asgi": {"version": "3.0", "spec_version": "2.3"},
         "http_version": f"{request.version.major}.{request.version.minor}",
@@ -691,71 +726,101 @@ async def _bridge_aiohttp_request(asgi_app: McpHttpApp, request: Any, route_path
         "server": tuple(sock[:2]) if isinstance(sock, tuple) else None,
     }
 
-    body_sent = False
-    # Set once the ASGI app may stop waiting on receive(): the response is
-    # complete, or the client went away (http.disconnect either way).
-    finished = asyncio.Event()
-    state: dict[str, Any] = {"response": None, "client_gone": False}
 
-    def _client_gone() -> None:
-        state["client_gone"] = True
-        finished.set()
+class _AiohttpBridge:
+    """The ASGI ``receive`` / ``send`` pair for one aiohttp request.
 
-    async def _watch_client() -> None:
-        # aiohttp exposes no awaitable "connection lost"; poll the transport.
-        while not finished.is_set():
-            transport = request.transport
+    ``finished`` is set once the ASGI app may stop waiting on ``receive()``:
+    the response is complete, or the client went away (``http.disconnect``
+    either way).
+    """
+
+    def __init__(self, request: Any, body: bytes) -> None:
+        self.request = request
+        self.body = body
+        self.body_sent = False
+        self.finished = asyncio.Event()
+        self.response: Any = None
+        self.client_gone = False
+
+    def _mark_client_gone(self) -> None:
+        self.client_gone = True
+        self.finished.set()
+
+    async def watch_client(self) -> None:
+        """Mark the client gone when its connection closes; end with the response."""
+        # aiohttp exposes no awaitable "connection lost", so check the
+        # transport every tick — but wake at once when the response finishes.
+        while not self.finished.is_set():
+            transport = self.request.transport
             if transport is None or transport.is_closing():
-                _client_gone()
+                self._mark_client_gone()
                 return
-            await asyncio.sleep(_DISCONNECT_POLL_INTERVAL)
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(self.finished.wait(), _DISCONNECT_POLL_INTERVAL)
 
-    async def receive() -> dict:
-        nonlocal body_sent
-        if not body_sent:
-            body_sent = True
-            return {"type": "http.request", "body": body, "more_body": False}
-        await finished.wait()
+    async def receive(self) -> dict:
+        if not self.body_sent:
+            self.body_sent = True
+            return {"type": "http.request", "body": self.body, "more_body": False}
+        await self.finished.wait()
         return {"type": "http.disconnect"}
 
-    async def send(message: dict) -> None:
-        if state["client_gone"]:
+    async def send(self, message: dict) -> None:
+        if self.client_gone:
             return  # like an ASGI server: sends after a disconnect are dropped
         try:
-            await _forward(message)
+            await self._forward(message)
         except ConnectionResetError:  # aiohttp's ClientConnectionResetError too
-            _client_gone()
+            self._mark_client_gone()
 
-    async def _forward(message: dict) -> None:
-        if message["type"] == "http.response.start":
-            response = web.StreamResponse(status=message["status"])
-            for key, value in message.get("headers", []):
-                response.headers.add(key.decode("latin-1"), value.decode("latin-1"))
-            state["response"] = response
-            # Send the status line and headers now: an SSE stream may not
-            # produce a body chunk for a long time, and the client is waiting
-            # for the headers to start reading it.
-            await response.prepare(request)
-        elif message["type"] == "http.response.body":
-            response = state["response"]
-            chunk = message.get("body", b"")
-            if chunk:
-                await response.write(chunk)
-            if not message.get("more_body", False):
-                await response.write_eof()
-                finished.set()
+    async def _forward(self, message: dict) -> None:
+        if message["type"] == _RESPONSE_START:
+            await self._start_response(message)
+        elif message["type"] == _RESPONSE_BODY:
+            await self._write_body(message)
 
-    watcher = asyncio.create_task(_watch_client())
+    async def _start_response(self, message: dict) -> None:
+        from aiohttp import web
+
+        response = web.StreamResponse(status=message["status"])
+        for key, value in message.get("headers", []):
+            response.headers.add(key.decode("latin-1"), value.decode("latin-1"))
+        self.response = response
+        # Send the status line and headers now: an SSE stream may not produce
+        # a body chunk for a long time, and the client is waiting for the
+        # headers to start reading it.
+        await response.prepare(self.request)
+
+    async def _write_body(self, message: dict) -> None:
+        chunk = message.get("body", b"")
+        if chunk:
+            await self.response.write(chunk)
+        if not message.get("more_body", False):
+            await self.response.write_eof()
+            self.finished.set()
+
+
+async def _bridge_aiohttp_request(asgi_app: McpHttpApp, request: Any, route_path: str) -> Any:
+    """Run one aiohttp request through an ASGI app and return the aiohttp response.
+
+    *route_path* is the path the route was registered with on its (sub-)app.
+    """
+    from aiohttp import web
+
+    body = await request.read()
+    scope = _aiohttp_asgi_scope(request, route_path)
+    bridge = _AiohttpBridge(request, body)
+    watcher = asyncio.create_task(bridge.watch_client())
     try:
-        await asgi_app(scope, receive, send)
+        await asgi_app(scope, bridge.receive, bridge.send)
     finally:
-        finished.set()
+        bridge.finished.set()
         watcher.cancel()
 
-    response = state["response"]
-    if response is None:
+    if bridge.response is None:
         return web.json_response(_NO_RESPONSE, status=500)
-    return response
+    return bridge.response
 
 
 def serve_http(
