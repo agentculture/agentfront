@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/). This project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.21.3] - 2026-10-31
+
+
+### Fixed
+
+- Cap the MCP SDK below 2 (`mcp>=1.28.0,<2`, both the `mcp` extra and the dev group): mcp 2.x removed the low-level `Server.list_tools` / `Server.call_tool` decorators the MCP surface uses, so a fresh `agentfront[mcp]` install (or anything depending on it, such as culture and irc-lens) pulled mcp 2.3.0 and broke at import
+
 ## [0.21.2] - 2026-10-31
 
 
