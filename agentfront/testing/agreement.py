@@ -17,7 +17,13 @@ __all__ = ["assert_surfaces_agree"]
 # Doc-bearing and tool-bearing surfaces, each compared against the registry
 # (the single source of truth every other surface is derived from).
 _DOC_SURFACES: tuple[str, ...] = ("registry_docs", "http_docs", "cli_docs")
-_TOOL_SURFACES: tuple[str, ...] = ("registry_tools", "cli_tools", "mcp_tools", "taui_tools")
+_TOOL_SURFACES: tuple[str, ...] = (
+    "registry_tools",
+    "cli_tools",
+    "mcp_tools",
+    "mcp_http_tools",
+    "taui_tools",
+)
 
 
 def assert_surfaces_agree(app: App) -> None:

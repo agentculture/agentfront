@@ -84,7 +84,7 @@ assert missing == {
 }
 ```
 
-`call_mcp(app, command, args=None) -> dict` dispatches `command` (a list of
+`call_mcp(app, command, args=None, *, caller=None) -> dict` dispatches `command` (a list of
 path segments, matching the MCP `run` tool's own `command` argument) against
 your app's registry and returns the exact payload shape the real MCP server
 would — `{"result": <value>}` on success, XOR
@@ -95,7 +95,10 @@ without installing the optional `agentfront[mcp]` extra or standing up a
 server. A raised `agentfront.errors.AgentfrontError` maps to its own
 `.to_dict()`; any other exception maps to the generic
 `{"code": 1, "message": "<ExcName>: <exc>", "remediation": "check command arguments"}`
-shape; an async tool function is resolved transparently.
+shape; an async tool function is resolved transparently. Pass `caller=` to
+run the tool with that principal as `agentfront.current_caller()` — the same
+value a remote transport's authenticator supplies (see
+[`remote-mcp.md`](./remote-mcp.md)) — to test per-caller command scoping.
 
 ## `drive` — fold a scripted event trail through a live `Session`
 

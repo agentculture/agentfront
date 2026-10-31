@@ -149,4 +149,6 @@ call from your own test suite.
 - [agentculture.md](./agentculture.md) — the org this project is foundational to.
 - [consumer-cli.md](./consumer-cli.md) — the versioned public API reference for
   the CLI surface.
+- [remote-mcp.md](./remote-mcp.md) — serving the MCP surface over streamable
+  HTTP (ASGI / aiohttp mount) with a caller-context hook.
 - [../README.md](../README.md) — install and quick-start.

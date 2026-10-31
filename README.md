@@ -95,6 +95,12 @@ def test_surfaces_agree():
 agent- and human-driven cockpit. See [`docs/testing.md`](./docs/testing.md)
 for the full guide, with runnable examples for each.
 
+To serve the MCP surface to remote agents, `agentfront.mcp_http` exposes it
+over streamable HTTP — as an ASGI app, mounted into an aiohttp app, or
+standalone — with an optional authenticator whose caller principal reaches
+your handlers via `agentfront.current_caller()`. See
+[`docs/remote-mcp.md`](./docs/remote-mcp.md).
+
 ## Develop
 
 ```bash

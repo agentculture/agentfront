@@ -47,6 +47,20 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: https://sonarcloud.io
 
+      # No unresolved SonarCloud issue on the PR. A code smell leaves the quality gate
+      # green, so this fails the job while the PR has any OPEN or CONFIRMED issue;
+      # ACCEPTED and FALSE_POSITIVE ones pass. Cited from culture-rules
+      # (scripts/sonar-pr-issues.py); the token stays scoped to this step.
+      - name: SonarCloud unresolved issues
+        if: env.SONAR_TOKEN_PRESENT == 'true' && github.event_name == 'pull_request'
+        timeout-minutes: 10
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python3 scripts/sonar-pr-issues.py
+
   version-check:
     # Only run on PR events. On push to main after a merged PR, the
     # comparison would always fail (PR_VERSION == MAIN_VERSION because HEAD

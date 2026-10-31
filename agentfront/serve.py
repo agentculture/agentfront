@@ -89,6 +89,25 @@ def _mcp_command_paths(app: App) -> set[str]:
     return paths
 
 
+def _mcp_http_command_paths(app: App) -> set[str]:
+    """The command paths the remote (streamable-HTTP) MCP transport advertises.
+
+    Read from the transport's structured command catalog
+    (:func:`agentfront.mcp_http._transport_catalog` — the catalog its ``run``
+    tool embeds), built once per call, without constructing the transport or
+    parsing the tool's human-readable description. Without the optional
+    ``mcp`` extra the transport cannot exist; the paths are then derived from
+    the registry, like :func:`_mcp_command_paths`.
+    """
+    try:
+        from agentfront.mcp_http import _transport_catalog
+    except ImportError as exc:
+        if (getattr(exc, "name", "") or "").split(".", 1)[0] != "mcp":
+            raise
+        return _mcp_command_paths(app)
+    return {"/".join(entry["path"]) for entry in _transport_catalog(app)}
+
+
 def surface_inventory(app: App) -> dict[str, set[str]]:
     """What each surface independently enumerates, alongside the registry truth."""
     cli_docs, cli_tools = _cli_inventory(app)
@@ -113,6 +132,7 @@ def surface_inventory(app: App) -> dict[str, set[str]]:
         "cli_docs": cli_docs,
         "cli_tools": cli_tools,
         "mcp_tools": _mcp_command_paths(app),
+        "mcp_http_tools": _mcp_http_command_paths(app),
         "taui_tools": taui_tools,
     }
 
@@ -139,5 +159,11 @@ def surfaces_agree(app: App) -> bool:
     and the HTTP ``/front`` markdown agrees with the TAUI markdown tier."""
     inv = surface_inventory(app)
     docs_agree = inv["registry_docs"] == inv["http_docs"] == inv["cli_docs"]
-    tools_agree = inv["registry_tools"] == inv["cli_tools"] == inv["mcp_tools"] == inv["taui_tools"]
+    tools_agree = (
+        inv["registry_tools"]
+        == inv["cli_tools"]
+        == inv["mcp_tools"]
+        == inv["mcp_http_tools"]
+        == inv["taui_tools"]
+    )
     return docs_agree and tools_agree and http_front_agrees(app)

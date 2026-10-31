@@ -1,6 +1,6 @@
 [project]
 name = "agentfront"
-version = "0.20.0"
+version = "0.21.0"
 description = "Agent First Interface — scaffold CLI, MCP, and HTTP interfaces for agent-first tools."
 readme = "README.md"
 license = "Apache-2.0"
@@ -21,7 +21,8 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-# The MCP surface (`app.mcp_server()` / `serve_stdio`). Keep the version pin in
+# The MCP surface (`app.mcp_server()` / `serve_stdio`, and the remote
+# streamable-HTTP transport in `agentfront.mcp_http`). Keep the version pin in
 # lockstep with the `dev` group below so tests exercise the same SDK floor.
 mcp = [
     "mcp>=1.28.0",
@@ -62,6 +63,10 @@ dev = [
     "pre-commit>=3.5.0",
     "isort>=5.12.0",
     "black>=23.7.0",
+    # aiohttp is NOT a runtime dependency: agentfront.mcp_http.mount_aiohttp
+    # imports it lazily from the *host* application. The test suite mounts the
+    # streamable-HTTP MCP transport into a real aiohttp app, so dev/CI need it.
+    "aiohttp>=3.9",
 ]
 
 [tool.coverage.run]

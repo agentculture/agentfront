@@ -73,3 +73,23 @@ def test_empty_app_surfaces_agree():
     assert inv["http_docs"] == set()
     assert inv["mcp_tools"] == set()
     assert surfaces_agree(app) is True
+
+
+def test_inventory_falls_back_to_registry_without_mcp_extra(monkeypatch):
+    """Without the ``mcp`` extra the remote transport can't be built; the
+    inventory still reports the registry's command paths instead of crashing.
+
+    Lives here (not beside the transport's integration tests, which skip
+    without the extra) so it also runs in an install that lacks ``mcp``.
+    """
+    import sys
+
+    monkeypatch.setitem(sys.modules, "mcp", None)
+    for name in [m for m in sys.modules if m.startswith("mcp.")]:
+        monkeypatch.setitem(sys.modules, name, None)
+    monkeypatch.delitem(sys.modules, "agentfront.mcp_http", raising=False)
+    monkeypatch.delitem(sys.modules, "agentfront.mcp_surface", raising=False)
+
+    from agentfront.serve import _mcp_http_command_paths
+
+    assert _mcp_http_command_paths(_app()) == {"search", "echo"}
