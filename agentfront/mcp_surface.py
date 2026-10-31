@@ -20,7 +20,7 @@ import inspect
 import json
 from typing import Any
 
-from mcp import Tool
+from mcp import Tool, types
 from mcp.server import Server
 
 from agentfront._run_dispatch import error_payload, result_payload, validate_and_lookup
@@ -51,6 +51,21 @@ def _request_caller(server: Server) -> Any:
     if not isinstance(scope, dict):
         return None
     return scope.get(CALLER_SCOPE_KEY)
+
+
+def _call_result(payload: dict[str, Any], *, is_error: bool) -> types.CallToolResult:
+    """Wrap a ``run`` payload in a :class:`~mcp.types.CallToolResult`.
+
+    Content matches what the SDK builds for a plain dict return (indented JSON
+    text plus ``structuredContent``), so the wire payload is identical; only
+    ``isError`` differs. The MCP spec reports tool-execution errors with
+    ``isError: true`` so clients and models can tell failure from success.
+    """
+    return types.CallToolResult(
+        content=[types.TextContent(type="text", text=json.dumps(payload, indent=2))],
+        structuredContent=payload,
+        isError=is_error,
+    )
 
 
 def _build_catalog(app: App) -> list[dict[str, Any]]:
@@ -135,15 +150,18 @@ def make_mcp_server(app: App) -> Server:
     # --- call_tool --------------------------------------------------------
 
     @server.call_tool(validate_input=False)
-    async def call_tool(tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    async def call_tool(tool_name: str, arguments: dict[str, Any]) -> types.CallToolResult:
         if tool_name != "run":
-            return {
-                "error": {
-                    "code": 1,
-                    "message": f"unknown tool: {tool_name!r}",
-                    "remediation": "use the 'run' tool",
-                }
-            }
+            return _call_result(
+                {
+                    "error": {
+                        "code": 1,
+                        "message": f"unknown tool: {tool_name!r}",
+                        "remediation": "use the 'run' tool",
+                    }
+                },
+                is_error=True,
+            )
 
         command = arguments.get("command", [])
         args = arguments.get("args", {})
@@ -154,7 +172,7 @@ def make_mcp_server(app: App) -> Server:
 
         entry_or_error = validate_and_lookup(app, command)
         if isinstance(entry_or_error, dict):
-            return entry_or_error
+            return _call_result(entry_or_error, is_error=True)
         entry = entry_or_error
 
         try:
@@ -162,9 +180,9 @@ def make_mcp_server(app: App) -> Server:
                 result = entry.func(**args)
                 if inspect.isawaitable(result):
                     result = await result
-            return result_payload(result)
+            return _call_result(result_payload(result), is_error=False)
         except Exception as exc:
-            return error_payload(exc)
+            return _call_result(error_payload(exc), is_error=True)
 
     return server
 
