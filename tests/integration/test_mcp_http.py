@@ -399,3 +399,36 @@ def test_transport_options_are_declared_once_and_forwarded_everywhere():
     # An unknown option is a TypeError, not silently dropped.
     with pytest.raises(TypeError):
         make_mcp_http_app(_app(), not_an_option=True)  # type: ignore[call-arg]
+
+
+def test_401_carries_a_configurable_www_authenticate_challenge():
+    """#8: RFC 7235 — a 401 names its challenge; consumer-configurable, or off."""
+    app = _app()
+
+    async def scenario():
+        out = {}
+        for label, extra in (
+            ("default", {}),
+            ("custom", {"www_authenticate": 'Bearer realm="tools"'}),
+            ("off", {"www_authenticate": None}),
+        ):
+            asgi = make_mcp_http_app(app, authenticate=_bearer_auth, **extra)
+            async with _uvicorn(asgi) as base:
+                async with httpx.AsyncClient(timeout=10) as http:
+                    out[label] = await http.post(f"{base}/mcp", json={})
+        async with _aiohttp_host(app, "/mcp", authenticate=_bearer_auth) as base:
+            async with httpx.AsyncClient(timeout=10) as http:
+                out["aiohttp"] = await http.post(f"{base}/mcp", json={})
+        return out
+
+    out = asyncio.run(scenario())
+    assert all(resp.status_code == 401 for resp in out.values())
+    assert out["default"].headers["www-authenticate"] == "Bearer"
+    assert out["custom"].headers["www-authenticate"] == 'Bearer realm="tools"'
+    assert "www-authenticate" not in out["off"].headers
+    assert out["aiohttp"].headers["www-authenticate"] == "Bearer"
+
+
+def test_www_authenticate_rejects_header_injection():
+    with pytest.raises(ValueError):
+        make_mcp_http_app(_app(), www_authenticate="Bearer\r\nX-Evil: 1")

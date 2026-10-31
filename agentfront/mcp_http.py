@@ -124,12 +124,16 @@ class McpHttpOptions(TypedDict, total=False):
       passed to the SDK's session manager.
     * ``security_settings`` — passed to the SDK
       (:class:`mcp.server.transport_security.TransportSecuritySettings`).
+    * ``www_authenticate`` (default ``"Bearer"``) — the ``WWW-Authenticate``
+      challenge sent with every ``401`` (RFC 7235), e.g.
+      ``'Bearer realm="tools"'``; ``None`` omits the header.
     """
 
     authenticate: Optional[Authenticator]
     stateless: bool
     json_response: bool
     security_settings: Any
+    www_authenticate: Optional[str]
 
 
 def _error_body(code: int, message: str, remediation: str) -> dict[str, Any]:
@@ -188,7 +192,21 @@ def _caller_request(scope: Mapping[str, Any]) -> CallerRequest:
     )
 
 
-async def _send_json(send: Callable[..., Awaitable[None]], status: int, payload: dict) -> None:
+def _check_header_value(name: str, value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    if not isinstance(value, str) or any(ch in value for ch in "\r\n\0"):
+        raise ValueError(f"{name} must be a single-line header value: {value!r}")
+    value.encode("latin-1")  # header values must be latin-1; raises otherwise
+    return value
+
+
+async def _send_json(
+    send: Callable[..., Awaitable[None]],
+    status: int,
+    payload: dict,
+    extra_headers: tuple[tuple[bytes, bytes], ...] = (),
+) -> None:
     body = json.dumps(payload).encode("utf-8")
     await send(
         {
@@ -197,6 +215,7 @@ async def _send_json(send: Callable[..., Awaitable[None]], status: int, payload:
             "headers": [
                 (b"content-type", b"application/json"),
                 (b"content-length", str(len(body)).encode("ascii")),
+                *extra_headers,
             ],
         }
     )
@@ -220,6 +239,7 @@ class McpHttpApp:
         stateless: bool = True,
         json_response: bool = True,
         security_settings: Any = None,
+        www_authenticate: Optional[str] = "Bearer",
     ) -> None:
         self.app = app
         self.server = make_mcp_server(app)
@@ -228,6 +248,10 @@ class McpHttpApp:
         self._stateless = stateless
         self._json_response = json_response
         self._security_settings = security_settings
+        challenge = _check_header_value("www_authenticate", www_authenticate)
+        self._unauthorized_headers: tuple[tuple[bytes, bytes], ...] = (
+            () if challenge is None else ((b"www-authenticate", challenge.encode("latin-1")),)
+        )
         self._manager: Optional[StreamableHTTPSessionManager] = None
         self._runner: Optional[asyncio.Task] = None
         self._stop_event: Optional[asyncio.Event] = None
@@ -297,7 +321,7 @@ class McpHttpApp:
 
         principal = await self._authenticated_principal(scope)
         if principal is _REFUSED:
-            await _send_json(send, 401, _UNAUTHORIZED)
+            await _send_json(send, 401, _UNAUTHORIZED, self._unauthorized_headers)
             return
 
         manager = self._manager or await self.start()
