@@ -14,6 +14,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Stateful sessions (`stateless=False`) are bound to the principal that initialized them: another caller presenting the `mcp-session-id` is refused `403`. "Same caller" is `session_owner_key(a) == session_owner_key(b)` (option; default the principal itself).
 - Session-manager lifecycle: lazy starts are serialised and cancellation-safe; `stop()` is final (requests during and after it get `503`, nothing restarts); a manager that dies after startup is logged and replaced on the next request, and `stop()` never re-raises it into host cleanup.
 - `agentfront.testing.call_mcp(..., caller=...)` runs a tool with a given principal in-process.
+- CI: a PR now fails while SonarCloud reports any OPEN or CONFIRMED issue on it (ACCEPTED / FALSE_POSITIVE pass) — `scripts/sonar-pr-issues.py`, cited from culture-rules, runs right after the scan in `tests.yml`.
 - Docs: `docs/remote-mcp.md`.
 
 ### Changed
