@@ -71,17 +71,20 @@ import inspect
 import json
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable, Mapping, Optional, Union
+from typing import Any, Awaitable, Callable, Mapping, Optional, TypedDict, Union, Unpack
 
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 
+from agentfront._run_dispatch import error_payload
 from agentfront.app import App
+from agentfront.errors import AgentfrontError
 from agentfront.mcp_surface import CALLER_SCOPE_KEY, make_mcp_server
 
 __all__ = [
     "CallerRequest",
     "Authenticator",
     "McpHttpApp",
+    "McpHttpOptions",
     "make_mcp_http_app",
     "mount_aiohttp",
     "serve_http",
@@ -108,23 +111,51 @@ class CallerRequest:
 Authenticator = Callable[[CallerRequest], Union[Any, Awaitable[Any]]]
 """``(CallerRequest) -> principal | None`` — sync or async. ``None`` refuses."""
 
-_UNAUTHORIZED = {
-    "error": {
-        "code": 401,
-        "message": "unauthorized: this MCP endpoint requires valid credentials",
-        "remediation": "send the credentials this endpoint's operator issued you",
-    }
-}
+
+class McpHttpOptions(TypedDict, total=False):
+    """The transport options every entry point accepts (all optional).
+
+    Declared once here; :class:`McpHttpApp` holds the defaults and
+    :func:`make_mcp_http_app`, :func:`mount_aiohttp` and :func:`serve_http`
+    forward them unchanged as ``**options``.
+
+    * ``authenticate`` — the caller-context hook (see the module docstring).
+    * ``stateless`` (default ``True``) / ``json_response`` (default ``True``) —
+      passed to the SDK's session manager.
+    * ``security_settings`` — passed to the SDK
+      (:class:`mcp.server.transport_security.TransportSecuritySettings`).
+    """
+
+    authenticate: Optional[Authenticator]
+    stateless: bool
+    json_response: bool
+    security_settings: Any
+
+
+def _error_body(code: int, message: str, remediation: str) -> dict[str, Any]:
+    """A transport-level error body, built by the same helper as the run tool's."""
+    return error_payload(AgentfrontError(code=code, message=message, remediation=remediation))
+
+
+_UNAUTHORIZED = _error_body(
+    401,
+    "unauthorized: this MCP endpoint requires valid credentials",
+    "send the credentials this endpoint's operator issued you",
+)
 # Sentinel: the authenticator refused (returned None or raised).
 _REFUSED = object()
 
-_NOT_FOUND = {
-    "error": {
-        "code": 404,
-        "message": "not found: no MCP endpoint at this path",
-        "remediation": "use the MCP endpoint path this server advertises",
-    }
-}
+_NOT_FOUND = _error_body(
+    404,
+    "not found: no MCP endpoint at this path",
+    "use the MCP endpoint path this server advertises",
+)
+
+_NO_RESPONSE = _error_body(
+    500,
+    "MCP transport produced no response",
+    "retry the request; report it if it persists",
+)
 
 
 def _normalize_path(path: Optional[str]) -> Optional[str]:
@@ -303,11 +334,8 @@ class McpHttpApp:
 def make_mcp_http_app(
     app: App,
     *,
-    authenticate: Optional[Authenticator] = None,
     path: Optional[str] = None,
-    stateless: bool = True,
-    json_response: bool = True,
-    security_settings: Any = None,
+    **options: Unpack[McpHttpOptions],
 ) -> McpHttpApp:
     """Return an ASGI app serving *app*'s MCP server over streamable HTTP.
 
@@ -315,16 +343,10 @@ def make_mcp_http_app(
     (e.g. a Starlette ``Mount``); pass ``path="/mcp"`` to answer only there and
     ``404`` elsewhere. ``security_settings`` is passed through to the SDK
     (:class:`mcp.server.transport_security.TransportSecuritySettings`, e.g. for
-    DNS-rebinding protection). See the module docstring for ``authenticate``.
+    DNS-rebinding protection). See :class:`McpHttpOptions` for ``**options``
+    and the module docstring for ``authenticate``.
     """
-    return McpHttpApp(
-        app,
-        authenticate=authenticate,
-        path=path,
-        stateless=stateless,
-        json_response=json_response,
-        security_settings=security_settings,
-    )
+    return McpHttpApp(app, path=path, **options)
 
 
 def mount_aiohttp(
@@ -332,10 +354,7 @@ def mount_aiohttp(
     app: App,
     *,
     path: str = "/mcp",
-    authenticate: Optional[Authenticator] = None,
-    stateless: bool = True,
-    json_response: bool = True,
-    security_settings: Any = None,
+    **options: Unpack[McpHttpOptions],
 ) -> McpHttpApp:
     """Mount *app*'s MCP endpoint into an aiohttp ``web.Application`` at *path*.
 
@@ -343,16 +362,10 @@ def mount_aiohttp(
     host's ``on_startup`` / ``on_cleanup`` signals; the host keeps its own
     routes, middleware, host and port. Returns the :class:`McpHttpApp` handle.
     Call before the host app is frozen (i.e. before it starts serving).
+    ``**options`` are the :class:`McpHttpOptions`.
     """
     normalized = _check_path(path)
-    mcp_app = McpHttpApp(
-        app,
-        authenticate=authenticate,
-        path=normalized,
-        stateless=stateless,
-        json_response=json_response,
-        security_settings=security_settings,
-    )
+    mcp_app = McpHttpApp(app, path=normalized, **options)
 
     async def _handle(request: Any) -> Any:
         return await _bridge_aiohttp_request(mcp_app, request)
@@ -431,16 +444,7 @@ async def _bridge_aiohttp_request(asgi_app: McpHttpApp, request: Any) -> Any:
 
     response = state["response"]
     if response is None:
-        return web.json_response(
-            {
-                "error": {
-                    "code": 500,
-                    "message": "MCP transport produced no response",
-                    "remediation": "retry the request; report it if it persists",
-                }
-            },
-            status=500,
-        )
+        return web.json_response(_NO_RESPONSE, status=500)
     if not state["prepared"]:
         await response.prepare(request)
         await response.write_eof()
@@ -453,25 +457,16 @@ def serve_http(
     host: str,
     port: int,
     path: str = "/mcp",
-    authenticate: Optional[Authenticator] = None,
-    stateless: bool = True,
-    json_response: bool = True,
-    security_settings: Any = None,
+    **options: Unpack[McpHttpOptions],
 ) -> None:
     """Serve *app*'s MCP endpoint over streamable HTTP with uvicorn (blocking).
 
     ``host`` and ``port`` are required — agentfront never picks a bind address
     for you. For embedding in an existing server use :func:`make_mcp_http_app`
-    or :func:`mount_aiohttp` instead.
+    or :func:`mount_aiohttp` instead. ``**options`` are the
+    :class:`McpHttpOptions`.
     """
     import uvicorn
 
-    asgi = make_mcp_http_app(
-        app,
-        authenticate=authenticate,
-        path=path,
-        stateless=stateless,
-        json_response=json_response,
-        security_settings=security_settings,
-    )
+    asgi = make_mcp_http_app(app, path=path, **options)
     uvicorn.run(asgi, host=host, port=port, lifespan="on")

@@ -343,3 +343,59 @@ def test_stdio_entry_point_unchanged():
 
     assert "serve_stdio" in mcp_surface.__all__
     assert list(inspect.signature(mcp_surface.serve_stdio).parameters) == ["app"]
+
+
+# --- review fixes (PR #56) --------------------------------------------------
+
+
+def test_transport_error_bodies_are_canonical_error_payloads():
+    """#10: the transport's own 401/404 bodies come from the canonical helper."""
+    from agentfront import mcp_http
+    from agentfront._run_dispatch import error_payload
+
+    app = _app()
+
+    async def scenario():
+        asgi = make_mcp_http_app(app, path="/mcp", authenticate=_bearer_auth)
+        async with _uvicorn(asgi) as base:
+            async with httpx.AsyncClient(timeout=10) as http:
+                return (
+                    await http.post(f"{base}/mcp", json={}),
+                    await http.post(f"{base}/elsewhere", json={}),
+                )
+
+    refused, missing = asyncio.run(scenario())
+    for resp, status in ((refused, 401), (missing, 404)):
+        assert resp.status_code == status
+        err = resp.json()["error"]
+        rebuilt = error_payload(
+            AgentfrontError(
+                code=err["code"], message=err["message"], remediation=err["remediation"]
+            )
+        )
+        assert resp.json() == rebuilt and err["code"] == status
+    assert mcp_http._error_body(401, "x", "y") == error_payload(
+        AgentfrontError(code=401, message="x", remediation="y")
+    )
+
+
+def test_transport_options_are_declared_once_and_forwarded_everywhere():
+    """#10: one options declaration; every entry point accepts all of it."""
+    from typing import get_type_hints
+
+    from agentfront.mcp_http import McpHttpApp, McpHttpOptions
+
+    option_names = set(get_type_hints(McpHttpOptions))
+    init = inspect.signature(McpHttpApp.__init__).parameters
+    assert option_names == {
+        name
+        for name, p in init.items()
+        if p.kind is inspect.Parameter.KEYWORD_ONLY and name != "path"
+    }
+    for helper in (make_mcp_http_app, mount_aiohttp, serve_http):
+        params = inspect.signature(helper).parameters
+        assert "options" in params and params["options"].kind is inspect.Parameter.VAR_KEYWORD
+        assert params["path"].kind is inspect.Parameter.KEYWORD_ONLY
+    # An unknown option is a TypeError, not silently dropped.
+    with pytest.raises(TypeError):
+        make_mcp_http_app(_app(), not_an_option=True)  # type: ignore[call-arg]
