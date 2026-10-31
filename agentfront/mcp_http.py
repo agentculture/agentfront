@@ -525,6 +525,11 @@ def mount_aiohttp(
     return mcp_app
 
 
+# How often the aiohttp bridge checks whether the client is still connected
+# while an ASGI response (e.g. an SSE stream) is in flight.
+_DISCONNECT_POLL_INTERVAL = 0.1
+
+
 def _aiohttp_root_path(request_path: str, route_path: str) -> str:
     """The prefix aiohttp routed through before reaching *route_path*.
 
@@ -566,46 +571,69 @@ async def _bridge_aiohttp_request(asgi_app: McpHttpApp, request: Any, route_path
     }
 
     body_sent = False
-    response_done = asyncio.Event()
-    state: dict[str, Any] = {"response": None, "prepared": False}
+    # Set once the ASGI app may stop waiting on receive(): the response is
+    # complete, or the client went away (http.disconnect either way).
+    finished = asyncio.Event()
+    state: dict[str, Any] = {"response": None, "client_gone": False}
+
+    def _client_gone() -> None:
+        state["client_gone"] = True
+        finished.set()
+
+    async def _watch_client() -> None:
+        # aiohttp exposes no awaitable "connection lost"; poll the transport.
+        while not finished.is_set():
+            transport = request.transport
+            if transport is None or transport.is_closing():
+                _client_gone()
+                return
+            await asyncio.sleep(_DISCONNECT_POLL_INTERVAL)
 
     async def receive() -> dict:
         nonlocal body_sent
         if not body_sent:
             body_sent = True
             return {"type": "http.request", "body": body, "more_body": False}
-        await response_done.wait()
+        await finished.wait()
         return {"type": "http.disconnect"}
 
     async def send(message: dict) -> None:
+        if state["client_gone"]:
+            return  # like an ASGI server: sends after a disconnect are dropped
+        try:
+            await _forward(message)
+        except ConnectionResetError:  # aiohttp's ClientConnectionResetError too
+            _client_gone()
+
+    async def _forward(message: dict) -> None:
         if message["type"] == "http.response.start":
             response = web.StreamResponse(status=message["status"])
             for key, value in message.get("headers", []):
                 response.headers.add(key.decode("latin-1"), value.decode("latin-1"))
             state["response"] = response
+            # Send the status line and headers now: an SSE stream may not
+            # produce a body chunk for a long time, and the client is waiting
+            # for the headers to start reading it.
+            await response.prepare(request)
         elif message["type"] == "http.response.body":
             response = state["response"]
-            if not state["prepared"]:
-                await response.prepare(request)
-                state["prepared"] = True
             chunk = message.get("body", b"")
             if chunk:
                 await response.write(chunk)
             if not message.get("more_body", False):
                 await response.write_eof()
-                response_done.set()
+                finished.set()
 
+    watcher = asyncio.create_task(_watch_client())
     try:
         await asgi_app(scope, receive, send)
     finally:
-        response_done.set()
+        finished.set()
+        watcher.cancel()
 
     response = state["response"]
     if response is None:
         return web.json_response(_NO_RESPONSE, status=500)
-    if not state["prepared"]:
-        await response.prepare(request)
-        await response.write_eof()
     return response
 
 

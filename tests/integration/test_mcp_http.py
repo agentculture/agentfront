@@ -638,3 +638,63 @@ def test_runner_crash_after_startup_is_detected_and_restarts_lazily():
     assert status == 200
     assert restarted
     assert runners == []
+
+
+# --- aiohttp bridge: client disconnect (#4) -----------------------------------
+
+
+def test_aiohttp_bridge_delivers_disconnect_and_ends_sse_stream(monkeypatch):
+    """#4: stateful + SSE over the aiohttp mount; the client drops a long-lived
+    GET stream and the bridged request (the stream's server-side task) ends."""
+    pytest.importorskip("aiohttp")
+    from agentfront import mcp_http
+
+    finished: dict[str, asyncio.Event] = {}
+    real_bridge = mcp_http._bridge_aiohttp_request
+
+    async def tracking_bridge(asgi_app: Any, request: Any, route_path: str) -> Any:
+        done = finished.setdefault(request.method, asyncio.Event())
+        try:
+            return await real_bridge(asgi_app, request, route_path)
+        finally:
+            if request.method == "GET":
+                done.set()
+
+    monkeypatch.setattr(mcp_http, "_bridge_aiohttp_request", tracking_bridge)
+    accept = {"Accept": "application/json, text/event-stream"}
+
+    async def scenario():
+        async with _aiohttp_host(_app(), "/mcp", stateless=False, json_response=False) as base:
+            url = f"{base}/mcp"
+            async with httpx.AsyncClient(timeout=10) as http:
+                init = await http.post(
+                    url, content=_INITIALIZE, headers={**accept, "Content-Type": "application/json"}
+                )
+                sid = init.headers["mcp-session-id"]
+                session = {**accept, "mcp-session-id": sid}
+                note = await http.post(
+                    url,
+                    json={"jsonrpc": "2.0", "method": "notifications/initialized"},
+                    headers=session,
+                )
+            stream_client = httpx.AsyncClient(timeout=10)
+            request = stream_client.build_request(
+                "GET", url, headers={"Accept": "text/event-stream", "mcp-session-id": sid}
+            )
+            response = await stream_client.send(request, stream=True)
+            opened = response.status_code
+            await asyncio.sleep(0.2)  # the server is now parked on the stream
+            still_open = not finished["GET"].is_set()
+            await response.aclose()
+            await stream_client.aclose()  # the client goes away
+            try:
+                await asyncio.wait_for(finished["GET"].wait(), timeout=3)
+                ended = True
+            except asyncio.TimeoutError:
+                ended = False
+            return init.status_code, note.status_code, opened, still_open, ended
+
+    init_status, note_status, opened, still_open, ended = asyncio.run(scenario())
+    assert init_status == 200 and note_status == 202
+    assert opened == 200 and still_open
+    assert ended, "the bridged SSE stream did not end after the client disconnected"
