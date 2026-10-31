@@ -172,6 +172,20 @@ def _check_path(path: str) -> str:
     return path.rstrip("/") or "/"
 
 
+def _relative_path(scope: Mapping[str, Any]) -> str:
+    """The request path below the app's mount point, normalised like ``path=``.
+
+    ASGI hosts that mount an app under a prefix (Starlette ``Mount``, a
+    ``--root-path``) put the prefix in ``root_path`` and keep it in ``path``;
+    the path filter compares what lies below it.
+    """
+    path = scope.get("path", "") or ""
+    root = (scope.get("root_path", "") or "").rstrip("/")
+    if root and (path == root or path.startswith(root + "/")):
+        path = path[len(root) :]
+    return path.rstrip("/") or "/"
+
+
 def _caller_request(scope: Mapping[str, Any]) -> CallerRequest:
     headers: dict[str, str] = {}
     for raw_key, raw_value in scope.get("headers", []):
@@ -315,7 +329,7 @@ class McpHttpApp:
             if kind == "websocket":
                 await send({"type": "websocket.close", "code": 1000})
             return
-        if self.path is not None and (scope.get("path", "").rstrip("/") or "/") != self.path:
+        if self.path is not None and _relative_path(scope) != self.path:
             await _send_json(send, 404, _NOT_FOUND)
             return
 
@@ -392,7 +406,10 @@ def mount_aiohttp(
     mcp_app = McpHttpApp(app, path=normalized, **options)
 
     async def _handle(request: Any) -> Any:
-        return await _bridge_aiohttp_request(mcp_app, request)
+        return await _bridge_aiohttp_request(mcp_app, request, normalized)
+
+    async def _handle_slash(request: Any) -> Any:
+        return await _bridge_aiohttp_request(mcp_app, request, normalized + "/")
 
     async def _on_startup(_web_app: Any) -> None:
         await mcp_app.start()
@@ -402,14 +419,31 @@ def mount_aiohttp(
 
     web_app.router.add_route("*", normalized, _handle)
     if normalized != "/":
-        web_app.router.add_route("*", normalized + "/", _handle)
+        web_app.router.add_route("*", normalized + "/", _handle_slash)
     web_app.on_startup.append(_on_startup)
     web_app.on_cleanup.append(_on_cleanup)
     return mcp_app
 
 
-async def _bridge_aiohttp_request(asgi_app: McpHttpApp, request: Any) -> Any:
-    """Run one aiohttp request through an ASGI app and return the aiohttp response."""
+def _aiohttp_root_path(request_path: str, route_path: str) -> str:
+    """The prefix aiohttp routed through before reaching *route_path*.
+
+    A route added to a sub-app (``add_subapp("/api", sub)``) matches the full
+    ``/api/<route_path>``; the prefix becomes the ASGI ``root_path`` so the
+    path filter sees the route's own, relative path.
+    """
+    if route_path != "/" and request_path.endswith(route_path):
+        return request_path[: -len(route_path)]
+    if route_path == "/" and request_path.endswith("/"):
+        return request_path[:-1]
+    return ""
+
+
+async def _bridge_aiohttp_request(asgi_app: McpHttpApp, request: Any, route_path: str) -> Any:
+    """Run one aiohttp request through an ASGI app and return the aiohttp response.
+
+    *route_path* is the path the route was registered with on its (sub-)app.
+    """
     from aiohttp import web
 
     body = await request.read()
@@ -425,7 +459,7 @@ async def _bridge_aiohttp_request(asgi_app: McpHttpApp, request: Any) -> Any:
         "path": request.path,
         "raw_path": request.raw_path.split("?", 1)[0].encode("latin-1"),
         "query_string": request.query_string.encode("latin-1"),
-        "root_path": "",
+        "root_path": _aiohttp_root_path(request.path, route_path),
         "headers": [(k.lower(), v) for k, v in request.raw_headers],
         "client": tuple(peer[:2]) if isinstance(peer, tuple) else None,
         "server": tuple(sock[:2]) if isinstance(sock, tuple) else None,

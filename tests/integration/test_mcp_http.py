@@ -432,3 +432,71 @@ def test_401_carries_a_configurable_www_authenticate_challenge():
 def test_www_authenticate_rejects_header_injection():
     with pytest.raises(ValueError):
         make_mcp_http_app(_app(), www_authenticate="Bearer\r\nX-Evil: 1")
+
+
+def test_path_filter_honours_starlette_mount_root_path():
+    """#6: inside Mount('/api', ...) the filter matches the path *below* the mount."""
+    starlette_routing = pytest.importorskip("starlette.routing")
+    from starlette.applications import Starlette
+
+    app = _app()
+
+    async def scenario():
+        host = Starlette(
+            routes=[starlette_routing.Mount("/api", app=make_mcp_http_app(app, path="/mcp"))]
+        )
+        async with _uvicorn(host) as base:
+            _, _, called = await _session_roundtrip(
+                f"{base}/api/mcp", None, ["add"], {"x": 2, "y": 2}
+            )
+            async with httpx.AsyncClient(timeout=10) as http:
+                other = await http.post(f"{base}/api/other", json={})
+        return called, other
+
+    called, other = asyncio.run(scenario())
+    assert _payload(called) == {"result": 4}
+    assert other.status_code == 404
+
+
+def test_aiohttp_mount_inside_a_prefixed_subapp():
+    """#6: mount_aiohttp into a sub-app added with add_subapp('/api', ...)."""
+    web = pytest.importorskip("aiohttp.web")
+    app = _app()
+
+    async def scenario():
+        host = web.Application()
+        sub = web.Application()
+        mount_aiohttp(sub, app, path="/mcp")
+        host.add_subapp("/api", sub)
+        runner = web.AppRunner(host)
+        await runner.setup()
+        site = web.TCPSite(runner, LOOPBACK, 0)
+        await site.start()
+        try:
+            port = site._server.sockets[0].getsockname()[1]  # pylint: disable=protected-access
+            base = f"http://{LOOPBACK}:{port}"
+            _, _, called = await _session_roundtrip(
+                f"{base}/api/mcp", None, ["add"], {"x": 3, "y": 3}
+            )
+            _, _, slashed = await _session_roundtrip(
+                f"{base}/api/mcp/", None, ["add"], {"x": 1, "y": 0}
+            )
+        finally:
+            await runner.cleanup()
+        return called, slashed
+
+    called, slashed = asyncio.run(scenario())
+    assert _payload(called) == {"result": 6}
+    assert _payload(slashed) == {"result": 1}
+
+
+def test_relative_path_strips_root_path_only_as_a_prefix():
+    from agentfront.mcp_http import _relative_path
+
+    assert _relative_path({"path": "/api/mcp", "root_path": "/api"}) == "/mcp"
+    assert _relative_path({"path": "/api/mcp/", "root_path": "/api/"}) == "/mcp"
+    # Servers that already strip root_path from path (older ASGI semantics).
+    assert _relative_path({"path": "/mcp", "root_path": "/api"}) == "/mcp"
+    # A sibling that merely shares the prefix string is not under the mount.
+    assert _relative_path({"path": "/apix/mcp", "root_path": "/api"}) == "/apix/mcp"
+    assert _relative_path({"path": "/api", "root_path": "/api"}) == "/"
