@@ -307,7 +307,8 @@ def test_stock_client_over_aiohttp_mount_with_custom_path_and_auth():
     assert _payload(me) == {"result": "agent-a"}
     assert _payload(summed) == {"result": 9}
     # The host's own routes are untouched by the mount.
-    assert health.status_code == 200 and health.text == "host ok"
+    assert health.status_code == 200
+    assert health.text == "host ok"
     assert refused.status_code == 401
     assert set(refused.json()["error"]) == {"code", "message", "remediation"}
 
@@ -317,8 +318,9 @@ def test_aiohttp_mount_returns_handle_and_rejects_bad_path():
 
     handle = mount_aiohttp(web.Application(), _app(), path="/mcp")
     assert handle.path == "/mcp"
+    host, app = web.Application(), _app()
     with pytest.raises(ValueError):
-        mount_aiohttp(web.Application(), _app(), path="mcp")
+        mount_aiohttp(host, app, path="mcp")
 
 
 # --- no hardcoded host/port; agreement; stdio unchanged ---------------------
@@ -373,7 +375,8 @@ def test_transport_error_bodies_are_canonical_error_payloads():
                 code=err["code"], message=err["message"], remediation=err["remediation"]
             )
         )
-        assert resp.json() == rebuilt and err["code"] == status
+        assert resp.json() == rebuilt
+        assert err["code"] == status
     assert mcp_http._error_body(401, "x", "y") == error_payload(
         AgentfrontError(code=401, message="x", remediation="y")
     )
@@ -394,11 +397,13 @@ def test_transport_options_are_declared_once_and_forwarded_everywhere():
     }
     for helper in (make_mcp_http_app, mount_aiohttp, serve_http):
         params = inspect.signature(helper).parameters
-        assert "options" in params and params["options"].kind is inspect.Parameter.VAR_KEYWORD
+        assert "options" in params
+        assert params["options"].kind is inspect.Parameter.VAR_KEYWORD
         assert params["path"].kind is inspect.Parameter.KEYWORD_ONLY
     # An unknown option is a TypeError, not silently dropped.
+    app = _app()
     with pytest.raises(TypeError):
-        make_mcp_http_app(_app(), not_an_option=True)  # type: ignore[call-arg]
+        make_mcp_http_app(app, not_an_option=True)  # type: ignore[call-arg]
 
 
 def test_401_carries_a_configurable_www_authenticate_challenge():
@@ -430,8 +435,9 @@ def test_401_carries_a_configurable_www_authenticate_challenge():
 
 
 def test_www_authenticate_rejects_header_injection():
+    app = _app()
     with pytest.raises(ValueError):
-        make_mcp_http_app(_app(), www_authenticate="Bearer\r\nX-Evil: 1")
+        make_mcp_http_app(app, www_authenticate="Bearer\r\nX-Evil: 1")
 
 
 def test_path_filter_honours_starlette_mount_root_path():
@@ -607,7 +613,8 @@ def test_cancelled_start_leaves_no_orphan_runner():
 
     orphans, shared, live, after_stop = asyncio.run(scenario())
     assert orphans == []
-    assert shared and live == 1
+    assert shared
+    assert live == 1
     assert after_stop == []
 
 
@@ -695,8 +702,10 @@ def test_aiohttp_bridge_delivers_disconnect_and_ends_sse_stream(monkeypatch):
             return init.status_code, note.status_code, opened, still_open, ended
 
     init_status, note_status, opened, still_open, ended = asyncio.run(scenario())
-    assert init_status == 200 and note_status == 202
-    assert opened == 200 and still_open
+    assert init_status == 200
+    assert note_status == 202
+    assert opened == 200
+    assert still_open
     assert ended, "the bridged SSE stream did not end after the client disconnected"
 
 
@@ -803,7 +812,8 @@ def test_session_owner_key_that_raises_fails_closed():
             await asgi.stop()
 
     status, payload = asyncio.run(scenario())
-    assert status == 403 and payload["error"]["code"] == 403
+    assert status == 403
+    assert payload["error"]["code"] == 403
 
 
 # --- inventory reads the structured catalog (#9) ------------------------------
