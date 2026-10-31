@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import asyncio
 
+import pytest
+
 from agentfront import AgentfrontError, App, current_caller
 from agentfront.context import caller_context
 from agentfront.testing import call_mcp
@@ -87,6 +89,7 @@ def test_call_mcp_passes_caller_through():
 
 def test_stdio_style_dispatch_has_no_caller():
     """The real MCP server's run tool (stdio path, no HTTP request) sees no caller."""
+    pytest.importorskip("mcp")
     import anyio
     from mcp import types
 

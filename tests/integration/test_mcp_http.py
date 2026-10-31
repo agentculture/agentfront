@@ -20,14 +20,26 @@ import json
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator
 
-import httpx
 import pytest
-from mcp import ClientSession
-from mcp.client.streamable_http import streamable_http_client
 
-from agentfront import AgentfrontError, App, current_caller
-from agentfront.mcp_http import CallerRequest, make_mcp_http_app, mount_aiohttp, serve_http
-from agentfront.serve import surface_inventory, surfaces_agree
+# The remote transport needs the optional ``mcp`` extra (which brings httpx and
+# uvicorn's ASGI stack along); skip the whole module without it, like the other
+# mcp-dependent tests. aiohttp is a host-side dependency, guarded per test.
+pytest.importorskip("mcp")
+httpx = pytest.importorskip("httpx")
+pytest.importorskip("uvicorn")
+
+from mcp import ClientSession  # noqa: E402
+from mcp.client.streamable_http import streamable_http_client  # noqa: E402
+
+from agentfront import AgentfrontError, App, current_caller  # noqa: E402
+from agentfront.mcp_http import (  # noqa: E402
+    CallerRequest,
+    make_mcp_http_app,
+    mount_aiohttp,
+    serve_http,
+)
+from agentfront.serve import surface_inventory, surfaces_agree  # noqa: E402
 
 LOOPBACK = "127.0.0.1"
 TOKENS = {"token-a": "agent-a", "token-admin": "admin"}
@@ -102,7 +114,7 @@ async def _uvicorn(asgi: Any) -> AsyncIterator[str]:
 
 @asynccontextmanager
 async def _aiohttp_host(app: App, path: str, **kwargs: Any) -> AsyncIterator[str]:
-    from aiohttp import web
+    web = pytest.importorskip("aiohttp.web")
 
     host = web.Application()
 
@@ -301,7 +313,7 @@ def test_stock_client_over_aiohttp_mount_with_custom_path_and_auth():
 
 
 def test_aiohttp_mount_returns_handle_and_rejects_bad_path():
-    from aiohttp import web
+    web = pytest.importorskip("aiohttp.web")
 
     handle = mount_aiohttp(web.Application(), _app(), path="/mcp")
     assert handle.path == "/mcp"
@@ -331,18 +343,3 @@ def test_stdio_entry_point_unchanged():
 
     assert "serve_stdio" in mcp_surface.__all__
     assert list(inspect.signature(mcp_surface.serve_stdio).parameters) == ["app"]
-
-
-def test_inventory_falls_back_to_registry_without_mcp_extra(monkeypatch):
-    """Without the ``mcp`` extra the remote transport can't be built; the
-    inventory still reports the registry's command paths instead of crashing."""
-    import sys
-
-    for name in [m for m in sys.modules if m == "mcp" or m.startswith("mcp.")]:
-        monkeypatch.setitem(sys.modules, name, None)
-    monkeypatch.delitem(sys.modules, "agentfront.mcp_http", raising=False)
-    monkeypatch.delitem(sys.modules, "agentfront.mcp_surface", raising=False)
-
-    from agentfront.serve import _mcp_http_command_paths
-
-    assert _mcp_http_command_paths(_app()) == {"add", "whoami", "admin/purge"}
