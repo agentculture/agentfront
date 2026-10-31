@@ -83,12 +83,10 @@ def test_target_mode_flags_missing_triple(tmp_path: Path) -> None:
     report = inspect(tmp_path)
     triple = next(s for s in report.sections if s.heading == "Agent-first universals")
     present = {f["verb"]: f["present"] for f in triple.findings}
-    assert (
-        not present["learn"]
-        and not present["explain"]
-        and not present["overview"]
-        and not present["doctor"]
-    )
+    assert not present["learn"]
+    assert not present["explain"]
+    assert not present["overview"]
+    assert not present["doctor"]
 
 
 def test_malformed_pyproject_falls_back(tmp_path: Path) -> None:

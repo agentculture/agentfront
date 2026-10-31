@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import copy
 import sys
 from pathlib import Path
 
@@ -89,7 +90,7 @@ def _build_state(
 def test_render_ansi_is_deterministic() -> None:
     """render_ansi(s) == render_ansi(s) — byte-identical output."""
     state = _build_state()
-    assert render_ansi(state) == render_ansi(state)
+    assert render_ansi(state) == render_ansi(copy.deepcopy(state))
 
 
 def test_render_ansi_no_clock_or_random() -> None:
@@ -205,7 +206,7 @@ def test_focused_on_input_prompt() -> None:
     # No item matches, so no "> " prefix on any item
     assert "> " not in output
     # Still deterministic
-    assert render_ansi(state) == render_ansi(state)
+    assert render_ansi(state) == render_ansi(copy.deepcopy(state))
 
 
 def test_focused_on_panel_id() -> None:
@@ -214,7 +215,7 @@ def test_focused_on_panel_id() -> None:
     output = render_ansi(state)
     # No item matches the panel id, so no "> " prefix
     assert "> " not in output
-    assert render_ansi(state) == render_ansi(state)
+    assert render_ansi(state) == render_ansi(copy.deepcopy(state))
 
 
 def test_empty_state() -> None:
@@ -222,7 +223,7 @@ def test_empty_state() -> None:
     state = TAUIState()
     output = render_ansi(state)
     assert isinstance(output, str)
-    assert render_ansi(state) == render_ansi(state)
+    assert render_ansi(state) == render_ansi(copy.deepcopy(state))
 
 
 # ---------------------------------------------------------------------------
@@ -331,4 +332,4 @@ def test_render_ansi_deterministic_with_conversation() -> None:
             ConversationLine(text="B", count=2),
         ]
     )
-    assert render_ansi(state) == render_ansi(state)
+    assert render_ansi(state) == render_ansi(copy.deepcopy(state))

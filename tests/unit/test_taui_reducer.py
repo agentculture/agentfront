@@ -550,7 +550,8 @@ def test_dismiss_clears_blocking_so_diagnose_stays_ok():
     state = TAUIState(work_item=WorkItem(task_id="t1", engine="mock", running=True))
     failed = reduce(state, WorkStep(label="call tool", ok=False, error="boom"))
     err = next(p for p in failed.popups if p.id == "popup.work-error")
-    assert err.visible is True and err.blocking is True
+    assert err.visible is True
+    assert err.blocking is True
     assert diagnose_structured(failed).ok is True
 
     dismissed = reduce(failed, Dismiss())

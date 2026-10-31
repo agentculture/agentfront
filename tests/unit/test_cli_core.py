@@ -37,11 +37,11 @@ def _make_parser(**kwargs) -> StructuredArgumentParser:
     return StructuredArgumentParser(prog="testprog", **kwargs)
 
 
-def test_parser_error_emits_structured_text(capsys) -> None:
+def test_parser_error_emits_structured_text(capsys, monkeypatch) -> None:
     """Unknown arg → error:/hint: lines on stderr, nonzero exit."""
     parser = _make_parser()
     parser.add_argument("--known")
-    StructuredArgumentParser._json_hint = False
+    monkeypatch.setattr(StructuredArgumentParser, "_json_hint", False)
 
     with pytest.raises(SystemExit) as exc:
         parser.parse_args(["--unknown"])
@@ -53,11 +53,11 @@ def test_parser_error_emits_structured_text(capsys) -> None:
     assert captured.out == ""
 
 
-def test_parser_error_emits_json_when_json_hint(capsys) -> None:
+def test_parser_error_emits_json_when_json_hint(capsys, monkeypatch) -> None:
     """--json present → JSON object on stderr."""
     parser = _make_parser()
     parser.add_argument("--known")
-    StructuredArgumentParser._json_hint = True
+    monkeypatch.setattr(StructuredArgumentParser, "_json_hint", True)
 
     with pytest.raises(SystemExit) as exc:
         parser.parse_args(["--unknown"])
@@ -71,19 +71,20 @@ def test_parser_error_emits_json_when_json_hint(capsys) -> None:
     assert captured.out == ""
 
 
-def test_parser_error_no_json_when_not_hint(capsys) -> None:
+def test_parser_error_no_json_when_not_hint(capsys, monkeypatch) -> None:
     """Without --json, output is error:/hint: lines, not JSON."""
     parser = _make_parser()
     parser.add_argument("--known")
-    StructuredArgumentParser._json_hint = False
+    monkeypatch.setattr(StructuredArgumentParser, "_json_hint", False)
 
     with pytest.raises(SystemExit):
         parser.parse_args(["--unknown"])
 
     captured = capsys.readouterr()
     # Should NOT be valid JSON
+    stderr_text = captured.err.strip()
     with pytest.raises(json.JSONDecodeError):
-        json.loads(captured.err.strip())
+        json.loads(stderr_text)
 
 
 # ── dispatch ───────────────────────────────────────────────────────────────

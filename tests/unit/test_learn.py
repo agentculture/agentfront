@@ -41,7 +41,8 @@ def test_learn_json_mode_emits_parseable_structure(
     payload = json.loads(capsys.readouterr().out)
     assert payload["tool"] == "agentfront"
     assert "purpose" in payload
-    assert isinstance(payload["commands"], list) and payload["commands"]
+    assert isinstance(payload["commands"], list)
+    assert payload["commands"]
     assert "0" in payload["exit_codes"]
     assert payload["json_support"] is True
     assert "explain_pointer" in payload

@@ -26,12 +26,9 @@ def render_markdown(state: TAUIState) -> str:
         meta_parts.append(state.header.subtitle)
     if meta_parts:
         lines.append(" — ".join(meta_parts))
-    lines.append("")
 
     # Status
-    lines.append("## Status")
-    lines.append(f"{state.status.severity}: {state.status.message}")
-    lines.append("")
+    lines.extend(["", "## Status", f"{state.status.severity}: {state.status.message}", ""])
 
     # Panels
     for panel in state.panels:
@@ -45,8 +42,7 @@ def render_markdown(state: TAUIState) -> str:
 
     # Conversation section (only when non-empty)
     if state.conversation:
-        lines.append("## Conversation")
-        lines.append("")
+        lines.extend(["## Conversation", ""])
         for conv_line in state.conversation:
             lines.append(f"- {conv_line.render()}")
         lines.append("")

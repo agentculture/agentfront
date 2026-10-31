@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import copy
 import importlib
 import inspect
 
@@ -403,4 +404,4 @@ def test_render_markdown_deterministic_with_conversation() -> None:
             ConversationLine(text="B", count=2),
         ]
     )
-    assert render_markdown(state) == render_markdown(state)
+    assert render_markdown(state) == render_markdown(copy.deepcopy(state))
