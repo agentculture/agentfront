@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/). This project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.21.2] - 2026-10-31
+
+
+### Fixed
+
+- MCP `run` tool errors (unknown tool, validation/lookup errors, raised exceptions) now return a CallToolResult with isError=true, per the MCP spec; the JSON payload text and structuredContent are unchanged, and successes keep isError=false (stdio and streamable-HTTP)
+
 ## [0.21.1] - 2026-10-31
 
 

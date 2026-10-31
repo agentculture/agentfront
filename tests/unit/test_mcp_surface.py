@@ -6,6 +6,8 @@ subprocess is needed.
 
 from __future__ import annotations
 
+import json
+
 import anyio
 import pytest
 
@@ -211,6 +213,65 @@ def test_call_run_unknown_tool_name_returns_error():
     assert "not-run" in err["message"]
 
 
+# --- isError flag (MCP spec: tool-execution errors carry isError: true) ---
+
+
+def _raising_app() -> App:
+    a = App(name="t")
+
+    @a.tool
+    def boom() -> str:
+        """Always fails."""
+        raise ValueError("kaboom")
+
+    @a.tool
+    def ok() -> str:
+        """Always works."""
+        return "fine"
+
+    return a
+
+
+def test_raising_command_is_flagged_is_error():
+    result = anyio.run(_call_raw, make_mcp_server(_raising_app()), "run", _cmd("boom"))
+    assert result.isError is True
+
+
+def test_raising_command_payload_text_unchanged():
+    result = anyio.run(_call_raw, make_mcp_server(_raising_app()), "run", _cmd("boom"))
+    expected = {
+        "error": {
+            "code": 1,
+            "message": "ValueError: kaboom",
+            "remediation": "check command arguments",
+        }
+    }
+    assert json.loads(result.content[0].text) == expected
+    assert result.structuredContent == expected
+
+
+def test_unknown_command_is_flagged_is_error():
+    result = anyio.run(_call_raw, make_mcp_server(_raising_app()), "run", _cmd("nope"))
+    assert result.isError is True
+
+
+def test_malformed_command_is_flagged_is_error():
+    arguments = {"command": [123], "args": {}}
+    result = anyio.run(_call_raw, make_mcp_server(_raising_app()), "run", arguments)
+    assert result.isError is True
+
+
+def test_unknown_tool_name_is_flagged_is_error():
+    result = anyio.run(_call_raw, make_mcp_server(_raising_app()), "not-run", {})
+    assert result.isError is True
+
+
+def test_successful_command_is_not_flagged():
+    result = anyio.run(_call_raw, make_mcp_server(_raising_app()), "run", _cmd("ok"))
+    assert result.isError is False
+    assert result.structuredContent == {"result": "fine"}
+
+
 # --- grouped tools -------------------------------------------------------
 
 
@@ -326,3 +387,20 @@ async def _call_tool(server, tool_name: str, arguments: dict) -> object:
                 return parsed["result"]
             return parsed
     return call_result
+
+
+def _cmd(name: str) -> dict:
+    return {"command": [name], "args": {}}
+
+
+async def _call_raw(server, tool_name: str, arguments: dict):
+    """Invoke the call_tool handler and return the full CallToolResult."""
+    from mcp import types
+
+    req = types.CallToolRequest(
+        params=types.CallToolRequestParams(name=tool_name, arguments=arguments)
+    )
+    handler = server.request_handlers.get(types.CallToolRequest)
+    assert handler is not None, "call_tool handler not registered"
+    result = await handler(req)
+    return result.root

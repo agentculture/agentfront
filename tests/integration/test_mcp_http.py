@@ -195,6 +195,23 @@ def test_error_payload_shape_preserved_over_http():
     assert err["code"] == 1
 
 
+def test_error_results_carry_is_error_over_http():
+    app = _app()
+
+    async def scenario():
+        async with _uvicorn(make_mcp_http_app(app)) as base:
+            url = f"{base}/mcp"
+            _, _, unknown = await _session_roundtrip(url, None, ["nope"], {})
+            _, _, bad = await _session_roundtrip(url, None, ["add"], {"x": 1})
+            _, _, good = await _session_roundtrip(url, None, ["add"], {"x": 1, "y": 2})
+        return unknown, bad, good
+
+    unknown, bad, good = asyncio.run(scenario())
+    assert unknown.isError is True
+    assert bad.isError is True
+    assert good.isError is False
+
+
 def test_authenticator_principal_reaches_handler_over_asgi():
     app = _app()
 

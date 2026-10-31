@@ -42,6 +42,12 @@ def call_mcp(
     ``RuntimeError`` into the error payload instead of executing the tool —
     call it from sync code when the tool is async.
 
+    The real server flags every error payload with the MCP ``isError: true``
+    result flag. This harness deliberately keeps returning the bare payload
+    dict (adding a key would change the payload shape and break
+    ``surfaces_agree``-style comparisons): a payload is an error exactly when
+    it has an ``"error"`` key, which is what ``isError`` mirrors.
+
     *caller* is the principal the tool sees through
     :func:`agentfront.current_caller` for the duration of the call — the same
     value a remote transport's authenticator would supply — so a consumer can
