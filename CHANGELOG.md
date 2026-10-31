@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/). This project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.21.1] - 2026-10-31
+
+
+### Fixed
+
+- Rewrote 12 self-comparing determinism assertions in TAUI tests (SonarCloud S5863) to compare against an independently deep-copied state
+- Cleared remaining SonarCloud new-code smells in tests (S9073, S8997, S5778) and TAUI markdown renderer (S9409)
+
 ## [0.21.0] - 2026-10-31
 
 ### Added

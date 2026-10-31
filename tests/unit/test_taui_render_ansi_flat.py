@@ -7,6 +7,8 @@ conversation zone, popup rendering, status message propagation, and clip.
 
 from __future__ import annotations
 
+import copy
+
 from agentfront.taui.render.ansi_flat import _IDLE_GLYPH, _WORK_FRAMES, render_flat
 from agentfront.taui.state import (
     Action,
@@ -58,13 +60,13 @@ def test_returns_str():
 def test_determinism():
     """Calling render_flat twice on the same state yields identical output."""
     state = _make_state(status=Status(severity="info", message="stable"))
-    assert render_flat(state) == render_flat(state)
+    assert render_flat(state) == render_flat(copy.deepcopy(state))
 
 
 def test_determinism_with_work():
     """Determinism holds even when a work item is present."""
     state = _make_state(work_item=WorkItem(running=True, step_count=3))
-    assert render_flat(state) == render_flat(state)
+    assert render_flat(state) == render_flat(copy.deepcopy(state))
 
 
 # ---------------------------------------------------------------------------

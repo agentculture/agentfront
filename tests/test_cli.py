@@ -31,7 +31,9 @@ def test_learn_subcommand(capsys: pytest.CaptureFixture[str]) -> None:
     assert rc == 0
     out = capsys.readouterr().out
     assert "Agent First Interface" in out
-    assert "CLI" in out and "MCP" in out and "HTTP" in out
+    assert "CLI" in out
+    assert "MCP" in out
+    assert "HTTP" in out
 
 
 def test_python_dash_m_invocation() -> None:
@@ -59,4 +61,5 @@ def test_afi_alias_warns_on_stderr_and_forwards(capsys: pytest.CaptureFixture[st
     assert __version__ in captured.out  # forwarded command output
     assert "deprecated" not in captured.out.lower()  # stdout stays clean
     assert "deprecated" in captured.err.lower()
-    assert "teken" in captured.err and "agentfront" in captured.err
+    assert "teken" in captured.err
+    assert "agentfront" in captured.err

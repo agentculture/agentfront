@@ -162,17 +162,14 @@ def test_learn_ok_on_populated_app() -> None:
     assert learn.status == "ok"
 
 
-def test_learn_check_exercises_run_cli() -> None:
+def test_learn_check_exercises_run_cli(monkeypatch: pytest.MonkeyPatch) -> None:
     """Ensure the learn check actually exercises run_cli, not just make_cli."""
     app = _make_populated_app()
     # Capture stdout to confirm run_cli was invoked
     captured = StringIO()
-    old_stdout = sys.stdout
-    sys.stdout = captured
-    try:
-        checks = run_doctor(app)
-    finally:
-        sys.stdout = old_stdout
+    monkeypatch.setattr(sys, "stdout", captured)
+    checks = run_doctor(app)
+    monkeypatch.undo()
     learn = next(c for c in checks if c.name == "learn")
     assert learn.status == "ok"
     # run_cli prints to stdout, so there should be output

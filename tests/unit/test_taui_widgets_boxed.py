@@ -6,6 +6,8 @@ Each renderer is a pure function of TAUIState — same state → same output.
 
 from __future__ import annotations
 
+import copy
+
 from agentfront.taui.state import (
     Action,
     ConversationLine,
@@ -93,7 +95,7 @@ def test_status_bar_unknown_severity_falls_back_to_cyan_inf() -> None:
 def test_status_bar_deterministic() -> None:
     """Same state produces identical output on repeated calls."""
     state = _state(status=Status(severity="error", message="repeat"))
-    assert render_status_bar(state) == render_status_bar(state)
+    assert render_status_bar(state) == render_status_bar(copy.deepcopy(state))
 
 
 # ---------------------------------------------------------------------------
@@ -280,7 +282,7 @@ def test_conversation_small_width_no_crash() -> None:
 def test_conversation_deterministic() -> None:
     """Same state yields identical output on repeated calls."""
     state = _state(conversation=[ConversationLine(text="A"), ConversationLine(text="B", count=2)])
-    assert render_conversation(state) == render_conversation(state)
+    assert render_conversation(state) == render_conversation(copy.deepcopy(state))
 
 
 # ---------------------------------------------------------------------------
@@ -354,7 +356,7 @@ def test_command_palette_deterministic() -> None:
             )
         ]
     )
-    assert render_command_palette(state) == render_command_palette(state)
+    assert render_command_palette(state) == render_command_palette(copy.deepcopy(state))
 
 
 # ---------------------------------------------------------------------------
@@ -487,4 +489,4 @@ def test_popup_layer_multiple_visible_separated() -> None:
 def test_popup_layer_deterministic() -> None:
     """Same state produces identical output on repeated calls."""
     state = _state(popups=[Popup(id="d1", kind="error", visible=True, message="err")])
-    assert render_popup_layer(state) == render_popup_layer(state)
+    assert render_popup_layer(state) == render_popup_layer(copy.deepcopy(state))
