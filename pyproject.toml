@@ -1,6 +1,6 @@
 [project]
 name = "agentfront"
-version = "0.21.2"
+version = "0.21.3"
 description = "Agent First Interface — scaffold CLI, MCP, and HTTP interfaces for agent-first tools."
 readme = "README.md"
 license = "Apache-2.0"
@@ -24,8 +24,10 @@ dependencies = []
 # The MCP surface (`app.mcp_server()` / `serve_stdio`, and the remote
 # streamable-HTTP transport in `agentfront.mcp_http`). Keep the version pin in
 # lockstep with the `dev` group below so tests exercise the same SDK floor.
+# Capped below 2: mcp 2.x removed the low-level `Server.list_tools` /
+# `Server.call_tool` decorators the MCP surface is built on.
 mcp = [
-    "mcp>=1.28.0",
+    "mcp>=1.28.0,<2",
 ]
 
 [project.urls]
@@ -50,7 +52,7 @@ dev = [
     # but the test suite exercises the MCP surface, so the dev/CI environment
     # always installs it. `uv sync` installs dev groups but not extras, hence
     # the explicit entry here. Keep the pin in lockstep with the mcp extra.
-    "mcp>=1.28.0",
+    "mcp>=1.28.0,<2",
     "pytest>=8.0",
     "pytest-xdist>=3.0",
     "pytest-cov>=4.1",
