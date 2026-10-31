@@ -92,21 +92,20 @@ def _mcp_command_paths(app: App) -> set[str]:
 def _mcp_http_command_paths(app: App) -> set[str]:
     """The command paths the remote (streamable-HTTP) MCP transport advertises.
 
-    Builds the transport exactly as a host would (``make_mcp_http_app``) and
-    reads the command catalog out of its ``run`` tool — the same tool a remote
-    client lists — so a transport that served a different server would show up
-    here. Without the optional ``mcp`` extra the transport cannot exist; the
-    paths are then derived from the registry, like :func:`_mcp_command_paths`.
+    Read from the transport's structured command catalog
+    (:func:`agentfront.mcp_http._transport_catalog` — the catalog its ``run``
+    tool embeds), built once per call, without constructing the transport or
+    parsing the tool's human-readable description. Without the optional
+    ``mcp`` extra the transport cannot exist; the paths are then derived from
+    the registry, like :func:`_mcp_command_paths`.
     """
     try:
-        from agentfront.mcp_http import make_mcp_http_app
+        from agentfront.mcp_http import _transport_catalog
     except ImportError as exc:
         if (getattr(exc, "name", "") or "").split(".", 1)[0] != "mcp":
             raise
         return _mcp_command_paths(app)
-    description = make_mcp_http_app(app).server.run_tool.description or ""
-    catalog = json.loads(description.split("Available commands:\n", 1)[1])
-    return {"/".join(c["path"]) for c in catalog}
+    return {"/".join(entry["path"]) for entry in _transport_catalog(app)}
 
 
 def surface_inventory(app: App) -> dict[str, set[str]]:

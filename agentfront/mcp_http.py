@@ -79,7 +79,7 @@ from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from agentfront._run_dispatch import error_payload
 from agentfront.app import App
 from agentfront.errors import AgentfrontError
-from agentfront.mcp_surface import CALLER_SCOPE_KEY, make_mcp_server
+from agentfront.mcp_surface import CALLER_SCOPE_KEY, _build_catalog, make_mcp_server
 
 __all__ = [
     "CallerRequest",
@@ -194,6 +194,17 @@ def _check_path(path: str) -> str:
     if not path.startswith("/"):
         raise ValueError(f"path must start with '/': {path!r}")
     return path.rstrip("/") or "/"
+
+
+def _transport_catalog(app: App) -> list[dict[str, Any]]:
+    """The structured command catalog the transport's ``run`` tool serves.
+
+    :class:`McpHttpApp` serves ``make_mcp_server(app)``, whose ``run`` tool
+    embeds exactly this catalog (``_build_run_tool`` renders it into the
+    description). The surface inventory reads it here — structured, without
+    standing up a transport or parsing the human-readable description.
+    """
+    return _build_catalog(app)
 
 
 def _same_principal(principal: Any) -> Any:

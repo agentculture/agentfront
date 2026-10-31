@@ -804,3 +804,30 @@ def test_session_owner_key_that_raises_fails_closed():
 
     status, payload = asyncio.run(scenario())
     assert status == 403 and payload["error"]["code"] == 403
+
+
+# --- inventory reads the structured catalog (#9) ------------------------------
+
+
+def test_inventory_reads_structured_catalog_without_building_a_transport(monkeypatch):
+    """#9: surface_inventory must not stand up an McpHttpApp + MCP server per call,
+    nor parse the run tool's human-readable description."""
+    from agentfront import mcp_http
+
+    def no_transport(*_a: Any, **_k: Any) -> None:
+        raise AssertionError("surface_inventory built an McpHttpApp")
+
+    monkeypatch.setattr(mcp_http.McpHttpApp, "__init__", no_transport)
+    inv = surface_inventory(_app())
+    assert inv["mcp_http_tools"] == inv["registry_tools"] == {"add", "whoami", "admin/purge"}
+
+
+def test_transport_catalog_is_what_the_transport_run_tool_serves():
+    """#9: the structured catalog the inventory reads is exactly the one the
+    transport's ``run`` tool embeds — so mcp_http_tools stays meaningful."""
+    from agentfront.mcp_http import McpHttpApp, _transport_catalog
+
+    app = _app()
+    served = McpHttpApp(app).server.run_tool.description
+    embedded = json.loads(served.split("Available commands:\n", 1)[1])
+    assert embedded == _transport_catalog(app)
