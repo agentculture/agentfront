@@ -25,8 +25,32 @@ from mcp.server import Server
 
 from agentfront._run_dispatch import error_payload, result_payload, validate_and_lookup
 from agentfront.app import App
+from agentfront.context import caller_context
 
 __all__ = ["make_mcp_server", "serve_stdio"]
+
+# ASGI scope key under which the remote transport (agentfront.mcp_http) stores
+# the authenticator's caller principal. The MCP SDK hands the originating
+# HTTP request to the server's request context, so ``call_tool`` reads the
+# principal back from that request's scope — per request, independent of which
+# task the session's server loop happens to run in.
+CALLER_SCOPE_KEY = "agentfront.caller"
+
+
+def _request_caller(server: Server) -> Any:
+    """The caller principal of the MCP request being handled, or ``None``.
+
+    ``None`` on stdio (no HTTP request behind the message) and when the
+    handler is invoked outside a live request context (direct handler calls).
+    """
+    try:
+        request = server.request_context.request
+    except LookupError:
+        return None
+    scope = getattr(request, "scope", None)
+    if not isinstance(scope, dict):
+        return None
+    return scope.get(CALLER_SCOPE_KEY)
 
 
 def _build_catalog(app: App) -> list[dict[str, Any]]:
@@ -134,9 +158,10 @@ def make_mcp_server(app: App) -> Server:
         entry = entry_or_error
 
         try:
-            result = entry.func(**args)
-            if inspect.isawaitable(result):
-                result = await result
+            with caller_context(_request_caller(server)):
+                result = entry.func(**args)
+                if inspect.isawaitable(result):
+                    result = await result
             return result_payload(result)
         except Exception as exc:
             return error_payload(exc)

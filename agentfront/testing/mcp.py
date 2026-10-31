@@ -16,11 +16,18 @@ from typing import Any, Optional
 
 from agentfront._run_dispatch import error_payload, result_payload, validate_and_lookup
 from agentfront.app import App
+from agentfront.context import caller_context
 
 __all__ = ["call_mcp"]
 
 
-def call_mcp(app: App, command: list[str], args: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+def call_mcp(
+    app: App,
+    command: list[str],
+    args: Optional[dict[str, Any]] = None,
+    *,
+    caller: Any = None,
+) -> dict[str, Any]:
     """Dispatch *command* against *app*'s registry, returning the MCP payload shape.
 
     Mirrors ``agentfront.mcp_surface``'s ``run`` tool dispatch exactly — same
@@ -34,6 +41,12 @@ def call_mcp(app: App, command: list[str], args: Optional[dict[str, Any]] = None
     loop, calling ``call_mcp`` on an ASYNC tool from an async test maps that
     ``RuntimeError`` into the error payload instead of executing the tool —
     call it from sync code when the tool is async.
+
+    *caller* is the principal the tool sees through
+    :func:`agentfront.current_caller` for the duration of the call — the same
+    value a remote transport's authenticator would supply — so a consumer can
+    unit-test per-caller command scoping without standing up a server.
+    ``None`` (the default) matches the stdio/CLI path: no caller.
     """
     if args is None:
         args = {}
@@ -44,9 +57,10 @@ def call_mcp(app: App, command: list[str], args: Optional[dict[str, Any]] = None
     entry = entry_or_error
 
     try:
-        result = entry.func(**args)
-        if inspect.isawaitable(result):
-            result = asyncio.run(result)
+        with caller_context(caller):
+            result = entry.func(**args)
+            if inspect.isawaitable(result):
+                result = asyncio.run(result)
         return result_payload(result)
     # dispatch boundary — exception mapped to a payload, not re-raised
     except Exception as exc:  # noqa: BLE001

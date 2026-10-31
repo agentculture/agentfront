@@ -89,6 +89,26 @@ def _mcp_command_paths(app: App) -> set[str]:
     return paths
 
 
+def _mcp_http_command_paths(app: App) -> set[str]:
+    """The command paths the remote (streamable-HTTP) MCP transport advertises.
+
+    Builds the transport exactly as a host would (``make_mcp_http_app``) and
+    reads the command catalog out of its ``run`` tool — the same tool a remote
+    client lists — so a transport that served a different server would show up
+    here. Without the optional ``mcp`` extra the transport cannot exist; the
+    paths are then derived from the registry, like :func:`_mcp_command_paths`.
+    """
+    try:
+        from agentfront.mcp_http import make_mcp_http_app
+    except ImportError as exc:
+        if (getattr(exc, "name", "") or "").split(".", 1)[0] != "mcp":
+            raise
+        return _mcp_command_paths(app)
+    description = make_mcp_http_app(app).server.run_tool.description or ""
+    catalog = json.loads(description.split("Available commands:\n", 1)[1])
+    return {"/".join(c["path"]) for c in catalog}
+
+
 def surface_inventory(app: App) -> dict[str, set[str]]:
     """What each surface independently enumerates, alongside the registry truth."""
     cli_docs, cli_tools = _cli_inventory(app)
@@ -113,6 +133,7 @@ def surface_inventory(app: App) -> dict[str, set[str]]:
         "cli_docs": cli_docs,
         "cli_tools": cli_tools,
         "mcp_tools": _mcp_command_paths(app),
+        "mcp_http_tools": _mcp_http_command_paths(app),
         "taui_tools": taui_tools,
     }
 
@@ -139,5 +160,11 @@ def surfaces_agree(app: App) -> bool:
     and the HTTP ``/front`` markdown agrees with the TAUI markdown tier."""
     inv = surface_inventory(app)
     docs_agree = inv["registry_docs"] == inv["http_docs"] == inv["cli_docs"]
-    tools_agree = inv["registry_tools"] == inv["cli_tools"] == inv["mcp_tools"] == inv["taui_tools"]
+    tools_agree = (
+        inv["registry_tools"]
+        == inv["cli_tools"]
+        == inv["mcp_tools"]
+        == inv["mcp_http_tools"]
+        == inv["taui_tools"]
+    )
     return docs_agree and tools_agree and http_front_agrees(app)
