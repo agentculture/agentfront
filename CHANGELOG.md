@@ -9,14 +9,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- Remote MCP transport (`agentfront.mcp_http`, closes #52): the same single-`run`-tool MCP server over streamable HTTP — `make_mcp_http_app(app)` (ASGI, configurable `path`), `mount_aiohttp(web_app, app, path=...)` (in-process ASGI-over-aiohttp bridge tied to the host's startup/cleanup), and `serve_http(app, *, host, port)` (uvicorn; no host/port defaults). Defaults to stateless JSON responses.
-- Caller-context hook: an optional sync/async `authenticate(CallerRequest)` runs before any command and returns a caller principal or refuses with `401` and a `{code, message, remediation}` body (fails closed if it raises); handlers read the principal via `agentfront.current_caller()` (new stdlib-only `agentfront.context`). Auth policy stays in the consumer.
+- Remote MCP transport (`agentfront.mcp_http`, closes #52): the same single-`run`-tool MCP server over streamable HTTP — `make_mcp_http_app(app)` (ASGI, configurable `path`, matched below the ASGI `root_path` so it works under a Starlette `Mount`), `mount_aiohttp(web_app, app, path=...)` (in-process ASGI-over-aiohttp bridge tied to the host's startup/cleanup; works on a prefixed `add_subapp`; streams SSE headers immediately and delivers `http.disconnect` when the client goes away), and `serve_http(app, *, host, port)` (uvicorn; no host/port defaults). Defaults to stateless JSON responses. All three take the same `**options`, declared once as `McpHttpOptions`.
+- Caller-context hook: an optional sync/async `authenticate(CallerRequest)` runs before any command and returns a caller principal or refuses with `401`, a `{code, message, remediation}` body and a `WWW-Authenticate` challenge (`www_authenticate=`, default `Bearer`, `None` omits it; fails closed if the authenticator raises); handlers read the principal via `agentfront.current_caller()` (new stdlib-only `agentfront.context`). Auth policy stays in the consumer.
+- Stateful sessions (`stateless=False`) are bound to the principal that initialized them: another caller presenting the `mcp-session-id` is refused `403`. "Same caller" is `session_owner_key(a) == session_owner_key(b)` (option; default the principal itself).
+- Session-manager lifecycle: lazy starts are serialised and cancellation-safe; `stop()` is final (requests during and after it get `503`, nothing restarts); a manager that dies after startup is logged and replaced on the next request, and `stop()` never re-raises it into host cleanup.
 - `agentfront.testing.call_mcp(..., caller=...)` runs a tool with a given principal in-process.
 - Docs: `docs/remote-mcp.md`.
 
 ### Changed
 
-- `surface_inventory` / `surfaces_agree` / `assert_surfaces_agree` now include `mcp_http_tools`, read from the remote transport's own `run` tool catalog (registry-derived when the `mcp` extra is absent).
+- `surface_inventory` / `surfaces_agree` / `assert_surfaces_agree` now include `mcp_http_tools`, read from the structured command catalog the remote transport's `run` tool embeds (registry-derived when the `mcp` extra is absent).
 - The MCP `run` tool sets the request's caller principal as call context around each command; stdio behaviour is unchanged (`current_caller()` is `None`).
 - `aiohttp` added to the `dev` dependency group (tests only; not a runtime dependency).
 

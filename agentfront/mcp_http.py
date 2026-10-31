@@ -26,7 +26,9 @@ Pass ``authenticate=`` a callable (sync or async) that receives a
 address) and returns a **caller principal** — any non-``None`` object the
 consumer chooses — or ``None`` to refuse. It runs before the request reaches
 the MCP session, so a refused request is answered ``401`` with an
-``{"error": {code, message, remediation}}`` body and no command runs. An
+``{"error": {code, message, remediation}}`` body, a ``WWW-Authenticate``
+challenge (``www_authenticate=``, default ``Bearer``; ``None`` omits it) and no
+command runs. An
 authenticator that *raises* also fails closed (``401``; the exception is
 logged). The accepted principal travels with the request (in the ASGI scope
 under :data:`agentfront.mcp_surface.CALLER_SCOPE_KEY`) and is set as call
@@ -44,7 +46,12 @@ process and a reverse proxy, :func:`mount_aiohttp` runs the **same ASGI app
 in-process behind a small ASGI-over-aiohttp bridge**: one aiohttp route (any
 method) at the chosen path translates the ``aiohttp.web.Request`` into an ASGI
 ``http`` scope + ``receive`` and streams the ASGI ``send`` events back through
-an ``aiohttp.web.StreamResponse`` (so SSE responses stream too). The session
+an ``aiohttp.web.StreamResponse`` (so SSE responses stream too; headers are
+sent as soon as the app starts its response). When the client goes away
+mid-response the bridge delivers ``http.disconnect`` (it watches the
+connection, and treats a failed write the same way), so long-lived streams
+end with their client. A route on a prefixed sub-app (``add_subapp``) passes
+the prefix as ``root_path``. The session
 manager's lifetime is tied to the host's ``on_startup`` / ``on_cleanup``
 signals. aiohttp is imported lazily from the host — it is *not* an agentfront
 dependency — and the authenticator, dispatch, and payloads are byte-for-byte
@@ -54,14 +61,24 @@ The session manager is run in a dedicated background task (``start()`` /
 ``stop()``), not entered inline in a host callback, because anyio task groups
 must be exited by the task that entered them and hosts run startup and
 cleanup in different tasks. If a host never sends ASGI lifespan events (e.g.
-a mounted sub-app), the manager starts lazily on the first request.
+a mounted sub-app), the manager starts lazily on the first request; concurrent
+lazy starts share one manager, and a caller cancelled mid-start leaves nothing
+running. ``stop()`` is final: while it runs and afterwards requests are
+answered ``503`` and nothing restarts. If the manager dies on its own after
+startup, the crash is logged and a fresh manager starts on the next request.
+
+The ``path=`` filter compares the path below the ASGI ``root_path``, so the app
+can sit under a Starlette ``Mount`` with ``path=`` set.
 
 Defaults: ``stateless=True`` and ``json_response=True`` — each POST is a
 self-contained request/response, which suits a hosted, horizontally scalable
 endpoint of request/response tools and needs no session affinity. Both are
 overridable. With ``stateless=False`` the authenticator still runs on *every*
 request and the principal is taken per request, so a session never carries a
-stale caller.
+stale caller; and each session is bound to the principal that initialized it —
+another caller presenting its ``mcp-session-id`` is refused ``403``. Principals
+are opaque, so "same caller" is ``session_owner_key(a) == session_owner_key(b)``
+(default: the principal itself).
 """
 
 from __future__ import annotations
