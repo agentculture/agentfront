@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.12"
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'win32'",
@@ -10,7 +10,7 @@ resolution-markers = [
 
 [[package]]
 name = "agentfront"
-version = "0.21.3"
+version = "0.22.0"
 source = { editable = "." }
 
 [package.optional-dependencies]

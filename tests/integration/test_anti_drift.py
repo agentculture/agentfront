@@ -95,7 +95,12 @@ def test_no_public_side_channel_to_inject_into_a_surface():
         for name in dir(app)
         if not name.startswith("_") and callable(getattr(app, name)) and ("add" in name)
     }
-    assert public_mutators == {"add_doc", "add_docs_dir", "add_command"}
+    # add_command is a CLI-only host verb; add_learn_section is CLI-only prose.
+    # Neither adds a doc or tool, so neither can make a surface's inventory drift.
+    assert public_mutators == {"add_doc", "add_docs_dir", "add_command", "add_learn_section"}
+    inventory = surface_inventory(app)
+    app.add_learn_section("Notes", "prose only")
+    assert surface_inventory(app) == inventory
 
     # Build the HTTP surface, then mutate the registry: the *same* surface object
     # reflects the new state (it reads the registry live, holds no snapshot).

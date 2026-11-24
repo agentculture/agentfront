@@ -8,6 +8,7 @@ from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _v
 
 from agentfront import _brand
+from agentfront._registry import Flag
 from agentfront.app import App
 from agentfront.context import current_caller
 from agentfront.errors import AgentfrontError
@@ -17,4 +18,4 @@ try:
 except PackageNotFoundError:  # editable install without metadata
     __version__ = "0.0.0+local"
 
-__all__ = ["AgentfrontError", "App", "current_caller", "__version__"]
+__all__ = ["AgentfrontError", "App", "Flag", "current_caller", "__version__"]
