@@ -21,12 +21,22 @@ source of truth the whole runtime is built on.
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Optional
 
 from agentfront._registry import DocEntry, DuplicateError, Flag, HostCommand, Registry, ToolEntry
 
-__all__ = ["App"]
+__all__ = ["App", "MetaVerbOverride"]
+
+
+@dataclass(frozen=True)
+class MetaVerbOverride:
+    """A host handler registered for a reserved meta-verb via :meth:`App.meta_verb`."""
+
+    name: str
+    handler: Callable[[argparse.Namespace], Optional[int]]
+    configure: Optional[Callable[[argparse.ArgumentParser], None]] = None
 
 
 class App:
@@ -45,6 +55,8 @@ class App:
         self._registry = Registry()
         self._commands: dict[str, HostCommand] = {}
         self._no_command_handler: Optional[Callable[..., Any]] = None
+        self._meta_overrides: dict[str, MetaVerbOverride] = {}
+        self._learn_sections: list[tuple[str, str]] = []
 
     @property
     def registry(self) -> Registry:
@@ -239,6 +251,91 @@ class App:
         """The current no-command handler, or ``None``."""
         return self._no_command_handler
 
+    # --- meta-verb extension points ----------------------------------------
+    #: Meta-verbs a host may point at its own handler. ``learn`` is absent on
+    #: purpose: its ``--json`` listing is the CLI inventory that the
+    #: cross-surface agreement check (:func:`agentfront.serve.surfaces_agree`)
+    #: reads, so replacing it would let the CLI drift from the registry. Hosts
+    #: extend ``learn`` with :meth:`add_learn_section` instead.
+    OVERRIDABLE_META_VERBS: frozenset[str] = frozenset({"explain", "overview", "doctor"})
+
+    def meta_verb(
+        self,
+        name: str,
+        handler: Optional[Callable[[argparse.Namespace], Optional[int]]] = None,
+        *,
+        configure: Optional[Callable[[argparse.ArgumentParser], None]] = None,
+    ) -> Any:
+        """Point a reserved meta-verb (``explain``, ``overview``, ``doctor``) at *handler*.
+
+        Usable as ``@app.meta_verb("doctor")`` or ``app.meta_verb("doctor", fn)``;
+        returns the handler unchanged.
+
+        Contract:
+
+        * agentfront still builds the verb's parser, so its arguments stay
+          stable: every meta-verb has ``--json``; ``explain`` has ``path``
+          (zero or more tokens, a list); ``overview`` has an optional
+          ``scope``. *configure*, if given, receives that parser and may add
+          more arguments.
+        * *handler* receives the parsed :class:`argparse.Namespace` and
+          returns an exit code (``None`` means ``0``). It writes results to
+          stdout and should honour ``args.json``.
+        * Failures should raise :class:`AgentfrontError`; it is rendered on
+          stderr (as JSON under ``--json``) and its ``code`` is the exit code.
+          Any other exception is wrapped (exit ``1``) without a traceback.
+        * The override is CLI-only. The registry, the MCP and HTTP surfaces
+          and ``learn`` are unchanged, so ``surfaces_agree`` still holds. The
+          handler owns its output, so it owns the rubric bundle for that verb.
+
+        Raises :class:`ValueError` for ``learn`` or any other name, and
+        :class:`DuplicateError` if *name* is already overridden.
+        """
+        if name not in self.OVERRIDABLE_META_VERBS:
+            if name == "learn":
+                raise ValueError(
+                    "'learn' cannot be overridden: its --json listing is the CLI inventory "
+                    "the cross-surface agreement check reads. Extend it with "
+                    "app.add_learn_section(title, text) instead."
+                )
+            raise ValueError(
+                f"{name!r} is not an overridable meta-verb; choose one of "
+                f"{sorted(self.OVERRIDABLE_META_VERBS)} (use app.tool or app.add_command "
+                "for other verbs)."
+            )
+
+        def register(f: Callable[[argparse.Namespace], Optional[int]]) -> Any:
+            if name in self._meta_overrides:
+                raise DuplicateError(f"meta-verb {name!r} is already overridden")
+            self._meta_overrides[name] = MetaVerbOverride(name=name, handler=f, configure=configure)
+            return f
+
+        if handler is not None:
+            return register(handler)
+        return register
+
+    def get_meta_verb(self, name: str) -> Optional["MetaVerbOverride"]:
+        """Return the host override for meta-verb *name*, or ``None`` (built-in)."""
+        return self._meta_overrides.get(name)
+
+    def add_learn_section(self, title: str, text: str) -> None:
+        """Append a prose section to the built-in ``learn`` output.
+
+        Rendered as ``## <title>`` plus *text* in text mode, and as
+        ``{"title", "text"}`` in the ``sections`` list under ``--json``.
+        Sections appear in registration order, after the registry-derived
+        command listing. Use them for what the registry cannot know: runtime
+        requirements, what each exit code means for this tool, workflows.
+        """
+        if not title.strip():
+            raise ValueError("add_learn_section requires a non-empty title")
+        self._learn_sections.append((title, text))
+
+    @property
+    def learn_sections(self) -> tuple[tuple[str, str], ...]:
+        """The ``(title, text)`` sections added with :meth:`add_learn_section`."""
+        return tuple(self._learn_sections)
+
     # --- surfaces ---------------------------------------------------------
     # One call each, all derived from this App's single registry. Imports are
     # lazy so the SSOT core stays decoupled from the surface modules (and from
@@ -283,6 +380,22 @@ class App:
         from agentfront.cli_surface import make_cli
 
         return make_cli(self)
+
+    def run_cli(self, argv: Optional[list[str]] = None) -> int:
+        """Parse *argv* (default ``sys.argv[1:]``), dispatch, and return the exit code.
+
+        The supported entry point for a host's ``main(argv) -> int``. It never
+        raises :class:`SystemExit` for its own exits: ``--help`` and
+        ``--version`` return ``0``; a parse error returns ``1`` with a
+        structured ``error:``/``hint:`` on stderr (a JSON object when
+        ``--json`` is in *argv*); a handler's :class:`AgentfrontError` returns
+        its ``code``; any other exception returns ``1`` without a traceback;
+        ``KeyboardInterrupt`` returns ``130``. Only a handler that calls
+        :func:`sys.exit` itself propagates :class:`SystemExit`.
+        """
+        from agentfront.cli_surface import run_cli
+
+        return run_cli(self, argv)
 
     def taui(self) -> Any:
         """Return the registry-derived baseline TAUI state for this App."""

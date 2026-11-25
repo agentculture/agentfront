@@ -5,8 +5,29 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/). This project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.21.3] - 2026-10-31
+## [0.22.0] - 2026-11-25
 
+### Added
+
+- `App.run_cli(argv=None) -> int`: the supported `main(argv) -> int` body. Returns 0 for `--help`/`--version`, 1 for a parse error (structured `error:`/`hint:`, JSON under `--json`), an `AgentfrontError`'s code, 1 for any other exception (no traceback), 130 for `KeyboardInterrupt`; never raises `SystemExit` for its own exits
+- `App.meta_verb(name, handler=None, *, configure=None)` (decorator or call): point the `explain`, `overview` or `doctor` meta-verb at a host handler that receives the parsed Namespace (agentfront keeps the parser, so `--json`, `explain`'s `path` and `overview`'s `scope` stay stable). CLI-only: the registry, MCP, HTTP and `learn` are unchanged. `learn` is not overridable because its `--json` listing is the inventory `surfaces_agree` reads
+- `App.add_learn_section(title, text)` / `App.learn_sections`: append prose to the built-in `learn` (rendered as `## title`, and under `sections` in `--json`)
+- `App.get_meta_verb(name)`, `App.OVERRIDABLE_META_VERBS` and the `agentfront.app.MetaVerbOverride` record
+- `agentfront.Flag` top-level export (same class as `agentfront._registry.Flag`)
+- Every generated CLI has `--version` (`<name> <version>`); a host that still adds its own `--version` to `app.cli()` replaces it instead of hitting an argparse conflict
+- Built-in `doctor` takes `--json` and emits the rubric's `{healthy, checks}` shape
+
+### Changed
+
+- Built-in `learn` now carries the rubric's markers (Purpose, commands, Machine-readable output/`--json`, Exit codes 0/1/2, `explain` pointer); `learn --json` adds `purpose`, `sections`, `exit_codes`, `json_support` and `explain` keys alongside the unchanged `docs`/`tools` inventory
+- Built-in `explain <app name>` shows the root entry instead of failing (rubric bundle 5)
+- `cli_surface.run_cli` returns 130 on `KeyboardInterrupt` instead of raising `SystemExit(130)`, routes the no-command handler through the structured error path (a `None` return is 0), and reads `sys.argv[1:]` when `argv` is `None` so parse errors honour `--json`
+
+### Fixed
+
+- `docs/consumer-cli.md` documented `app.run_cli(argv)`, which did not exist on `App`, and its worked example passed a Namespace to `sys.exit`
+
+## [0.21.3] - 2026-10-31
 
 ### Fixed
 
@@ -14,13 +35,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.21.2] - 2026-10-31
 
-
 ### Fixed
 
 - MCP `run` tool errors (unknown tool, validation/lookup errors, raised exceptions) now return a CallToolResult with isError=true, per the MCP spec; the JSON payload text and structuredContent are unchanged, and successes keep isError=false (stdio and streamable-HTTP)
 
 ## [0.21.1] - 2026-10-31
-
 
 ### Fixed
 

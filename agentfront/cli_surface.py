@@ -329,21 +329,25 @@ def _explain_handler(app: App, args: argparse.Namespace) -> None:
     from agentfront.errors import EXIT_USER_ERROR, AgentfrontError
 
     path = tuple(args.path) if args.path else ()
-    if not path:
-        # No path given — show root overview
-        print(f"# {app.name} v{app.version}")
-        if app.description:
-            print(app.description)
-        return
-
-    entry = app.get_by_path(path)
+    entry = app.get_by_path(path) if path else None
     if entry is not None:
         _print_leaf_doc(path, entry.doc or entry.description or "", args.json, entry.flags)
         return
 
-    children = _collect_path_children(app, path)
+    children = _collect_path_children(app, path) if path else []
     if children:
         _print_group_children(path, children, args.json)
+        return
+
+    if not path or path == (app.name,):
+        # No path, or the tool's own name — show the root entry
+        if args.json:
+            root = {"path": [], "doc": app.description or "", "version": app.version}
+            print(json.dumps(root, ensure_ascii=False))
+            return
+        print(f"# {app.name} v{app.version}")
+        if app.description:
+            print(app.description)
         return
 
     # Unknown path
@@ -405,48 +409,105 @@ def _overview_handler(app: App, args: argparse.Namespace) -> None:
         _print_full_overview(app, args.json)
 
 
-def _learn_handler(app: App, args: argparse.Namespace) -> int:
-    """Dispatch for the ``learn`` verb — prints the agent-facing summary."""
+#: The exit-code policy every generated CLI follows (see docs/rubric.md).
+_EXIT_CODES: dict[str, str] = {
+    "0": "success",
+    "1": "user-input error (bad flag, bad path, missing argument)",
+    "2": "environment / setup error",
+    "3+": "reserved",
+}
+
+
+def _learn_payload(app: App) -> dict[str, Any]:
+    """The ``learn --json`` object.
+
+    ``docs`` and ``tools`` are the CLI inventory read by
+    :func:`agentfront.serve.surfaces_agree`; they always come from the registry.
+    """
     docs = [{"slug": d.slug, "title": d.title} for d in app.list_docs()]
     tools: list[dict[str, Any]] = []
     for t in app.list_tools():
         path_parts = list(t.group) + [t.name]
         tools.append({"path": path_parts, "name": t.name, "description": t.description})
+    return {
+        "name": app.name,
+        "version": app.version,
+        "purpose": app.description,
+        "docs": docs,
+        "tools": tools,
+        "sections": [{"title": title, "text": text} for title, text in app.learn_sections],
+        "exit_codes": dict(_EXIT_CODES),
+        "json_support": True,
+        "explain": f"{app.name} explain <path>",
+    }
 
+
+def _learn_text(app: App, payload: dict[str, Any]) -> str:
+    """The text ``learn`` prompt: purpose, docs, commands, host sections, policy."""
+    lines: list[str] = [
+        f"# {app.name} v{app.version}",
+        "",
+        "## Purpose",
+        app.description or f"{app.name} (no description set).",
+        "",
+        "## Docs",
+        *(f"  - {d['slug']}: {d['title']}" for d in payload["docs"]),
+        "",
+        "## Tools",
+        f"Commands, by path (`{app.name} explain <path>` shows one in full):",
+        *(f"  - {' '.join(t['path'])}: {t['description']}" for t in payload["tools"]),
+        "",
+    ]
+    for section in payload["sections"]:
+        lines.extend([f"## {section['title']}", section["text"].rstrip("\n"), ""])
+    lines.extend(
+        [
+            "## Machine-readable output",
+            "Every command accepts --json. Results go to stdout and errors to stderr, "
+            "never mixed; an error under --json is a {code, message, remediation} object.",
+            "",
+            "## Exit codes",
+            *(f"  {code}  {meaning}" for code, meaning in _EXIT_CODES.items()),
+            "",
+            "## More detail",
+            f"  {app.name} explain <path>",
+            f"  {app.name} overview",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def _learn_handler(app: App, args: argparse.Namespace) -> int:
+    """Dispatch for the ``learn`` verb — prints the agent-facing summary."""
+    payload = _learn_payload(app)
     if args.json:
-        payload: dict[str, Any] = {
-            "name": app.name,
-            "version": app.version,
-            "docs": docs,
-            "tools": tools,
-        }
         print(json.dumps(payload, ensure_ascii=False))
     else:
-        lines: list[str] = []
-        lines.append(f"# {app.name} v{app.version}")
-        if app.description:
-            lines.append(app.description)
-        lines.append("")
-
-        lines.append("## Docs")
-        for d in docs:
-            lines.append(f"  - {d['slug']}: {d['title']}")
-        lines.append("")
-
-        lines.append("## Tools")
-        for t in tools:
-            path_str = " ".join(t["path"])
-            lines.append(f"  - {path_str}: {t['description']}")
-        lines.append("")
-
-        print("\n".join(lines))
+        print(_learn_text(app, payload))
     return 0
 
 
-def _doctor_handler(app: App) -> None:
-    """Dispatch for the ``doctor`` verb — prints a readiness check."""
+def _doctor_handler(app: App, args: argparse.Namespace) -> None:
+    """Dispatch for the ``doctor`` verb — prints a readiness check.
+
+    Under ``--json`` it emits the rubric's ``{healthy, checks}`` shape.
+    """
     doc_count = len(app.list_docs())
     tool_count = len(app.list_tools())
+    if getattr(args, "json", False):
+        checks = [
+            {
+                "id": f"registry_{kind}",
+                "passed": True,
+                "severity": "info",
+                "message": f"{count} {kind} registered",
+                "remediation": "",
+            }
+            for kind, count in (("docs", doc_count), ("tools", tool_count))
+        ]
+        print(json.dumps({"healthy": True, "checks": checks}, ensure_ascii=False))
+        return
 
     lines = [
         f"{app.name} v{app.version} — readiness check",
@@ -460,8 +521,8 @@ def _doctor_handler(app: App) -> None:
 def _dispatch(args: argparse.Namespace, *, json_mode: bool) -> int:
     """Invoke the registered handler and translate exceptions to exit codes.
 
-    AgentfrontError → structured stderr + code, KeyboardInterrupt → 130,
-    unexpected → wrapped, no traceback.
+    AgentfrontError → structured stderr + code, KeyboardInterrupt → 130
+    (returned, not raised), unexpected → wrapped, no traceback.
     """
     from agentfront.cli._output import emit_error
     from agentfront.errors import EXIT_USER_ERROR, AgentfrontError
@@ -472,7 +533,7 @@ def _dispatch(args: argparse.Namespace, *, json_mode: bool) -> int:
         emit_error(err, json_mode=json_mode)
         return err.code
     except KeyboardInterrupt:
-        raise SystemExit(130)
+        return 130
     except Exception as err:  # noqa: BLE001 - last-resort; wrap and route cleanly
         wrapped = AgentfrontError(
             code=EXIT_USER_ERROR,
@@ -481,7 +542,8 @@ def _dispatch(args: argparse.Namespace, *, json_mode: bool) -> int:
         )
         emit_error(wrapped, json_mode=json_mode)
         return wrapped.code
-    return rc if rc is not None else 0
+    # A handler's exit code is an int; None and anything else it returned mean success.
+    return rc if isinstance(rc, int) and not isinstance(rc, bool) else 0
 
 
 def _flag_dest(flag: "Flag") -> str | None:
@@ -573,6 +635,16 @@ def _ensure_group_chain(
     return current_sub
 
 
+def _apply_meta_override(app: App, name: str, verb_parser: argparse.ArgumentParser) -> None:
+    """Point meta-verb *name* at the host handler registered via ``App.meta_verb``."""
+    override = app.get_meta_verb(name)
+    if override is None:
+        return
+    if override.configure is not None:
+        override.configure(verb_parser)
+    verb_parser.set_defaults(func=override.handler)
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -586,14 +658,20 @@ def make_cli(app: App) -> argparse.ArgumentParser:
     """
     from agentfront._registry import ToolEntry
 
+    # ``resolve`` lets a host that still adds its own ``--version`` to the
+    # returned parser replace ours instead of raising an argparse conflict.
     parser = _CliParser(
         prog=app.name,
         description=f"{app.name} v{app.version}",
+        conflict_handler="resolve",
     )
+    parser.add_argument("--version", action="version", version=f"{app.name} {app.version}")
 
     sub = parser.add_subparsers(dest="command", parser_class=_CliParser)
 
     # --- learn, explain, overview, and doctor meta-verbs ------------------
+    # Every meta-verb takes --json. explain/overview/doctor may be pointed at a
+    # host handler (App.meta_verb); learn is always the registry-derived one.
     learn_parser = sub.add_parser("learn", help="agent-facing summary")
     learn_parser.add_argument("--json", action="store_true", help=_JSON_HELP)
     learn_parser.set_defaults(func=lambda a: _learn_handler(app, a))
@@ -602,14 +680,18 @@ def make_cli(app: App) -> argparse.ArgumentParser:
     explain_parser.add_argument("path", nargs="*", help="command path (e.g. feedback record)")
     explain_parser.add_argument("--json", action="store_true", help=_JSON_HELP)
     explain_parser.set_defaults(func=lambda a: _explain_handler(app, a))
+    _apply_meta_override(app, "explain", explain_parser)
 
     overview_parser = sub.add_parser("overview", help="list available commands")
     overview_parser.add_argument("scope", nargs="?", help="optional noun to scope to")
     overview_parser.add_argument("--json", action="store_true", help=_JSON_HELP)
     overview_parser.set_defaults(func=lambda a: _overview_handler(app, a))
+    _apply_meta_override(app, "overview", overview_parser)
 
     doctor_parser = sub.add_parser("doctor", help="readiness check")
-    doctor_parser.set_defaults(func=lambda a: _doctor_handler(app))
+    doctor_parser.add_argument("--json", action="store_true", help=_JSON_HELP)
+    doctor_parser.set_defaults(func=lambda a: _doctor_handler(app, a))
+    _apply_meta_override(app, "doctor", doctor_parser)
 
     # --- grouped tools: build nested subparser chains -------------------
     # Maps from group prefix → parser / subparser action, so siblings share the
@@ -650,13 +732,31 @@ def make_cli(app: App) -> argparse.ArgumentParser:
 
 
 def run_cli(app: App, argv: list[str] | None = None) -> int:
-    """Parse *argv* against *app*'s CLI and dispatch.
+    """Parse *argv* (default ``sys.argv[1:]``) against *app*'s CLI and dispatch.
 
-    Returns an exit code. Dispatches via :func:`_dispatch` for structured
-    error handling (AgentfrontError → structured stderr + code,
-    KeyboardInterrupt → 130, unexpected → wrapped, no traceback).
+    Returns an exit code and never raises :class:`SystemExit` for its own
+    exits (see :meth:`agentfront.App.run_cli` for the full contract).
+    Dispatches via :func:`_dispatch` for structured error handling
+    (AgentfrontError → structured stderr + code, KeyboardInterrupt → 130,
+    unexpected → wrapped, no traceback).
     """
-    parser = make_cli(app)
+    if argv is None:
+        argv = sys.argv[1:]  # resolved here so a parse error can still peek for --json
+    try:
+        parser = make_cli(app)
+    except (argparse.ArgumentError, ValueError) as err:
+        # A host's `configure` callback built a parser argparse refuses (for example an
+        # option that conflicts with a built-in one): a clean error, not a traceback.
+        from agentfront.cli._output import emit_error
+        from agentfront.errors import EXIT_USER_ERROR, AgentfrontError
+
+        wrapped = AgentfrontError(
+            code=EXIT_USER_ERROR,
+            message=f"this CLI could not be built: {err}",
+            remediation="fix the conflicting option in the host's meta_verb or command setup",
+        )
+        emit_error(wrapped, json_mode="--json" in argv)
+        return wrapped.code
 
     # Store raw argv so _CliParser.error() can peek for --json
     if isinstance(parser, _CliParser):
@@ -671,7 +771,8 @@ def run_cli(app: App, argv: list[str] | None = None) -> int:
     # No subcommand given
     if not hasattr(args, "command") or getattr(args, "command", None) is None:
         if app.no_command_handler is not None:
-            return app.no_command_handler(args)
+            args.func = app.no_command_handler
+            return _dispatch(args, json_mode=bool(getattr(args, "json", False)))
         parser.print_help()
         return 0
 

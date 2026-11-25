@@ -58,6 +58,27 @@ cli = app.cli()                      # argparse CLI with learn / doctor verbs
 
 Docs and tools are declared once into a single registry; the three surfaces only read from it, so a tool you add is automatically present on every surface and they cannot disagree.
 
+### Ship the CLI
+
+`app.run_cli(argv)` is your entry point's whole body. It always returns an exit code (`0` ok, `1` user error, `2` environment error, `130` interrupted) and never raises `SystemExit` for `--help`, `--version` or a parse error, which is rendered as `error:`/`hint:` (a JSON object under `--json`):
+
+```python
+def main(argv: list[str] | None = None) -> int:   # [project.scripts] mytool = "mytool:main"
+    return app.run_cli(argv)
+```
+
+Every generated CLI has `--version` and the meta-verbs `learn`, `explain`, `overview` and `doctor`, each with `--json`. When the generic output can't describe your tool, point `explain`, `overview` or `doctor` at your own handler, and add prose to `learn`:
+
+```python
+@app.meta_verb("doctor")                 # also "explain", "overview"
+def doctor(args) -> int:                 # args.json is always present
+    ...                                  # print {"healthy", "checks"}; return 0 or 1
+
+app.add_learn_section("Runtime", "Needs the core daemon on its Unix socket.")
+```
+
+`learn` itself can't be replaced: its `--json` listing is what the cross-surface agreement check reads. See [`docs/consumer-cli.md`](./docs/consumer-cli.md#meta-verbs) for the handler contract.
+
 ### Audit a CLI against the rubric
 
 agentfront also ships a CLI of its own (`uv tool install agentfront`) that introspects itself and audits other agent-first CLIs. Every command supports `--json` where it produces a listing or report, and respects the [exit-code policy](./docs/rubric.md#exit-code-policy) (`0` success / `1` user error / `2` env error).

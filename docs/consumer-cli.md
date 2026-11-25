@@ -6,14 +6,19 @@ the full CLI from that single registry.
 
 ## Versioned Public API
 
-Pin to `agentfront >= 0.13`. The following symbols are stable and
-documented:
+Pin to `agentfront >= 0.13` (`>= 0.22` for `run_cli`'s full contract,
+`meta_verb`, `add_learn_section` and the top-level `Flag`). The following
+symbols are stable and documented:
 
 | Symbol | Description |
 |---|---|
 | `agentfront.App` | The code-first config object |
 | `agentfront.errors.AgentfrontError` | Structured error type |
-| `agentfront._registry.Flag` | Per-verb CLI flag declaration |
+| `agentfront.Flag` | Per-verb CLI flag declaration (also importable as `agentfront._registry.Flag`) |
+
+Names with a leading underscore (`cli_surface._CliParser`, `_dispatch`,
+`_propagate_raw_argv`, a parser's `_actions`) are not part of this API. If you
+reach for one, use the hooks below instead, or open an issue.
 
 ### `agentfront.App`
 
@@ -30,9 +35,94 @@ app = App(name="mytool", version="1.0", description="A test tool")
 | `app.add_command(name, handler, *, help, configure, aliases)` | Register a host-written CLI command |
 | `app.set_no_command_handler(handler)` | Set the bare-invocation handler |
 | `app.cli()` | Return the argparse CLI parser |
-| `app.run_cli(argv)` | Parse *argv* and dispatch (returns exit code) |
+| `app.run_cli(argv=None)` | Parse *argv* (default `sys.argv[1:]`), dispatch, return the exit code ([contract](#apprun_cli)) |
+| `app.meta_verb(name, handler=None, *, configure=None)` | Point `explain`, `overview` or `doctor` at a host handler ([meta-verbs](#meta-verbs)) |
+| `app.add_learn_section(title, text)` | Append a prose section to `learn` |
 | `app.mcp_server()` | Return the MCP server (requires `[mcp]` extra) |
 | `app.http_app()` | Return the WSGI HTTP app |
+
+### `app.run_cli`
+
+The supported body of a `main(argv) -> int` entry point:
+
+```python
+def main(argv: list[str] | None = None) -> int:
+    return app.run_cli(argv)
+```
+
+It returns an exit code and never raises `SystemExit` for its own exits:
+
+| Situation | Exit code | Output |
+|---|---|---|
+| success, `--help`, `--version` | `0` | stdout (`--version` prints `<name> <version>`) |
+| parse error (unknown verb, missing argument) | `1` | `error:` / `hint:` on stderr, or a `{code, message, remediation}` object when `--json` is in argv |
+| handler raises `AgentfrontError` | its `code` | rendered the same way |
+| handler raises anything else | `1` | wrapped, no traceback |
+| `KeyboardInterrupt` | `130` | none |
+| bare invocation | the no-command handler's code, else `0` with help | |
+
+Only a handler that calls `sys.exit()` itself propagates `SystemExit`.
+`agentfront.cli_surface.run_cli(app, argv)` is the same function.
+
+### Meta-verbs
+
+Every generated CLI has four meta-verbs. The built-ins are derived from the
+registry; each takes `--json`:
+
+| Verb | Built-in | Overridable |
+|---|---|---|
+| `learn` | purpose, docs, commands, host sections, `--json`, exit codes, `explain` pointer | **no**, extend with `add_learn_section` |
+| `explain [path...]` | a tool's doc, a group's children, or the root (also for `explain <app name>`) | yes |
+| `overview [scope]` | top-level nouns, or the verbs under one noun | yes |
+| `doctor` | registry counts; `--json` gives `{healthy, checks}` | yes |
+
+Override one when the generic output can't carry your tool's knowledge, such as
+identity checks in `doctor` or a hand-written explain catalog:
+
+```python
+import json
+
+@app.meta_verb("doctor")
+def doctor(args) -> int:
+    checks = [{"id": "config", "passed": True, "severity": "error",
+               "message": "config found", "remediation": ""}]
+    healthy = all(c["passed"] for c in checks)
+    if args.json:
+        print(json.dumps({"healthy": healthy, "checks": checks}))
+    else:
+        print("healthy" if healthy else "unhealthy")
+    return 0 if healthy else 1
+
+app.meta_verb("explain", my_explain, configure=lambda p: p.add_argument("--raw", action="store_true"))
+```
+
+The handler contract:
+
+- agentfront still builds the verb's parser, so the arguments stay stable:
+  `--json` on every verb, `path` (a list) on `explain`, optional `scope` on
+  `overview`. `configure(parser)` may add more arguments.
+- The handler receives the parsed `argparse.Namespace` and returns an exit code
+  (`None` means `0`). Results go to stdout; honour `args.json`.
+- Raise `AgentfrontError` to fail; it is rendered like any other error.
+  Anything else is wrapped with no traceback.
+- Overrides are CLI-only. The registry, MCP, HTTP and `learn` are unchanged,
+  so `surfaces_agree` still holds.
+- Your handler owns its output, so it owns that verb's
+  [rubric](./rubric.md) bundle: `explain` must exit non-zero with a `hint:` on
+  an unknown path, `overview --json` must carry `subject` and `sections` and
+  must not fail on an unknown scope, and `doctor --json` must give
+  `{healthy, checks}` with a `remediation` on every failed check.
+- `learn` can't be overridden (it raises `ValueError`) because its `--json`
+  `docs` and `tools` lists are the CLI inventory that the cross-surface
+  agreement check reads. Add what the registry can't know with
+  `app.add_learn_section("Runtime", "...")`. It is rendered as `## Runtime` in
+  text and as `{"title", "text"}` in the `sections` list under `--json`.
+- Overriding the same verb twice raises `DuplicateError`. An unknown name
+  raises `ValueError`. `app.get_meta_verb(name)` returns the override or
+  `None`.
+
+The rubric also asks for a `cli overview` verb. Register it as an ordinary
+grouped tool: `@app.tool(name="overview", group="cli")`.
 
 ### `agentfront.errors.AgentfrontError`
 
@@ -49,10 +139,10 @@ raise AgentfrontError(
 Carries `{code, message, remediation}`; emitted to stderr with structured
 formatting. No Python traceback leaks.
 
-### `agentfront._registry.Flag`
+### `agentfront.Flag`
 
 ```python
-from agentfront._registry import Flag
+from agentfront import Flag
 
 @app.tool(flags=(
     Flag(names=("--verbose", "-v"), action="store_true"),
@@ -93,14 +183,17 @@ def tui_handler(args) -> int:
 app.add_command("tui", tui_handler, help="launch interactive TUI")
 
 # --- Derive the CLI -------------------------------------------------------
+def main(argv: list[str] | None = None) -> int:
+    return app.run_cli(argv)
+
 if __name__ == "__main__":
     import sys
-    sys.exit(app.cli().parse_args())
+    sys.exit(main())
 ```
 
 This yields:
 
-```
+```text
 mytool feedback record "great tool"    # generated verb
 mytool feedback show 42                # generated verb
 mytool tui                              # host-owned launcher
