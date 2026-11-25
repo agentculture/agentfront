@@ -341,6 +341,10 @@ def _explain_handler(app: App, args: argparse.Namespace) -> None:
 
     if not path or path == (app.name,):
         # No path, or the tool's own name — show the root entry
+        if args.json:
+            root = {"path": [], "doc": app.description or "", "version": app.version}
+            print(json.dumps(root, ensure_ascii=False))
+            return
         print(f"# {app.name} v{app.version}")
         if app.description:
             print(app.description)
@@ -440,40 +444,37 @@ def _learn_payload(app: App) -> dict[str, Any]:
 
 def _learn_text(app: App, payload: dict[str, Any]) -> str:
     """The text ``learn`` prompt: purpose, docs, commands, host sections, policy."""
-    lines: list[str] = [f"# {app.name} v{app.version}", ""]
-    lines.append("## Purpose")
-    lines.append(app.description or f"{app.name} (no description set).")
-    lines.append("")
-
-    lines.append("## Docs")
-    for d in payload["docs"]:
-        lines.append(f"  - {d['slug']}: {d['title']}")
-    lines.append("")
-
-    lines.append("## Tools")
-    lines.append(f"Commands, by path (`{app.name} explain <path>` shows one in full):")
-    for t in payload["tools"]:
-        lines.append(f"  - {' '.join(t['path'])}: {t['description']}")
-    lines.append("")
-
+    lines: list[str] = [
+        f"# {app.name} v{app.version}",
+        "",
+        "## Purpose",
+        app.description or f"{app.name} (no description set).",
+        "",
+        "## Docs",
+        *(f"  - {d['slug']}: {d['title']}" for d in payload["docs"]),
+        "",
+        "## Tools",
+        f"Commands, by path (`{app.name} explain <path>` shows one in full):",
+        *(f"  - {' '.join(t['path'])}: {t['description']}" for t in payload["tools"]),
+        "",
+    ]
     for section in payload["sections"]:
-        lines.append(f"## {section['title']}")
-        lines.append(section["text"].rstrip("\n"))
-        lines.append("")
-
-    lines.append("## Machine-readable output")
-    lines.append(
-        "Every command accepts --json. Results go to stdout and errors to stderr, "
-        "never mixed; an error under --json is a {code, message, remediation} object."
+        lines.extend([f"## {section['title']}", section["text"].rstrip("\n"), ""])
+    lines.extend(
+        [
+            "## Machine-readable output",
+            "Every command accepts --json. Results go to stdout and errors to stderr, "
+            "never mixed; an error under --json is a {code, message, remediation} object.",
+            "",
+            "## Exit codes",
+            *(f"  {code}  {meaning}" for code, meaning in _EXIT_CODES.items()),
+            "",
+            "## More detail",
+            f"  {app.name} explain <path>",
+            f"  {app.name} overview",
+            "",
+        ]
     )
-    lines.append("")
-    lines.append("## Exit codes")
-    lines.extend(f"  {code}  {meaning}" for code, meaning in _EXIT_CODES.items())
-    lines.append("")
-    lines.append("## More detail")
-    lines.append(f"  {app.name} explain <path>")
-    lines.append(f"  {app.name} overview")
-    lines.append("")
     return "\n".join(lines)
 
 
@@ -541,7 +542,8 @@ def _dispatch(args: argparse.Namespace, *, json_mode: bool) -> int:
         )
         emit_error(wrapped, json_mode=json_mode)
         return wrapped.code
-    return rc if rc is not None else 0
+    # A handler's exit code is an int; None and anything else it returned mean success.
+    return rc if isinstance(rc, int) and not isinstance(rc, bool) else 0
 
 
 def _flag_dest(flag: "Flag") -> str | None:
@@ -740,7 +742,21 @@ def run_cli(app: App, argv: list[str] | None = None) -> int:
     """
     if argv is None:
         argv = sys.argv[1:]  # resolved here so a parse error can still peek for --json
-    parser = make_cli(app)
+    try:
+        parser = make_cli(app)
+    except (argparse.ArgumentError, ValueError) as err:
+        # A host's `configure` callback built a parser argparse refuses (for example an
+        # option that conflicts with a built-in one): a clean error, not a traceback.
+        from agentfront.cli._output import emit_error
+        from agentfront.errors import EXIT_USER_ERROR, AgentfrontError
+
+        wrapped = AgentfrontError(
+            code=EXIT_USER_ERROR,
+            message=f"this CLI could not be built: {err}",
+            remediation="fix the conflicting option in the host's meta_verb or command setup",
+        )
+        emit_error(wrapped, json_mode="--json" in argv)
+        return wrapped.code
 
     # Store raw argv so _CliParser.error() can peek for --json
     if isinstance(parser, _CliParser):

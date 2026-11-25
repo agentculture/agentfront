@@ -164,7 +164,8 @@ def test_overriding_app_surfaces_still_agree() -> None:
 def test_learn_section_and_inventory_both_present() -> None:
     app = build_app()
     text = harness_run_cli(app, ["learn"]).stdout
-    assert "## Runtime" in text and "greet" in text
+    assert "## Runtime" in text
+    assert "greet" in text
     payload = json.loads(harness_run_cli(app, ["learn", "--json"]).stdout)
     assert ["greet"] in [t["path"] for t in payload["tools"]]
     assert payload["sections"][0]["title"] == "Runtime"

@@ -141,7 +141,8 @@ def test_meta_verb_decorator_overrides_doctor(app: App) -> None:
 
     assert my_doctor.__name__ == "my_doctor"  # decorator returns the function
     assert app.run_cli(["doctor", "--json"]) == 1
-    assert seen and seen[0].json is True
+    assert len(seen) == 1
+    assert seen[0].json is True
 
 
 def test_meta_verb_call_form_with_configure(app: App) -> None:
@@ -300,3 +301,37 @@ def test_legacy_private_parser_patching_still_works(app: App, capsys) -> None:
         parser.parse_args(["--version"])
     assert stop.value.code == 0
     assert capsys.readouterr().out.strip() == "mytool 7.7"
+
+
+def test_run_cli_always_returns_an_int(app: App, capsys: pytest.CaptureFixture[str]) -> None:
+    @app.meta_verb("doctor")
+    def my_doctor(args: argparse.Namespace):
+        return "healthy"  # not an exit code
+
+    code = app.run_cli(["doctor"])
+    assert code == 0
+    assert type(code) is int
+
+
+def test_a_conflicting_configure_is_a_clean_error_not_a_traceback(
+    app: App, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def configure(parser: argparse.ArgumentParser) -> None:
+        parser.add_argument("--json")  # conflicts with the built-in --json
+
+    @app.meta_verb("doctor", configure=configure)
+    def my_doctor(args: argparse.Namespace) -> int:
+        return 0
+
+    assert app.run_cli(["doctor", "--json"]) == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert json.loads(captured.err)["message"].startswith("this CLI could not be built")
+    assert "Traceback" not in captured.err
+
+
+def test_explain_root_honours_json(app: App, capsys: pytest.CaptureFixture[str]) -> None:
+    assert app.run_cli(["explain", "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["path"] == []
+    assert payload["version"] == app.version
